@@ -1,0 +1,94 @@
+//------------------------------------------------------------------------------
+//! \file       ARAExamples.rc
+//!             Windows resource fork implementation for the ARA examples.
+//! \project    ARA SDK Examples
+//! \copyright  Copyright (c) 2018-2021, Celemony Software GmbH, All Rights Reserved.
+//! \license    Licensed under the Apache License, Version 2.0 (the "License");
+//!             you may not use this file except in compliance with the License.
+//!             You may obtain a copy of the License at
+//!
+//!               http://www.apache.org/licenses/LICENSE-2.0
+//!
+//!             Unless required by applicable law or agreed to in writing, software
+//!             distributed under the License is distributed on an "AS IS" BASIS,
+//!             WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//!             See the License for the specific language governing permissions and
+//!             limitations under the License.
+//------------------------------------------------------------------------------
+
+#include <winres.h>
+
+#define APSTUDIO_READONLY_SYMBOLS
+
+#pragma code_page(65001)
+
+/////////////////////////////////////////////////////////////////////////////
+// Converting macro values to strings
+
+#define _IN_QUOTES_HELPER(x) #x
+#define IN_QUOTES(x) _IN_QUOTES_HELPER(x)
+
+/////////////////////////////////////////////////////////////////////////////
+// Version
+
+#define COMPANY_NAME        "ARA Demo Company"
+#define COPYRIGHT_YEAR      "2012-2021"
+#define LEGAL_TRADEMARKS    "ARA Audio Random Access is a trademark of Celemony Software GmbH. VST is a trademark of Steinberg Media Technologies GmbH."
+
+// \todo we're currently only building either .exe or .vst3, so checking ARA_TARGET_TYPE_... this way is sufficient for now
+//       A clean solution would be to provide a distinct executable type as argument to ara_add_default_settings() instead of relying
+//       on $<TARGET_PROPERTY:${target},TYPE> (which would also allow to integrate ara_configure_binary_package() there entirely).
+#ifdef ARA_TARGET_TYPE_EXECUTABLE
+    #define FILE_TYPE VFT_APP
+    #define FILE_EXTENSION ".exe"
+    #define FILE_DESCRIPTION "application"
+    #define ICON_PATH "ARAExamples.ico"
+#else
+    #define FILE_TYPE VFT_DLL
+    #define FILE_EXTENSION ".vst3"
+    #define FILE_DESCRIPTION "VST3 plug-in"
+#endif
+
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION    ARA_MAJOR_VERSION,ARA_MINOR_VERSION,ARA_PATCH_VERSION,ARA_BUILD_VERSION
+ PRODUCTVERSION ARA_MAJOR_VERSION,ARA_MINOR_VERSION,ARA_PATCH_VERSION,ARA_BUILD_VERSION
+ FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+ FILEFLAGS      VS_FF_DEBUG
+#else
+ FILEFLAGS      0
+#endif
+ FILEOS         VOS_NT_WINDOWS32
+ FILETYPE       FILE_TYPE
+ FILESUBTYPE    VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "000004B0"
+        BEGIN
+            VALUE "CompanyName",        COMPANY_NAME "\0"
+            VALUE "FileVersion",        IN_QUOTES(ARA_MAJOR_VERSION) "." IN_QUOTES(ARA_MINOR_VERSION) "." IN_QUOTES(ARA_PATCH_VERSION) "." IN_QUOTES(ARA_BUILD_VERSION) "\0"
+            VALUE "FileDescription",    ARA_TARGET_NAME " " FILE_DESCRIPTION "\0"
+            VALUE "InternalName",       ARA_TARGET_NAME "\0"
+            VALUE "LegalCopyright",     "© " COPYRIGHT_YEAR " " COMPANY_NAME "\0"
+            VALUE "LegalTrademarks",    LEGAL_TRADEMARKS "\0"
+            VALUE "OriginalFilename",   ARA_TARGET_NAME FILE_EXTENSION "\0"
+            VALUE "ProductName",        ARA_TARGET_NAME "\0"
+            VALUE "ProductVersion",     IN_QUOTES(ARA_MAJOR_VERSION) "." IN_QUOTES(ARA_MINOR_VERSION) "." IN_QUOTES(ARA_PATCH_VERSION) "\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0000, 0x04B0
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Icon
+
+#ifdef ICON_PATH
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_ICON1   ICON    ICON_PATH
+#endif

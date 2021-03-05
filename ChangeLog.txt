@@ -1,0 +1,105 @@
+This is a pre-release build of the ARA Examples 2.0.
+
+Changes since previous releases:
+
+ARA SDK 2.0 draft 14 (aka 1.9.14) (2021/02/26)
+- applied Apache License 2.0
+- added support for license management if using ARA plug-ins without UI as analysis or time-stretch engine
+- restructured the entire SDK layout to enable proper modular integration into builds of ARA enabled projects
+- improved CMake setup on all platforms, but still work-in-progress
+- Companion APIs can now either be installed using CMake scripts, or provided by specifying their local path
+- 3rd party library code used in the examples implementation is now integrated as git submodules
+  (a copy of the code will be included in .zip distributions of the ARA SDK)
+- migrated from native Visual Studio solution/projects or Xcode projects to CMake
+  (CMake is distributed with Visual Studio 2017 and later as optional Visual Studio Installer package,
+  for other environments installers are available at https://cmake.org/download/)
+- set up running validators as default exectuable for plug-in targets
+  (on Mac, debugging w/ auvaltool might not be possible due to SIP - disable debugging in the scheme if needed)
+- added support for using actual audio files instead of just the dummy modulated sine signal
+- added new test cases for dealing with ARA audio file chunks
+- all example hosts now use the same amplitude-modulated pulsed sine test signal
+- fixed bug in TestHost archiving code when dealing with plug-ins that do not yet support ARA 2 persistency
+- fixed processing algorithm request code in TestHost to properly apply document editing cycle
+- TestHost now supports multiple plug-in contained in a single VST3 binary (e.g. WaveShell)
+- TestHost code restructured and cleaned up
+- ARATestPlugIn code restructured and targets renamed, Audio Unit IDs updated
+  Make sure to delete old versions of the plug-ins that still have the old name to avoid conflicts!
+  On the Mac, these are located in ~/Library/Audio/Plug-Ins/Components and ../VST3 respectively,
+  on Windows in C:\Orogram Files\Common Files\VST3.
+- added ARA factory validation to VST3 loader code
+- VST3 loader code now creates all ARA::IMainFactories upon loading the binary to guarantee
+  proper life time of ARAFactory pointers it hands out to the calling code
+- fixed VST3 host and plug-in code to treat the entry/exit functions from dll/mac/linuxmain.cpp as required, not optional
+- fixed bug in ARATestDocumentController where model access from the rendering wasn't properly counted
+- more realistic interface for ARATestPlaybackRenderer: configuration separated from render call
+- adding support for proper application and plug-in icons
+- clean implementation of Semantic Versioning (https://semver.org)
+- enabling Hardened Runtime on Mac
+- IPCDemo example rewritten in C++ to reduce code size, improve readability and prepare for Windows port
+- dropping support for 32 bit architectures on Windows too
+- dropping support for Visual Studio 2015 and Windows 7, now requiring Visual Studio 2017 and Windows 8.1
+- updated VST3 SDK to version 3.7.1 build 50
+- updated to a newer archive of the Audio Unit SDK from
+  https://developer.apple.com/library/archive/samplecode/CoreAudioUtilityClasses/CoreAudioUtilityClasses.zip
+
+ARA SDK 2.0 draft 13 (aka 1.9.13) (2020/08/12)
+- fixes for Audio Unit buffer list handling
+- Audio Units: added support for AudioComponent tag
+- updated VST3 SDK to version 3.7.0 (which introduces PlugType::kOnlyARA for plug-ins that do not work
+  without ARA, and adds IProcessContextRequirements, both now used by the test plug-in)
+
+ARA SDK 2.0 draft 12 (aka 1.9.12) (2020/06/12)
+- TestHost and test plug-in now support processing algorithm selection draft
+- test plug-in now deals with analysis content grade and reads data from host if present
+- appropriate restriction of update scopes when notifying content changes
+- fixes in handling of analysis cancellation in test plug-in
+- cleaned up all logging output
+- moved "drag/drop" portion of TestHost archiving test into a new function called testDragAndDrop
+
+ARA SDK 2.0 draft 11 (aka 1.9.11) (2020/04/02)
+- improved logging related to content changes
+- Xcode schemes updated to provide all test cases as checkable list
+
+ARA SDK 2.0 draft 10 (aka 1.9.10) (2020/03/13)
+- added test cases for reading tuning, keys and chords from host
+- updated VST3 SDK to version 3.6.14
+
+ARA SDK 2.0 draft 9 (aka 1.9.9) (2019/12/06)
+- adopted current revision of partial persistency draft
+- added experimental Linux support (tested on Ubuntu 18.04 w/ GCC 8.3.0 and clang 7.0)
+- fixed analysis management edge cases when aborting and restarting analysis
+- various fixes for ARA_TEST_ARCHIVE_FILENAME
+- fixed possible decoding errors when not restoring all audio sources in test plug-in
+- added test cases for partial persistency
+- prepared TestHost for using actual audio files instead of dummy sine signal
+- various improvements and refactorings in TestHost
+  (check detailled diffs if your implementation has copied from that code)
+- dropped support for long-deprecated, Carbon Ressource Fork based AudioUnit version 1 loader
+
+ARA SDK 2.0 draft 8 (aka 1.9.8) (2019/06/28)
+- improved C++ details such as use of constexpr, explicit constructors, noexcept declarations, etc.
+- TestHost is now configurable via command line options, allowing to integrate it
+  into build systems for automated testing
+- TestHost now also supports plug-ins that are working with ARA 2 draft (not final),
+  and optionally ARA 1 plug-ins too
+- fixed bad property size in AudioUnitBindToARADocumentController()
+- improved bounds checking in the ARATestPlaybackRenderer
+- updated VST3 SDK to version 3.6.13
+
+ARA SDK 2.0 draft 7 (aka 1.9.7) (2019/03/04)
+- fixed test plug-in implementation of doRequestAudioSourceContentAnalysisWithAlgorithm ()
+- fixed test plug-in render range calculations
+- fixed how audio reader in test host deals with out-of-range samples
+- folder structure cleaned up
+- completely restructured C++ TestHost for a cleaner separation of ARA specific and and non-ARA code
+- improved C++ TestHost to perform all tests and validations of the previous C TestHost
+- with the C++ TestHost now providing a proper testing and validation environment in C++,
+  the C TestHost has been dramatically simplified and merged into the MiniHost to provide
+  a minimalistic yet functional C example of ARA
+- updated VST3 SDK to version 3.6.11
+- updated projects to be compatible with Xcode 10.1
+- Xcode now installs AudioUnit and VST3 plug-in to the user's plug-in folders after building
+
+ARA SDK 2.0 draft 6 (aka 1.9.6) (2018/9/19)
+This is the public release of kARAAPIGeneration_2_0_Draft.
+For changes compared earlier versions, see Version.txt in that release of the SDK.

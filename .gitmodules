@@ -1,0 +1,12 @@
+[submodule "3rdParty/cpp-base64"]
+	path = 3rdParty/cpp-base64
+	url = https://github.com/ReneNyffenegger/cpp-base64
+	shallow = true
+[submodule "3rdParty/pugixml"]
+	path = 3rdParty/pugixml
+	url = https://github.com/zeux/pugixml
+	shallow = true
+[submodule "3rdParty/ICST_AudioFile"]
+	path = 3rdParty/ICST_AudioFile
+	url = https://github.com/Celemony/ICST_AudioFile
+	shallow = true

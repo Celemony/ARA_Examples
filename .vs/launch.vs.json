@@ -1,0 +1,13 @@
+{
+  "version": "0.2.1",
+  "defaults": {},
+  "configurations": [
+    {
+      "type": "default",
+      "project": "CMakeLists.txt",
+      "projectTarget": "TestHost.exe",
+      "name": "TestHost with ARAVst3TestPlugIn",
+      "args": [ "-vst3 ARAVst3TestPlugIn.vst3" ]
+    }
+  ]
+}
