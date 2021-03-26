@@ -4,6 +4,7 @@ Changes since previous releases:
 
 ARA SDK 2.0 draft 15 (aka 1.9.15) (2021/??/??)
 - allow builds on Cmake 3.12 (even if 3.19 or later is highly recommended due to bug fixes and debugging support)
+- various minor Cmake improvements
 
 ARA SDK 2.0 draft 14 (aka 1.9.14) (2021/02/26)
 - applied Apache License 2.0

@@ -136,11 +136,16 @@ set(CMAKE_XCODE_GENERATE_SCHEME ON)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# https://stackoverflow.com/questions/41695993/ignore-warnings-in-external-modules-when-using-cmake
 if(POLICY CMP0077)
-    # https://stackoverflow.com/questions/41695993/ignore-warnings-in-external-modules-when-using-cmake
-    # cmake_policy(SET CMP0077 NEW)
     set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+    cmake_policy(SET CMP0077 NEW)
 endif()
+if(POLICY CMP0091)
+    set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
+    cmake_policy(SET CMP0091 NEW)
+endif()
+
 
 project(ARA_Examples
     DESCRIPTION "ARA Audio Random Access: Examples"
@@ -302,7 +307,7 @@ set(vst3sdk_SOURCE_DIR "${ARA_VST3_SDK_DIR}")
 # which we currently do not want because we build these plug-ins natively
 #set(SMTG_COREAUDIO_SDK_PATH "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio")
 #set(SMTG_AAX_SDK_PATH "${ARA_AAX_SDK_DIR}")
-add_subdirectory(${vst3sdk_SOURCE_DIR} ${PROJECT_BINARY_DIR}/vst3sdk EXCLUDE_FROM_ALL)
+add_subdirectory("${vst3sdk_SOURCE_DIR}" "${PROJECT_BINARY_DIR}/vst3sdk" EXCLUDE_FROM_ALL)
 unset(vst3sdk_SOURCE_DIR)
 
 set_target_properties(base cmake_modules pluginterfaces sdk_hosting sdk_common sdk validator PROPERTIES
@@ -887,12 +892,12 @@ function(configure_ARA_Examples_target target)
         # \todo for some reason, the Ninja and make generators do not fully expand the generator expression.
         if(ARA_IS_MULTI_CONFIG_GENERATOR)
             add_custom_command(TARGET ${target} POST_BUILD
-                COMMAND ${CMAKE_STRIP} $<$<NOT:$<CONFIG:Debug>>:-x -S> "$<TARGET_FILE:${target}>"
+                COMMAND "${CMAKE_STRIP}" $<$<NOT:$<CONFIG:Debug>>:-x -S> "$<TARGET_FILE:${target}>"
             )
         else()
             if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
                 add_custom_command(TARGET ${target} POST_BUILD
-                    COMMAND ${CMAKE_STRIP} -x -S "$<TARGET_FILE:${target}>"
+                    COMMAND "${CMAKE_STRIP}" -x -S "$<TARGET_FILE:${target}>"
                 )
             endif()
         endif()
@@ -942,7 +947,7 @@ function(ara_configure_binary_package target extension apple_plist_file)
         set_target_properties(${target} PROPERTIES
             BUNDLE ON
             BUNDLE_EXTENSION ${extension}
-            MACOSX_BUNDLE_INFO_PLIST ${apple_plist_file}
+            MACOSX_BUNDLE_INFO_PLIST "${apple_plist_file}"
 
             XCODE_ATTRIBUTE_INFOPLIST_PREPROCESS YES
             XCODE_ATTRIBUTE_GENERATE_PKGINFO_FILE YES
@@ -1084,14 +1089,10 @@ ara_add_vst3_main(ARATestPlugInVST3)
 ara_configure_binary_package(ARATestPlugInVST3 vst3 "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Info.plist")
 
 if(APPLE)
-    set_target_properties(ARATestPlugInVST3 PROPERTIES
-        MACOSX_RPATH "$ENV{HOME}/Library/Audio/Plug-Ins/VST3"
-    )
-
     add_custom_command(TARGET ARATestPlugInVST3 POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E
             copy_directory
-                $<TARGET_BUNDLE_DIR:ARATestPlugInVST3>
+                "$<TARGET_BUNDLE_DIR:ARATestPlugInVST3>"
                 "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/ARATestPlugIn.vst3"
     )
 endif()
@@ -1151,14 +1152,11 @@ if(APPLE)
     configure_ARA_Examples_target(ARATestPlugInAudioUnit)
 
     ara_configure_binary_package(ARATestPlugInAudioUnit component "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/TestAudioUnitInfo.plist")
-    set_target_properties(ARATestPlugInAudioUnit PROPERTIES
-        MACOSX_RPATH "$ENV{HOME}/Library/Audio/Plug-Ins/Components"
-    )
 
     add_custom_command(TARGET ARATestPlugInAudioUnit POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E
             copy_directory
-                $<TARGET_BUNDLE_DIR:ARATestPlugInAudioUnit>
+                "$<TARGET_BUNDLE_DIR:ARATestPlugInAudioUnit>"
                 "$ENV{HOME}/Library/Audio/Plug-Ins/Components/ARATestPlugIn.component"
     )
     # \todo Due to SIP, debugging with auvaltool is no longer allowed.
@@ -1334,19 +1332,19 @@ if(WIN32)
     # per default, test with VST3 example plug-in
     string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
     # alternatively for testing with Melodyne VST3:
-    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 $ENV{CommonProgramW6432}\\Common Files\\VST3\\Celemony\\Melodyne.vst3")
+    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{CommonProgramW6432}\\VST3\\Celemony\\Melodyne\\Melodyne.vst3\"")
     # alternatively for testing with JUCE_ARA VST3 example:
-    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 $ENV{CommonProgramW6432}\\Common Files\\VST3\\ARAPluginDemo.vst3")
+    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{CommonProgramW6432}\\VST3\\ARAPluginDemo.vst3\"")
 elseif(APPLE)
     # per default, test with VST3 example plug-in
     string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
     # alternatively for testing with Audio Unit example plug-in:
     #string(APPEND ARATestHost_Dbg_Arguments "-au aufx AraT ADeC")
     # alternatively for testing with Melodyne VST3 or Audio Unit:
-    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 /Library/Audio/Plug-Ins/VST3/Melodyne.vst3")
+    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"/Library/Audio/Plug-Ins/VST3/Melodyne.vst3\"")
     #string(APPEND ARATestHost_Dbg_Arguments "-au aumf MPLG CLMY")
     # alternatively for testing with JUCE_ARA VST3 or Audio Unit example:
-    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 $(HOME)/Library/Audio/Plug-Ins/VST3/ARAPluginDemo.vst3")
+    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{HOME}/Library/Audio/Plug-Ins/VST3/ARAPluginDemo.vst3\"")
     #string(APPEND ARATestHost_Dbg_Arguments "-au aufx AraD ADeC")
 else()
     string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
