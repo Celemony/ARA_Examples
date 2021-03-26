@@ -43,10 +43,14 @@ The macOS-only IPC demo illustrates how ARA's use of abstract `ARARefs` allows t
 
 ## Building and running the examples
 
-Building the ARA examples relies on CMake 3.10 or newer. Using CMake 3.19 or newer is highly recommended.
-To create a project for your devlopment environment of choice, from within the ARA_Examples folder execute this CMake command line:
+Building the ARA examples relies on CMake 3.12 or newer. Using CMake 3.19 or newer is highly recommended, debugger support requires at least 3.13 for Visual Studio and 3.15 for Xcode).
+To create a project for your devlopment environment of choice, from within the ARA_Examples folder execute this CMake command line (in older Cmake versions, omit the white spaces after -B/-G/-A):
 
     cmake -B <desired output directory, e.g. ./build> -G <desired generator for your development environment, e.g. Xcode> -A <optional architecture>
+
+This assume you've installed the Companion API SDKs using the optional install scripts from the ARA SDK installer. If you want to instead provide local copies of those SDKs, specify them like so:
+
+    cmake -D ARA_VST3_SDK_DIR=/path/to/VST3_SDK/ -D ARA_AUDIO_UNIT_SDK_DIR=/path/to/AudioUnit_SDK/ <then other arguments as shown above>
 
 Note that while it is possible to directly open the ARA_Examples folder in Visual Studio 2017 or newer utilizing its integrated CMake support, we still recommend creating an explicit solution due to its superior project layout and debugger support, e.g. for VS2019:
 

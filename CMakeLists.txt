@@ -21,22 +21,23 @@
 # ======================
 # cmake compatibility
 
+# VisualStudio 2017 ships with 3.12 so this is our minimum requirement.
+# You may be able to use older versions by commenting out this line, but we do not support it.
+cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 if(WIN32)
-    # VisualStudio 2017 only ships with 3.12
-    cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
     # on 3.13 and up we can additionally use VS_DEBUGGER_COMMAND
     if(CMAKE_VERSION VERSION_LESS 3.13)
         message(STATUS "Using CMake 3.13 or higher is suggested to improve debugger integration.")
     endif()
 elseif(APPLE)
     # 3.15 and up is required for for XCODE_GENERATE_SCHEME
-    cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
+    if(CMAKE_VERSION VERSION_LESS 3.15)
+        message(STATUS "Using CMake 3.15 or higher is required for proper debugger integration!")
+    endif()
     if(NOT CMAKE_GENERATOR MATCHES "Xcode")
         message(FATAL_ERROR "CMake support for Apple platforms is currently limited to Xcode, add '-G Xcode'.")
     endif()
 else()
-    # the oldest cmake we've actually tested this with
-    cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
     message(STATUS "Careful: ARA CMake support for this system is currently experimental.")
 endif()
 
