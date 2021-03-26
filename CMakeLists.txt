@@ -46,11 +46,8 @@ endif()
 # supported build configurations
 
 get_property(ARA_IS_MULTI_CONFIG_GENERATOR GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-
 if(ARA_IS_MULTI_CONFIG_GENERATOR)
     set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "Build Configurations" FORCE)
-
-    set(optional_build_type_subfolder "")
 else()
     if(CMAKE_BUILD_TYPE)
         if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -60,11 +57,13 @@ else()
         set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build Type (either 'Debug' or 'Release')" FORCE)
         message(STATUS "No build type specified, defaulting to '${CMAKE_BUILD_TYPE}'.")
     endif()
-
-    set(optional_build_type_subfolder "/${CMAKE_BUILD_TYPE}")
 endif()
 
 # these paths match Steinberg's default paths used in the VST SDK
+set(optional_build_type_subfolder "")
+if(NOT ARA_IS_MULTI_CONFIG_GENERATOR AND NOT WIN32)
+    set(optional_build_type_subfolder "/${CMAKE_BUILD_TYPE}")
+endif()
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib${optional_build_type_subfolder}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib${optional_build_type_subfolder}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin${optional_build_type_subfolder}")
@@ -125,14 +124,15 @@ set(ARA_AUDIO_UNIT_SDK_DIR "${ARA_AUDIO_UNIT_SDK_DIR}" CACHE PATH "directory of 
 include("${ARA_API_DIR}/ARA_Version.cmake")
 include("${ARA_API_DIR}/ARA_API_Helpers.cmake")
 
-# helpful for debugging the build if necessary
-#set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE STRING "Generate compile commands" FORCE)
+# set this to OFF when running on build servers, ON for developer machines where you intend to debug.
+# this may require building as admin, depending on the access rights needed to write to the audio plug-in folder(s)
+option(ARA_SETUP_DEBUGGING "Prepare for debugging (configure debugger, install audio plug-ins into system, etc.)" ON)
 
 # regenerating the project while building causes various of issues, esp. in Xcode, plus these examples are typically not modified
 set(CMAKE_SUPPRESS_REGENERATION ON)
 
 set(CMAKE_XCODE_GENERATE_TOP_LEVEL_PROJECT_ONLY ON)
-set(CMAKE_XCODE_GENERATE_SCHEME ON)
+set(CMAKE_XCODE_GENERATE_SCHEME ${ARA_SETUP_DEBUGGING})
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -146,6 +146,9 @@ if(POLICY CMP0091)
     cmake_policy(SET CMP0091 NEW)
 endif()
 
+
+# helpful for debugging the build if necessary
+#set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE STRING "Generate compile commands" FORCE)
 
 project(ARA_Examples
     DESCRIPTION "ARA Audio Random Access: Examples"
@@ -903,22 +906,24 @@ function(configure_ARA_Examples_target target)
         endif()
     endif()
 
-    # Xcode build&scheme defaults
-    set_target_properties(${target} PROPERTIES
-        XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
+    # Xcode build&scheme defaults for debugging
+    if(ARA_SETUP_DEBUGGING)
+        set_target_properties(${target} PROPERTIES
+            XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
 
-        # unfortunately due to how CMake and Xcode interact we cannot set these per configuration,
-        # so we switch the sanitizers off by default for now (\todo would be great to enable them for debug).
-        XCODE_SCHEME_DISABLE_MAIN_THREAD_CHECKER OFF
-        XCODE_SCHEME_MAIN_THREAD_CHECKER_STOP ON
-        XCODE_SCHEME_ADDRESS_SANITIZER OFF
-        XCODE_SCHEME_ADDRESS_SANITIZER_USE_AFTER_RETURN ON
-        XCODE_SCHEME_MALLOC_SCRIBBLE ON
-        XCODE_SCHEME_THREAD_SANITIZER OFF
-        XCODE_SCHEME_THREAD_SANITIZER_STOP ON
-        XCODE_SCHEME_UNDEFINED_BEHAVIOUR_SANITIZER OFF
-        XCODE_SCHEME_UNDEFINED_BEHAVIOUR_SANITIZER_STOP ON
-    )
+            # unfortunately due to how CMake and Xcode interact we cannot set these per configuration,
+            # so we switch the sanitizers off by default for now (\todo would be great to enable them for debug).
+            XCODE_SCHEME_DISABLE_MAIN_THREAD_CHECKER OFF
+            XCODE_SCHEME_MAIN_THREAD_CHECKER_STOP ON
+            XCODE_SCHEME_ADDRESS_SANITIZER OFF
+            XCODE_SCHEME_ADDRESS_SANITIZER_USE_AFTER_RETURN ON
+            XCODE_SCHEME_MALLOC_SCRIBBLE ON
+            XCODE_SCHEME_THREAD_SANITIZER OFF
+            XCODE_SCHEME_THREAD_SANITIZER_STOP ON
+            XCODE_SCHEME_UNDEFINED_BEHAVIOUR_SANITIZER OFF
+            XCODE_SCHEME_UNDEFINED_BEHAVIOUR_SANITIZER_STOP ON
+        )
+    endif()
 
 endfunction()
 
@@ -974,6 +979,35 @@ function(ara_configure_binary_package target extension apple_plist_file)
     # even though our plug-ins are technically libs, they are distributed as user-visible binaries so we place them next to the apps
     set_target_properties(${target} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+    )
+
+endfunction()
+
+
+# ======================
+# add post-build step that installs an audio plug-in into the system so that it can be debugged w/ various hosts
+# this may require building as admin, depending on the access rights needed to write to the plug-in folder
+function(ara_postbuild_install_for_debugging target install_target_dir create_symlink)
+
+    if(APPLE)
+        set(source_package "$<TARGET_BUNDLE_DIR:${target}>")
+        set(package_name "$<TARGET_FILE_NAME:${target}>.$<TARGET_PROPERTY:${target},BUNDLE_EXTENSION>")
+    else()
+        set(source_package "$<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_NAME:${target}>")
+        set(package_name "$<TARGET_FILE_NAME:${target}>")
+    endif()
+
+    if (create_symlink)
+        set(install_command create_symlink)
+    else()
+        set(install_command copy_directory)
+    endif()
+
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E
+            rm -Rf "${install_target_dir}${package_name}"
+        COMMAND "${CMAKE_COMMAND}" -E
+            ${install_command} "${source_package}" "${install_target_dir}${package_name}"
     )
 
 endfunction()
@@ -1088,34 +1122,33 @@ ara_add_vst3_main(ARATestPlugInVST3)
 
 ara_configure_binary_package(ARATestPlugInVST3 vst3 "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Info.plist")
 
-if(APPLE)
-    add_custom_command(TARGET ARATestPlugInVST3 POST_BUILD
-        COMMAND "${CMAKE_COMMAND}" -E
-            copy_directory
-                "$<TARGET_BUNDLE_DIR:ARATestPlugInVST3>"
-                "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/ARATestPlugIn.vst3"
-    )
-endif()
+if(ARA_SETUP_DEBUGGING)
+    if(WIN32)
+        ara_postbuild_install_for_debugging(ARATestPlugInVST3 "$ENV{CommonProgramW6432}\\VST3\\" ON)
+    elseif(APPLE)
+        ara_postbuild_install_for_debugging(ARATestPlugInVST3 "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/" ON)
+    endif()
 
-add_dependencies(ARATestPlugInVST3 validator)
-get_target_property(validator_dir validator RUNTIME_OUTPUT_DIRECTORY)
-get_target_property(plugin_dir ARATestPlugInVST3 RUNTIME_OUTPUT_DIRECTORY)
-if(ARA_IS_MULTI_CONFIG_GENERATOR)
-    # \todo always using Debug here...
-    # Xcode scheme uses Debug as default config for its "Run" action, regardless of the currently selected configuration.
-    # Also, generator expressions are not evaluated when creating the schemes, so we can't really know what is selected.
-    set(validator_dir "${validator_dir}/Debug")
-    set(plugin_dir "${plugin_dir}/Debug")
+    add_dependencies(ARATestPlugInVST3 validator)
+    get_target_property(validator_dir validator RUNTIME_OUTPUT_DIRECTORY)
+    get_target_property(plugin_dir ARATestPlugInVST3 RUNTIME_OUTPUT_DIRECTORY)
+    if(ARA_IS_MULTI_CONFIG_GENERATOR)
+        # \todo always using Debug here...
+        # Xcode scheme uses Debug as default config for its "Run" action, regardless of the currently selected configuration.
+        # Also, generator expressions are not evaluated when creating the schemes, so we can't really know what is selected.
+        set(validator_dir "${validator_dir}/Debug")
+        set(plugin_dir "${plugin_dir}/Debug")
+    endif()
+    set_target_properties(ARATestPlugInVST3 PROPERTIES
+        VS_DEBUGGER_WORKING_DIRECTORY  "${plugin_dir}"
+        XCODE_SCHEME_WORKING_DIRECTORY "${plugin_dir}"
+        VS_DEBUGGER_COMMAND     "${validator_dir}/validator"
+        XCODE_SCHEME_EXECUTABLE "${validator_dir}/validator"
+        VS_DEBUGGER_COMMAND_ARGUMENTS "ARATestPlugIn.vst3"
+        XCODE_SCHEME_ARGUMENTS        "ARATestPlugIn.vst3"
+    )
+    unset(validator_dir)
 endif()
-set_target_properties(ARATestPlugInVST3 PROPERTIES
-    VS_DEBUGGER_WORKING_DIRECTORY  "${plugin_dir}"
-    XCODE_SCHEME_WORKING_DIRECTORY "${plugin_dir}"
-    VS_DEBUGGER_COMMAND     "${validator_dir}/validator"
-    XCODE_SCHEME_EXECUTABLE "${validator_dir}/validator"
-    VS_DEBUGGER_COMMAND_ARGUMENTS "ARATestPlugIn.vst3"
-    XCODE_SCHEME_ARGUMENTS        "ARATestPlugIn.vst3"
-)
-unset(validator_dir)
 
 
 # ======================
@@ -1153,23 +1186,20 @@ if(APPLE)
 
     ara_configure_binary_package(ARATestPlugInAudioUnit component "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/TestAudioUnitInfo.plist")
 
-    add_custom_command(TARGET ARATestPlugInAudioUnit POST_BUILD
-        COMMAND "${CMAKE_COMMAND}" -E
-            copy_directory
-                "$<TARGET_BUNDLE_DIR:ARATestPlugInAudioUnit>"
-                "$ENV{HOME}/Library/Audio/Plug-Ins/Components/ARATestPlugIn.component"
-    )
-    # \todo Due to SIP, debugging with auvaltool is no longer allowed.
-    # On Intel Macs, it's possible to copy it out of /usr/bin,but this works no longer on Apple Silicon.
-    # As workaround, disable "Debug executable" in the "Info" tab of the scheme.
-    #if(NOT EXISTS "/usr/local/bin/auvaltool")
-    #   execute_process(COMMAND sudo cp /usr/bin/auvaltool /usr/local/bin)
-    #endif()
-    set_target_properties(ARATestPlugInAudioUnit PROPERTIES
-        #XCODE_SCHEME_EXECUTABLE "/usr/local/bin/auvaltool"
-        XCODE_SCHEME_EXECUTABLE "/usr/bin/auvaltool"
-        XCODE_SCHEME_ARGUMENTS "-v aufx AraT ADeC"
-    )
+    if(ARA_SETUP_DEBUGGING)
+        ara_postbuild_install_for_debugging(ARATestPlugInAudioUnit "$ENV{HOME}/Library/Audio/Plug-Ins/Components/" OFF)
+        # \todo Due to SIP, debugging with auvaltool is no longer allowed.
+        # On Intel Macs, it's possible to copy it out of /usr/bin,but this works no longer on Apple Silicon.
+        # As workaround, disable "Debug executable" in the "Info" tab of the scheme.
+        #if(NOT EXISTS "/usr/local/bin/auvaltool")
+        #   execute_process(COMMAND sudo cp /usr/bin/auvaltool /usr/local/bin)
+        #endif()
+        set_target_properties(ARATestPlugInAudioUnit PROPERTIES
+            #XCODE_SCHEME_EXECUTABLE "/usr/local/bin/auvaltool"
+            XCODE_SCHEME_EXECUTABLE "/usr/bin/auvaltool"
+            XCODE_SCHEME_ARGUMENTS "-v aufx AraT ADeC"
+        )
+    endif()
 
 endif(APPLE)
 
@@ -1254,9 +1284,11 @@ if(WIN32)
     ara_configure_binary_package(ARAMiniHost exe "")
 endif()
 
-add_dependencies(ARAMiniHost ARATestPlugInVST3)
-if(APPLE)
-    add_dependencies(ARAMiniHost ARATestPlugInAudioUnit)
+if(ARA_SETUP_DEBUGGING)
+    add_dependencies(ARAMiniHost ARATestPlugInVST3)
+    if(APPLE)
+        add_dependencies(ARAMiniHost ARATestPlugInAudioUnit)
+    endif()
 endif()
 
 
@@ -1322,49 +1354,51 @@ if(WIN32)
     ara_configure_binary_package(ARATestHost exe "")
 endif()
 
-add_dependencies(ARATestHost ARATestPlugInVST3)
-if(APPLE)
-    add_dependencies(ARATestHost ARATestPlugInAudioUnit)
-endif()
+if(ARA_SETUP_DEBUGGING)
+    add_dependencies(ARATestHost ARATestPlugInVST3)
+    if(APPLE)
+        add_dependencies(ARATestHost ARATestPlugInAudioUnit)
+    endif()
 
-set(ARATestHost_Dbg_Arguments "")
-if(WIN32)
-    # per default, test with VST3 example plug-in
-    string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
-    # alternatively for testing with Melodyne VST3:
-    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{CommonProgramW6432}\\VST3\\Celemony\\Melodyne\\Melodyne.vst3\"")
-    # alternatively for testing with JUCE_ARA VST3 example:
-    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{CommonProgramW6432}\\VST3\\ARAPluginDemo.vst3\"")
-elseif(APPLE)
-    # per default, test with VST3 example plug-in
-    string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
-    # alternatively for testing with Audio Unit example plug-in:
-    #string(APPEND ARATestHost_Dbg_Arguments "-au aufx AraT ADeC")
-    # alternatively for testing with Melodyne VST3 or Audio Unit:
-    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"/Library/Audio/Plug-Ins/VST3/Melodyne.vst3\"")
-    #string(APPEND ARATestHost_Dbg_Arguments "-au aumf MPLG CLMY")
-    # alternatively for testing with JUCE_ARA VST3 or Audio Unit example:
-    #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{HOME}/Library/Audio/Plug-Ins/VST3/ARAPluginDemo.vst3\"")
-    #string(APPEND ARATestHost_Dbg_Arguments "-au aufx AraD ADeC")
-else()
-    string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
+    set(ARATestHost_Dbg_Arguments "")
+    if(WIN32)
+        # per default, test with VST3 example plug-in
+        string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
+        # alternatively for testing with Melodyne VST3:
+        #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{CommonProgramW6432}\\VST3\\Celemony\\Melodyne\\Melodyne.vst3\"")
+        # alternatively for testing with JUCE_ARA VST3 example:
+        #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{CommonProgramW6432}\\VST3\\ARAPluginDemo.vst3\"")
+    elseif(APPLE)
+        # per default, test with VST3 example plug-in
+        string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
+        # alternatively for testing with Audio Unit example plug-in:
+        #string(APPEND ARATestHost_Dbg_Arguments "-au aufx AraT ADeC")
+        # alternatively for testing with Melodyne VST3 or Audio Unit:
+        #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"/Library/Audio/Plug-Ins/VST3/Melodyne.vst3\"")
+        #string(APPEND ARATestHost_Dbg_Arguments "-au aumf MPLG CLMY")
+        # alternatively for testing with JUCE_ARA VST3 or Audio Unit example:
+        #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{HOME}/Library/Audio/Plug-Ins/VST3/ARAPluginDemo.vst3\"")
+        #string(APPEND ARATestHost_Dbg_Arguments "-au aufx AraD ADeC")
+    else()
+        string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
+    endif()
+    # optionally, limit testing to selected test:
+    #string(APPEND ARATestHost_Dbg_Arguments " -test PropertyUpdates")
+    #string(APPEND ARATestHost_Dbg_Arguments " -test ContentUpdates")
+    #string(APPEND ARATestHost_Dbg_Arguments " -test ContentReading")
+    #string(APPEND ARATestHost_Dbg_Arguments " -test ModificationCloning")
+    #string(APPEND ARATestHost_Dbg_Arguments " -test Archiving")
+    #string(APPEND ARATestHost_Dbg_Arguments " -test DragAndDrop")
+    #string(APPEND ARATestHost_Dbg_Arguments " -test PlaybackRendering")
+    #string(APPEND ARATestHost_Dbg_Arguments " -test EditorView")
+    #string(APPEND ARATestHost_Dbg_Arguments " -test Algorithms")
+    # optionally, choose specific audio file(s) to selected test:
+    #string(APPEND ARATestHost_Dbg_Arguments " -file /some/path/audiofile.wav")
+    set_target_properties(ARATestHost PROPERTIES
+        VS_DEBUGGER_COMMAND_ARGUMENTS ${ARATestHost_Dbg_Arguments}
+        XCODE_SCHEME_ARGUMENTS ${ARATestHost_Dbg_Arguments}
+    )
 endif()
-# optionally, limit testing to selected test:
-#string(APPEND ARATestHost_Dbg_Arguments " -test PropertyUpdates")
-#string(APPEND ARATestHost_Dbg_Arguments " -test ContentUpdates")
-#string(APPEND ARATestHost_Dbg_Arguments " -test ContentReading")
-#string(APPEND ARATestHost_Dbg_Arguments " -test ModificationCloning")
-#string(APPEND ARATestHost_Dbg_Arguments " -test Archiving")
-#string(APPEND ARATestHost_Dbg_Arguments " -test DragAndDrop")
-#string(APPEND ARATestHost_Dbg_Arguments " -test PlaybackRendering")
-#string(APPEND ARATestHost_Dbg_Arguments " -test EditorView")
-#string(APPEND ARATestHost_Dbg_Arguments " -test Algorithms")
-# optionally, choose specific audio file(s) to selected test:
-#string(APPEND ARATestHost_Dbg_Arguments " -file /some/path/audiofile.wav")
-set_target_properties(ARATestHost PROPERTIES
-    VS_DEBUGGER_COMMAND_ARGUMENTS ${ARATestHost_Dbg_Arguments}
-    XCODE_SCHEME_ARGUMENTS ${ARATestHost_Dbg_Arguments}
-)
 
 
 # ======================
@@ -1400,8 +1434,10 @@ if(APPLE)
 
     configure_ARA_Examples_target(ARAIPCDemoPlugInProcess)
 
-    add_dependencies(ARAIPCDemoPlugInProcess ARATestPlugInVST3)
-    add_dependencies(ARAIPCDemoPlugInProcess ARATestPlugInAudioUnit)
+    if(ARA_SETUP_DEBUGGING)
+        add_dependencies(ARAIPCDemoPlugInProcess ARATestPlugInVST3)
+        add_dependencies(ARAIPCDemoPlugInProcess ARATestPlugInAudioUnit)
+    endif()
 
 endif(APPLE)
 

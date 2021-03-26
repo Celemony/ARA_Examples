@@ -5,9 +5,26 @@
     {
       "type": "default",
       "project": "CMakeLists.txt",
-      "projectTarget": "TestHost.exe",
-      "name": "TestHost with ARAVst3TestPlugIn",
-      "args": [ "-vst3 ARAVst3TestPlugIn.vst3" ]
+      "projectTarget": "ARATestHost.exe (bin\\ARATestHost.exe)",
+      "name": "ARATestHost.exe w/ ARATestPlugIn.vst3",
+      "args": [
+        "-vst3 ARATestPlugIn.vst3"
+      ]
+    },
+    {
+      "type": "default",
+      "project": "CMakeLists.txt",
+      "projectTarget": "validator.exe (bin\\validator.exe)",
+      "name": "validator.exe w/ ARATestPlugIn.vst3",
+      "args": [
+        "ARATestPlugIn.vst3"
+      ]
+    },
+    {
+      "type": "default",
+      "project": "CMakeLists.txt",
+      "projectTarget": "ARAMiniHost.exe (bin\\ARAMiniHost.exe)",
+      "name": "ARAMiniHost.exe w/ ARATestPlugIn.vst3"
     }
   ]
 }
