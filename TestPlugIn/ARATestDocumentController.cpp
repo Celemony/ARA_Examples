@@ -434,11 +434,13 @@ void ARATestDocumentController::didEndEditing () noexcept
 
 bool ARATestDocumentController::doRestoreObjectsFromArchive (ARA::PlugIn::HostArchiveReader* archiveReader, const ARA::PlugIn::RestoreObjectsFilter* filter) noexcept
 {
-    // start by reading the number of audio sources stored in the archive
-    TestUnarchiver unarchiver (archiveReader);
-    const auto numAudioSources { unarchiver.readSize () };
+    TestUnarchiver unarchiver { [archiveReader] (size_t position, size_t length, uint8_t buffer[]) noexcept -> bool
+                                {
+                                    return archiveReader->readBytesFromArchive (position, length, buffer);
+                                }};
 
     // loop over stored audio source data
+    const auto numAudioSources { unarchiver.readSize () };
     for (size_t i = 0; i < numAudioSources; ++i)
     {
         const float progressVal { static_cast<float> (i) / static_cast<float> (numAudioSources) };
@@ -487,7 +489,10 @@ bool ARATestDocumentController::doStoreObjectsToArchive (ARA::PlugIn::HostArchiv
     processCompletedAnalysisTasks ();
 
     // create archiver
-    TestArchiver archiver (archiveWriter);
+    TestArchiver archiver { [archiveWriter] (size_t position, size_t length, const uint8_t buffer[]) noexcept -> bool
+                            {
+                                return archiveWriter->writeBytesToArchive (position, length, buffer);
+                            }};
 
     // this dummy implementation only deals with audio source states
     const auto& audioSourcesToPersist { filter->getAudioSourcesToStore<ARATestAudioSource> () };

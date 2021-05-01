@@ -1,8 +1,6 @@
 //------------------------------------------------------------------------------
 //! \file       TestPersistency.cpp
 //!             archiver/unarchiver implementation for the ARA test plug-in
-//!             Actual plug-ins will typically have a persistency implementation which is
-//!             independent of ARA - this code is also largely decoupled from ARA.
 //! \project    ARA SDK Examples
 //! \copyright  Copyright (c) 2018-2021, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +18,8 @@
 
 #include "TestPersistency.h"
 
-#include "ARA_Library/PlugIn/ARAPlug.h"
+#include <limits>
+#include <vector>
 
 // host-network byte ordering include
 #if defined (_WIN32)
@@ -53,13 +52,10 @@ private:
     uint64_t _bytes;
 };
 
-using namespace ARA;
-using namespace PlugIn;
-
 /*******************************************************************************/
 
-TestArchiver::TestArchiver (HostArchiveWriter* archiveWriter) noexcept
-: _archiveWriter { archiveWriter }
+TestArchiver::TestArchiver (const ArchivingFunction& writeFunction) noexcept
+: _writeFunction { writeFunction }
 {
     writeInt64 (archiveVersion);
 }
@@ -90,7 +86,7 @@ void TestArchiver::writeString (std::string data) noexcept
 {
     const size_t numBytes { data.size () };
     writeSize (numBytes);
-    if (didSucceed () && !_archiveWriter->writeBytesToArchive (_location, numBytes, reinterpret_cast<const ARAByte*> (data.c_str ())))
+    if (didSucceed () && !_writeFunction (_location, numBytes, reinterpret_cast<const uint8_t*> (data.c_str ())))
         _state = TestArchiveState::iOError;
     _location += numBytes;
 }
@@ -98,19 +94,19 @@ void TestArchiver::writeString (std::string data) noexcept
 void TestArchiver::write8ByteData (uint64_t data) noexcept
 {
     const uint64_t encodedData { htonll (data) };
-    if (didSucceed () && !_archiveWriter->writeBytesToArchive (_location, sizeof (data), reinterpret_cast<const ARAByte*> (&encodedData)))
+    if (didSucceed () && !_writeFunction (_location, sizeof (data), reinterpret_cast<const uint8_t*> (&encodedData)))
         _state = TestArchiveState::iOError;
     _location += sizeof (data);
 }
 
 /*******************************************************************************/
 
-TestUnarchiver::TestUnarchiver (HostArchiveReader* archiveReader) noexcept
-: _archiveReader { archiveReader }
+TestUnarchiver::TestUnarchiver (const UnarchivingFunction& readFunction) noexcept
+: _readFunction { readFunction }
 {
     const int64_t version { readInt64 () };
     if (didSucceed () && (version != archiveVersion))
-        _state = TestArchiveState::unkownFormatError;
+        _state = TestArchiveState::unknownFormatError;
 }
 
 bool TestUnarchiver::readBool () noexcept
@@ -163,7 +159,7 @@ std::string TestUnarchiver::readString ()
     if (didSucceed () && numBytes)
     {
         std::vector<char> stringBuffer (numBytes + 1);
-        if (_archiveReader->readBytesFromArchive (_location, numBytes, reinterpret_cast<ARAByte*> (stringBuffer.data ())))
+        if (_readFunction (_location, numBytes, reinterpret_cast<uint8_t*> (stringBuffer.data ())))
             data = stringBuffer.data ();
         else
             _state = TestArchiveState::iOError;
@@ -175,7 +171,7 @@ std::string TestUnarchiver::readString ()
 uint64_t TestUnarchiver::read8ByteData () noexcept
 {
     uint64_t encodedData { 0 };
-    if (didSucceed () && !_archiveReader->readBytesFromArchive (_location, sizeof (encodedData), reinterpret_cast<ARAByte*> (&encodedData)))
+    if (didSucceed () && !_readFunction (_location, sizeof (encodedData), reinterpret_cast<uint8_t*> (&encodedData)))
         _state = TestArchiveState::iOError;
     if (!didSucceed ())
         encodedData = 0;

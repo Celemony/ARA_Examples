@@ -46,7 +46,7 @@ class TestAnalysisCallbacks
 public:
     virtual ~TestAnalysisCallbacks () = default;
     virtual void notifyAnalysisProgressStarted () noexcept {}
-    virtual void notifyAnalysisProgressUpdated (float progress) noexcept {}
+    virtual void notifyAnalysisProgressUpdated (float /*progress*/) noexcept {}
     virtual void notifyAnalysisProgressCompleted () noexcept {}
     virtual bool readAudioSamples (int64_t samplePosition, int64_t samplesPerChannel, void* const buffers[]) noexcept = 0;
     virtual bool shouldCancel () const noexcept { return false; }
