@@ -98,12 +98,12 @@ ARADocumentController* createHostAndBasicDocument (const PlugInEntry* plugInEntr
     for (size_t i { 0 }; i < audioFiles.size(); ++i)
     {
         // add an audio source based on the audio file
-        std::string audioSourcePersistentID { "audioSourceTestPersistentID " + std::to_string (i) };
+        const std::string audioSourcePersistentID { "audioSourceTestPersistentID " + std::to_string (i) };
         auto audioSource { testHost->addAudioSource (documentName, audioFiles[i].get (), audioSourcePersistentID) };
 
         // add an audio modification associated with the audio source
-        std::string audioModificationName { "Test audio modification " + std::to_string (i) };
-        std::string audioModificationPersistentID { "audioModificationTestPersistentID " + std::to_string (i) };
+        const std::string audioModificationName { "Test audio modification " + std::to_string (i) };
+        const std::string audioModificationPersistentID { "audioModificationTestPersistentID " + std::to_string (i) };
         auto audioModification { testHost->addAudioModification (documentName, audioSource, audioModificationName, audioModificationPersistentID) };
 
         // add a playback region encompassing the entire audio source to render modifications in our musical context,
@@ -174,7 +174,7 @@ void testPropertyUpdates (const PlugInEntry* plugInEntry, const AudioFileList& a
 /*******************************************************************************/
 // Demonstrates how to update content information if changed in the host
 // The plug-in will call back into the host's ARAContentAccessController implementation
-// to read the updated data - see TestHostContentAccessController
+// to read the updated data - see ARAContentAccessController
 void testContentUpdates (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("content updates");
@@ -373,7 +373,7 @@ void testArchiving (const PlugInEntry* plugInEntry, const AudioFileList& audioFi
         // create basic ARA model graph and perform analysis
         std::unique_ptr<TestHost> testHost;
         auto araDocumentController { createHostAndBasicDocument (plugInEntry, testHost, "testArchiving", true, audioFiles) };
-        supportsARA2Persistency = araDocumentController->getDocumentController ()->supportsPartialPersistency ();
+        supportsARA2Persistency = araDocumentController->supportsPartialPersistency ();
 
         // read the audio source content
         for (const auto& audioSource : araDocumentController->getDocument ()->getAudioSources ())
@@ -430,7 +430,7 @@ void testArchiving (const PlugInEntry* plugInEntry, const AudioFileList& audioFi
 
             for (size_t j { 0 }; j < audioModificationPersistentIDs[audioSource->getPersistentID ()].size (); j++)
             {
-                std::string audioModificationName { "Test audio modification " + std::to_string (i) + " " + std::to_string (j) };
+                const std::string audioModificationName { "Test audio modification " + std::to_string (i) + " " + std::to_string (j) };
                 auto audioModification { testHost->addAudioModification(documentName, audioSource, audioModificationName, audioModificationPersistentIDs[audioSource->getPersistentID()][j]) };
 
                 // add a playback region encompassing the entire audio source to render modifications in our musical context
@@ -500,7 +500,7 @@ void testDragAndDrop (const PlugInEntry* plugInEntry, const AudioFileList& audio
 
     std::unique_ptr<TestHost> testHost;
     auto testDocController { createHostAndBasicDocument (plugInEntry, testHost, "ARA2PersistencyTestDoc", false, {}) };
-    if (!testDocController->getDocumentController ()->supportsPartialPersistency ())
+    if (!testDocController->supportsPartialPersistency ())
     {
         ARA_LOG ("ARA2 Partial Persistency not supported by plug-in %s", plugInEntry->getARAFactory ()->plugInName);
         return;
@@ -534,7 +534,7 @@ void testDragAndDrop (const PlugInEntry* plugInEntry, const AudioFileList& audio
     ARA_LOG ("Dragging audio source with persistent ID \"%s\" from %s", draggedAudioSource->getPersistentID ().c_str (), dragDocument->getName ().c_str ());
     ARAMemoryArchive clipBoardArchive { plugInEntry->getARAFactory ()->documentArchiveID };
     const bool archivingSuccess { dragDocumentController->storeObjectsToArchive (&clipBoardArchive, &storeObjectsFilter) };
-    ARA_VALIDATE_API_STATE (archivingSuccess);
+    ARA_VALIDATE_API_STATE (archivingSuccess);      // our archive writer implementation never returns false, so this must always succeed
 
     // now create a new document that we'll "drop" the archive data on to
     auto dropDocumentController { createHostAndBasicDocument (plugInEntry, testHost, "Drop Document", false, audioFiles) };
@@ -543,17 +543,17 @@ void testDragAndDrop (const PlugInEntry* plugInEntry, const AudioFileList& audio
     // add new audio source and modification with unique persistent IDs
     dropDocumentController->beginEditing ();
 
-    std::string dropAudioSourcePersistentID { "audioSourceTestPersistentID " + std::to_string (audioFiles.size ()) };
+    const std::string dropAudioSourcePersistentID { "audioSourceTestPersistentID " + std::to_string (audioFiles.size ()) };
     auto dropAudioSource { testHost->addAudioSource (dropDocument->getName (), draggedAudioSource->getAudioFile (), dropAudioSourcePersistentID) };
 
-    std::string dropAudioModificationPersistentID { "audioModificationTestPersistentID " + std::to_string (audioFiles.size ()) };
+    const std::string dropAudioModificationPersistentID { "audioModificationTestPersistentID " + std::to_string (audioFiles.size ()) };
     auto dropAudioModification { testHost->addAudioModification (dropDocument->getName (), dropAudioSource, draggedAudioModification->getName (), dropAudioModificationPersistentID) };
 
     // construct a ARARestoreObjectsFilter containing the objects we want to restore
-    ARA::ARAPersistentID audioSourceArchiveID { draggedAudioSource->getPersistentID ().c_str () };
-    ARA::ARAPersistentID audioModificationArchiveID { draggedAudioModification->getPersistentID ().c_str () };
-    ARA::ARAPersistentID audioSourceCurrentID { dropAudioSource->getPersistentID ().c_str () };
-    ARA::ARAPersistentID audioModificationCurrentID { dropAudioModification->getPersistentID ().c_str () };
+    const auto audioSourceArchiveID { draggedAudioSource->getPersistentID ().c_str () };
+    const auto audioModificationArchiveID { draggedAudioModification->getPersistentID ().c_str () };
+    const auto audioSourceCurrentID { dropAudioSource->getPersistentID ().c_str () };
+    const auto audioModificationCurrentID { dropAudioModification->getPersistentID ().c_str () };
     const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARARestoreObjectsFilter, audioModificationCurrentIDs)> restoreObjectsFilter { ARA::kARATrue,
                                                                                                                             1U, &audioSourceArchiveID, &audioSourceCurrentID,
                                                                                                                             1U, &audioModificationArchiveID, &audioModificationCurrentID
@@ -789,7 +789,7 @@ void testProcessingAlgorithms (const PlugInEntry* plugInEntry, const AudioFileLi
 // Loads an `iXML` ARA audio file chunk from a supplied .WAV or .AIFF file
 void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
-    ARA_LOG_TEST_HOST_FUNC ("ARA sound file loading XML chunks");
+    ARA_LOG_TEST_HOST_FUNC ("ARA audio file loading XML chunks");
 
     // create basic ARA model graph with no audio sources - we'll create one for each wav file
     std::unique_ptr<TestHost> testHost;
@@ -807,7 +807,7 @@ void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileL
         iXMLChunk.load_buffer (iXMLBuf, iXMLBufLen);
         if (iXMLChunk.document_element ().empty ())
         {
-            ARA_LOG ("No iXML chunk found in audio file %s", audioFile->getName ().c_str ());
+            ARA_LOG ("No valid iXML chunk found in audio file %s", audioFile->getName ().c_str ());
             continue;
         }
 
@@ -883,14 +883,14 @@ void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileL
         araDocumentController->beginEditing ();
 
         // create audio source and load its state
-        const std::string audioSourceCurrentPersistentID { "audioSourceTestPersistentID " + std::to_string (index) };
-        auto audioSource { testHost->addAudioSource (document->getName (), audioFile.get (), audioSourceCurrentPersistentID) };
+        const std::string newPersistentID { "audioSourceTestPersistentID " + std::to_string (index) };
+        auto audioSource { testHost->addAudioSource (document->getName (), audioFile.get (), newPersistentID) };
 
         // partial persistence - restore this audio source using the archive stored in the XML data
-        ARA::ARAPersistentID audioSourceArchiveID { audioSourceArchivePersistentID.c_str () };
-        ARA::ARAPersistentID audioSourceCurrentID { audioSourceCurrentPersistentID.c_str () };
+        const auto oldID { audioSourceArchivePersistentID.c_str () };
+        const auto newID { newPersistentID.c_str () };
         const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARARestoreObjectsFilter, audioModificationCurrentIDs)> restoreObjectsFilter { ARA::kARAFalse,
-                                                                                                                                1U, &audioSourceArchiveID, &audioSourceCurrentID,
+                                                                                                                                1U, &oldID, &newID,
                                                                                                                                 0U, nullptr, nullptr
                                                                                                                               };
         // load chunk and enable sample access
@@ -900,19 +900,17 @@ void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileL
         araDocumentController->enableAudioSourceSamplesAccess (audioSource, true);
 
         // add audio modification and playback region
+        const std::string audioModificationPersistentID { "audioModificationTestPersistentID " + std::to_string (index) };
         const auto duration { audioSource->getDuration () };
-        auto audioModification { testHost->addAudioModification (document->getName (), audioSource, audioFile->getName () + " Modification", audioSourceCurrentPersistentID) };
+        auto audioModification { testHost->addAudioModification (document->getName (), audioSource, audioFile->getName () + " Modification", audioModificationPersistentID.c_str ()) };
         testHost->addPlaybackRegion (document->getName (), audioModification, ARA::kARAPlaybackTransformationNoChanges, 0.0, duration, 0.0, duration, document->getRegionSequences ()[0].get (), audioFile->getName () + "Playback Region", ARA::ARAColor {});
 
         // conclude loading chunk
         araDocumentController->endEditing ();
 
-        // log the restored audio source / modification content
+        // log the restored audio source content
         for (auto i { 0U }; i < araFactory->analyzeableContentTypesCount; ++i)
-        {
             araDocumentController->logAvailableContent (audioSource);
-            araDocumentController->logAvailableContent (audioModification);
-        }
 
         ++index;
     }
@@ -922,7 +920,7 @@ void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileL
 // Requests plug-in analysis and saves audio source state to disk in an `iXML` data chunk
 void testAudioFileChunkSaving (const PlugInEntry* plugInEntry)
 {
-    ARA_LOG_TEST_HOST_FUNC ("ARA sound file saving XML chunks");
+    ARA_LOG_TEST_HOST_FUNC ("ARA audio file saving XML chunks");
 
     // create basic ARA model graph
     std::unique_ptr<TestHost> testHost;
@@ -935,6 +933,10 @@ void testAudioFileChunkSaving (const PlugInEntry* plugInEntry)
     AudioFileList audioFilesWithXMLChunk;
     for (const auto& audioSource : document->getAudioSources ())
     {
+        // log the audio source content to store
+        for (auto i { 0U }; i < araFactory->analyzeableContentTypesCount; ++i)
+            araDocumentController->logAvailableContent (audioSource.get ());
+
         // configure an audio file for the audio source
         icstdsp::AudioFile audioFile;
         const auto sampleCount { static_cast<unsigned int> (audioSource->getSampleCount ()) };
@@ -976,7 +978,7 @@ void testAudioFileChunkSaving (const PlugInEntry* plugInEntry)
                                                                                                                       0U, nullptr
                                                                                                                     };
         const auto archivingSuccess { araDocumentController->storeObjectsToArchive (&archive, &storeObjectsFilter) };
-        ARA_VALIDATE_API_STATE (archivingSuccess);
+        ARA_VALIDATE_API_STATE (archivingSuccess);      // our archive writer implementation never returns false, so this must always succeed
 
         std::string encodedArchiveData { base64_encode (archive) };
         archiveEl.append_child (ARA::kARAXMLName_ArchiveData).append_child (pugi::node_pcdata).set_value (encodedArchiveData.c_str ());

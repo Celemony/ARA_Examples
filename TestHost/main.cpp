@@ -24,7 +24,7 @@
 //------------------------------------------------------------------------------
 // Command line arguments format for testing VST3 plug-ins:
 // ./ARATestHost -vst3 [binaryFilePath] [optionalPlugInName] -test [TestCase(s)] -file [AudioFile(s)]
-// The optionalPlugInName argument will typically be omited, it is only needed when the VST3 binary
+// The optionalPlugInName argument will typically be omitted, it is only needed when the VST3 binary
 // contains multiple plug-ins (e.g. WaveShell).
 //
 // On macOS, Audio Units can also be tested:
@@ -58,16 +58,11 @@
 #include <cstring>
 
 // asserts
-#if ARA_VALIDATE_API_CALLS
-    ARA::ARAAssertFunction assertFunction { &ARA::ARAInterfaceAssert };
-#else
-    ARAAssertFunction assertFunction {};
-#endif
+ARA::ARAAssertFunction assertFunction { &ARA::ARAInterfaceAssert };
 ARA::ARAAssertFunction* assertFunctionReference { &assertFunction };
 
-ARA_SETUP_DEBUG_MESSAGE_PREFIX("ARATestHost");
 
-using AudioFileList = std::vector<std::shared_ptr<AudioFileBase>>;
+ARA_SETUP_DEBUG_MESSAGE_PREFIX("ARATestHost");
 
 
 AudioFileList parseAudioFiles (const std::vector<std::string>& args)
@@ -116,7 +111,9 @@ const std::vector<std::string> parseTestCases (const std::vector<std::string>& a
 // see start of this file for detailled description of the command line arguments
 int main (int argc, const char* argv[])
 {
-    const std::vector<std::string> args (argv, argv + argc);
+    const std::vector<std::string> args (argv + 1, argv + argc);
+
+    ARA::ARASetExternalAssertReference(assertFunctionReference);
 
     // parse the plug-in binary from the command line arguments
     auto plugInEntry { PlugInEntry::parsePlugInEntry (args, assertFunctionReference) };
@@ -141,7 +138,7 @@ int main (int argc, const char* argv[])
     const auto audioFiles { parseAudioFiles (args) };
     const auto testCases { parseTestCases (args) };
 
-    // conditinally execute each test case
+    // conditionally execute each test case
     const auto shouldTest { [&] (const std::string& testCase) { return testCases.empty () || ARA::contains(testCases, testCase); } };
     if (shouldTest ("PropertyUpdates"))
         testPropertyUpdates (plugInEntry.get (), audioFiles);

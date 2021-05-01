@@ -25,8 +25,6 @@
 
 #pragma once
 
-#include "ARA_Library/Dispatch/ARAHostDispatch.h"
-
 #include "ARADocumentController.h"
 
 /*******************************************************************************/

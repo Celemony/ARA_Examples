@@ -109,6 +109,7 @@ public:
     // Archiving functions
 
     // ARA2 style archiving (aka "partial persistency")
+    bool supportsPartialPersistency ();
     bool storeObjectsToArchive (ARAArchive* archive, const ARA::ARAStoreObjectsFilter* filter = nullptr);
     bool restoreObjectsFromArchive (const ARAArchive* archive, const ARA::ARARestoreObjectsFilter* filter = nullptr);
 

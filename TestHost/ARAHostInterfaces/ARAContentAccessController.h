@@ -25,11 +25,7 @@
 
 #pragma once
 
-#include "ARA_Library/Dispatch/ARAHostDispatch.h"
-
 #include "ARADocumentController.h"
-
-#include <vector>
 
 /*******************************************************************************/
 // Simple content reader class that will be passed as ARAContentReaderHostRef

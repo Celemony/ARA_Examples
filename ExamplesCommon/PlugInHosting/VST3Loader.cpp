@@ -189,13 +189,13 @@ VST3Binary* VST3LoadBinary (const char* binaryName)
             ARA_INTERNAL_ASSERT (result == kResultOk);
             ARA_INTERNAL_ASSERT (araMainFactory);
 
-            const auto araFactory { araMainFactory->getFactory() };
+            const auto araFactory { araMainFactory->getFactory () };
             ARA_VALIDATE_API_CONDITION (araFactory);
 
             // ensure all ARAFactories are unique (address and factoryID)
             for (auto& otherMainFactory : vst3Binary->araMainFactories)
             {
-                const auto otherARAFactory = otherMainFactory->getFactory();
+                const auto otherARAFactory = otherMainFactory->getFactory ();
                 ARA_INTERNAL_ASSERT (std::strcmp (araFactory->factoryID, otherARAFactory->factoryID) != 0);
                 ARA_INTERNAL_ASSERT (std::strcmp (araFactory->plugInName, otherARAFactory->plugInName) != 0);
             }
@@ -254,11 +254,11 @@ const ARA::ARAFactory* VST3GetARAFactory (struct VST3Binary* vst3Binary, const c
         return nullptr;
 
     if (!optionalPlugInName)
-        return vst3Binary->araMainFactories.front()->getFactory();
+        return vst3Binary->araMainFactories.front()->getFactory ();
 
     for (auto& araMainFactory : vst3Binary->araMainFactories)
     {
-        const auto araFactory { araMainFactory->getFactory() };
+        const auto araFactory { araMainFactory->getFactory () };
         if (std::strcmp (optionalPlugInName, araFactory->plugInName) == 0)
             return araFactory;
     }

@@ -25,11 +25,7 @@
 
 #pragma once
 
-#include "ARA_Library/Dispatch/ARAHostDispatch.h"
-
 #include "ARADocumentController.h"
-
-#include <map>
 
 /*******************************************************************************/
 // Implemention of our test host's model update controller interface

@@ -7,7 +7,7 @@ ARA SDK 2.0 draft 15 (aka 1.9.15) (2021/??/??)
 - added option ARA_SETUP_DEBUGGING to Cmake that allows to suppress debug preparations on build bots
 - allow builds on Cmake 3.12 (even if 3.19 or later is highly recommended due to bug fixes and debugging support)
 - improved debugger support when directly using Cmake in Visual Studio (without generating a solution first)
-- various other minor Cmake improvements
+- various other minor refactorings and cleanups
 
 ARA SDK 2.0 draft 14 (aka 1.9.14) (2021/02/26)
 - applied Apache License 2.0

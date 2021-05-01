@@ -293,6 +293,11 @@ void ARADocumentController::updatePlaybackRegionProperties (PlaybackRegion* play
 
 /*******************************************************************************/
 
+bool ARADocumentController::supportsPartialPersistency ()
+{
+    return _documentController->supportsPartialPersistency ();
+}
+
 bool ARADocumentController::storeObjectsToArchive (ARAArchive* archive, const ARA::ARAStoreObjectsFilter* filter)
 {
     ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
