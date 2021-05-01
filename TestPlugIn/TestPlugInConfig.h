@@ -29,3 +29,4 @@
 
 #define TEST_FACTORY_ID "com.arademocompany.testplugin.arafactory"
 #define TEST_DOCUMENT_ARCHIVE_ID "com.arademocompany.testplugin.aradocumentarchive.version1"
+#define TEST_FILECHUNK_ARCHIVE_ID "com.arademocompany.testplugin.arafilechunkarchive.version1"

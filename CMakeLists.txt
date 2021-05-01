@@ -1232,6 +1232,41 @@ endif(APPLE)
 
 
 # ======================
+# command line tool target for ARA audio file chunk authoring for the TestPlugIn 
+
+add_executable(ARATestChunkWriter
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/SignalProcessing/PulsedSineSignal.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/SignalProcessing/PulsedSineSignal.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioFileChunkWriter/ARATestChunkWriter.cpp"
+)
+
+set_target_properties(ARATestChunkWriter PROPERTIES
+    FOLDER "Plug-In Examples/ARATestPlugIn"
+)
+
+target_link_libraries(ARATestChunkWriter PRIVATE
+    ARATestPlugInCommon
+)
+
+configure_ARA_Examples_target(ARATestChunkWriter)
+
+if(WIN32)
+    ara_configure_binary_package(ARATestChunkWriter exe "")
+endif()
+
+if(ARA_SETUP_DEBUGGING)
+    set(ARATestChunkWriter_Dbg_Arguments "")
+    # optionally, enable openAutomatically:
+    #string(APPEND ARATestChunkWriter_Dbg_Arguments "-openAutomatically ")
+    string(APPEND ARATestChunkWriter_Dbg_Arguments "TestSineWithARAChunk.wav")
+    set_target_properties(ARATestChunkWriter PROPERTIES
+        VS_DEBUGGER_COMMAND_ARGUMENTS ${ARATestChunkWriter_Dbg_Arguments}
+        XCODE_SCHEME_ARGUMENTS ${ARATestChunkWriter_Dbg_Arguments}
+    )
+endif()
+
+
+# ======================
 # plug-in hosting code shared between the multiple host applications
 
 add_library(ARAPlugInHosting ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
@@ -1409,6 +1444,7 @@ if(ARA_SETUP_DEBUGGING)
     #string(APPEND ARATestHost_Dbg_Arguments " -test PlaybackRendering")
     #string(APPEND ARATestHost_Dbg_Arguments " -test EditorView")
     #string(APPEND ARATestHost_Dbg_Arguments " -test Algorithms")
+    #string(APPEND ARATestHost_Dbg_Arguments " -test AudioFileChunkLoading")
     # optionally, choose specific audio file(s) to selected test:
     #string(APPEND ARATestHost_Dbg_Arguments " -file /some/path/audiofile.wav")
     set_target_properties(ARATestHost PROPERTIES

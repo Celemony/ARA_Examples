@@ -32,6 +32,7 @@ The ARAMiniHost example is a very minimal ARA host application written using the
 - Test Plug-In
 This Audio Unit and VST3 plug-in utilizes the `ARAPlug` classes from the ARA library and can be used as a template for creating ARA-enabled plug-ins. It executes a (fake) analysis of the audio material including proper export of the resulting ARA content data and provides pass-through ARA rendering and proper persistency.
 It also features extensive validation and logging capabilities that make it very useful when developing ARA host applications.
+The actual plug-in is accompanied by a standalone ARATestChunkWriter tool for creating ARA audio file chunks for the plug-in.
 
 - Test Host
 The ARATestHost is a command line utility that can be used to load and debug ARA plug-ins. It implements many test scenarios that relate to real-life use cases - please see `main.cpp` for details on the tests and how to run them conveniently.

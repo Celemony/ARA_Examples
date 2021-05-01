@@ -7,6 +7,8 @@ ARA SDK 2.0 draft 15 (aka 1.9.15) (2021/??/??)
 - decoupled ARATestPlugIn's TestAnalysis and TestPersistency from ARA
 - audio file and archive code moved out of TestHost into ExamplesCommon to enable reuse
 - ARA audio file chunk handling moved from TestCases to AudioFile classes to enable reuse
+- ARA audio file chunk handling now properly deals with potential line feeds in base64 encoding
+- added an appropriate ARA audio file chunk authoring tool for ARATestPlugIn, using a separate archive format
 - added option ARA_SETUP_DEBUGGING to Cmake that allows to suppress debug preparations on build bots
 - allow builds on Cmake 3.12 (even if 3.19 or later is highly recommended due to bug fixes and debugging support)
 - improved debugger support when directly using Cmake in Visual Studio (without generating a solution first)

@@ -439,8 +439,11 @@ bool ARATestDocumentController::doRestoreObjectsFromArchive (ARA::PlugIn::HostAr
                                     return archiveReader->readBytesFromArchive (position, length, buffer);
                                 }};
 
+    const auto documentArchiveID { archiveReader->getDocumentArchiveID () };
+    const bool isChunkArchive { (documentArchiveID != nullptr) ? std::strcmp (documentArchiveID, TEST_FILECHUNK_ARCHIVE_ID) == 0 : false };
+
     // loop over stored audio source data
-    const auto numAudioSources { unarchiver.readSize () };
+    const auto numAudioSources { (isChunkArchive) ? 1 : unarchiver.readSize () };
     for (size_t i = 0; i < numAudioSources; ++i)
     {
         const float progressVal { static_cast<float> (i) / static_cast<float> (numAudioSources) };
@@ -452,9 +455,9 @@ bool ARATestDocumentController::doRestoreObjectsFromArchive (ARA::PlugIn::HostAr
         // read algorithm
         const auto algorithmID { unarchiver.readString () };
 
-        // read note content
-        const auto noteContentGrade { static_cast<ARA::ARAContentGrade> (unarchiver.readInt64 ()) };
-        const auto noteContentFromHost { unarchiver.readBool () };
+        // read note content (regarding file chunk content grade: storing a chunk for reuse implies "approving" it)
+        const auto noteContentGrade { (isChunkArchive) ? ARA::kARAContentGradeApproved : static_cast<ARA::ARAContentGrade> (unarchiver.readInt64 ()) };
+        const auto noteContentFromHost { (isChunkArchive) ? false : unarchiver.readBool () };
         std::unique_ptr<TestNoteContent> noteContent { decodeTestNoteContent (unarchiver) };
 
         // abort on reader error
@@ -829,6 +832,8 @@ public:
 
     ARA::ARASize getAnalyzeableContentTypesCount () const noexcept override  { return analyzeableContentTypes.size (); }
     const ARA::ARAContentType* getAnalyzeableContentTypes () const noexcept override { return  analyzeableContentTypes.data (); }
+    ARA::ARASize getCompatibleDocumentArchiveIDsCount () const noexcept override { return 1; }
+    const ARA::ARAPersistentID* getCompatibleDocumentArchiveIDs () const noexcept override { static const auto id { TEST_FILECHUNK_ARCHIVE_ID }; return &id; }
 };
 
 const ARA::ARAFactory* ARATestDocumentController::getARAFactory () noexcept

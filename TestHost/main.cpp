@@ -162,8 +162,6 @@ int main (int argc, const char* argv[])
         testProcessingAlgorithms (plugInEntry.get (), audioFiles);
     if (shouldTest ("AudioFileChunkLoading"))
         testAudioFileChunkLoading (plugInEntry.get (), audioFiles);
-    if (shouldTest ("AudioFileChunkSaving"))
-        testAudioFileChunkSaving (plugInEntry.get ());
 
     return 0;
 }
