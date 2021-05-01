@@ -586,7 +586,7 @@ bool ARATestDocumentController::doIsAudioSourceContentAvailable (const ARA::Plug
 ARA::ARAContentGrade ARATestDocumentController::doGetAudioSourceContentGrade (const ARA::PlugIn::AudioSource* audioSource, ARA::ARAContentType type) noexcept
 {
     if (doIsAudioSourceContentAvailable (audioSource, type))
-        return ARA::kARAContentGradeDetected;
+        return static_cast<const ARATestAudioSource*> (audioSource)->getNoteContentGrade ();
     return ARA::kARAContentGradeInitial;
 }
 
