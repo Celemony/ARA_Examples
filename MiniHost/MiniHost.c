@@ -71,6 +71,7 @@
 
     #define ARA_PLUGIN_VST3_BINARY "ARATestPlugIn.vst3"
 //  #define ARA_PLUGIN_VST3_BINARY "/Library/Audio/Plug-Ins/VST3/Melodyne.vst3"
+    #define ARA_PLUGIN_VST3_OPTIONAL_PLUGIN_NAME NULL
 #else
     #error "PLUGIN_FORMAT not configured properly in the project"
 #endif
@@ -350,7 +351,7 @@ int main (int argc, const char * argv[])
     struct VST3Effect * vst3Effect;
     struct VST3Binary * vst3Binary = VST3LoadBinary (ARA_PLUGIN_VST3_BINARY);
     ARA_INTERNAL_ASSERT(vst3Binary != NULL);
-    factory = VST3GetARAFactory(vst3Binary, NULL);
+    factory = VST3GetARAFactory(vst3Binary, ARA_PLUGIN_VST3_OPTIONAL_PLUGIN_NAME);
 #endif
 
     if (factory == NULL)
@@ -425,7 +426,7 @@ int main (int argc, const char * argv[])
     audioUnit = AudioUnitOpen(audioComponent);
     plugInInstance = AudioUnitBindToARADocumentController(audioUnit, documentControllerRef, roles);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
-    vst3Effect = VST3CreateEffect (vst3Binary, NULL);
+    vst3Effect = VST3CreateEffect (vst3Binary, ARA_PLUGIN_VST3_OPTIONAL_PLUGIN_NAME);
     plugInInstance = VST3BindToARADocumentController(vst3Effect, documentControllerRef, roles);
 #endif
 
