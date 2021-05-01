@@ -28,7 +28,7 @@
 #include "ARADocumentController.h"
 
 /*******************************************************************************/
-// Implemention of our test host's model update controller interface
+// Implementation of our test host's model update controller interface
 // The plug-in will call these functions to notify the host of changes
 // in audio or musical content and post analysis progress notifications
 class ARAModelUpdateController : public ARA::Host::ModelUpdateControllerInterface
@@ -48,7 +48,7 @@ public:
     void notifyAudioSourceContentChanged (ARA::ARAAudioSourceHostRef audioSourceHostRef, const ARA::ARAContentTimeRange* range, ARA::ContentUpdateScopes scopeFlags) noexcept override;
 
     // Similar to notifyAudioSourceContentChanged but with a change in scope - now it's limited to a change in an audio modification
-    // (note that since ARA 2, in many situations it is preferrable to instead read the newly added playback region content)
+    // (note that since ARA 2, in many situations it is preferable to instead read the newly added playback region content)
     void notifyAudioModificationContentChanged (ARA::ARAAudioModificationHostRef audioModificationHostRef, const ARA::ARAContentTimeRange* range, ARA::ContentUpdateScopes scopeFlags) noexcept override;
 
     // Similar to notifyAudioSourceContentChanged but with a change in scope - now it's limited to a change with a playback region

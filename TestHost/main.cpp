@@ -110,7 +110,7 @@ const std::vector<std::string> parseTestCases (const std::vector<std::string>& a
     return parsedTests;
 }
 
-// see start of this file for detailled description of the command line arguments
+// see start of this file for detailed description of the command line arguments
 int main (int argc, const char* argv[])
 {
     const std::vector<std::string> args (argv + 1, argv + argc);

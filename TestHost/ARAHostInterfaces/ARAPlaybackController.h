@@ -30,7 +30,7 @@
 #include "ARADocumentController.h"
 
 /*******************************************************************************/
-// Implemention of our test host's playback controller interface
+// Implementation of our test host's playback controller interface
 // Since we aren't a real host this doesn't do anything, but it's the
 // plug-in's means of controller the host transport
 class ARAPlaybackController : public ARA::Host::PlaybackControllerInterface

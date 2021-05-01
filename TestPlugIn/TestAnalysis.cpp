@@ -33,7 +33,7 @@
 // consecutive samples that are not 0. It also tracks the peak amplitude throughout each note and
 // assumes this as note volume. (Note that actual plug-ins would rather use some calculation closer
 // to RMS for determining volume.) This is no meaningful algorithm for real-world signals, but it
-// was choosen so that the resulting note data can be easily verified both manually and via scripts
+// was chosen so that the resulting note data can be easily verified both manually and via scripts
 // parsing the debug output of the various examples (which generate a pulsed sine wave whenever no
 // actual audio file is used).
 // The time consumed by the fake analysis is the duration of the audio source scaled down by

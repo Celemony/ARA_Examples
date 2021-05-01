@@ -53,7 +53,7 @@ TestVST3Processor::~TestVST3Processor ()
 //------------------------------------------------------------------------
 tresult PLUGIN_API TestVST3Processor::initialize (FUnknown* context)
 {
-    // Here the Plug-in will be instanciated
+    // Here the Plug-in will be instantiated
 
     //---always initialize the parent-------
     tresult result = AudioEffect::initialize (context);
@@ -73,7 +73,7 @@ tresult PLUGIN_API TestVST3Processor::initialize (FUnknown* context)
 //------------------------------------------------------------------------
 tresult PLUGIN_API TestVST3Processor::terminate ()
 {
-    // Here the Plug-in will be de-instanciated, last possibility to remove some memory!
+    // Here the Plug-in will be de-instantiated, last possibility to remove some memory!
 
     //---do not forget to call parent ------
     return AudioEffect::terminate ();

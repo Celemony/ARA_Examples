@@ -407,7 +407,7 @@ void ARADocumentController::requestAudioSourceContentAnalysis (AudioSource* audi
         // Because this is our update loop, query the document controller for model updates here
         _documentController->notifyModelUpdates ();
 
-        // Check if all analyses are done for the available analysis content types
+        // Check if all analysis is done for the available analysis content types
         bool allDone { true };
         for (auto t { 0U }; t < contentTypesCount; ++t)
         {

@@ -46,7 +46,7 @@ ARA_MAP_HOST_REF (HostDataContentReader, ARA::ARAContentReaderHostRef)
 
 
 /*******************************************************************************/
-// Implemention of our test host's content access controller interface
+// Implementation of our test host's content access controller interface
 // We'll use it here to give the plug-in information about the content of our musical context or audio sources
 class ARAContentAccessController : public ARA::Host::ContentAccessControllerInterface
 {

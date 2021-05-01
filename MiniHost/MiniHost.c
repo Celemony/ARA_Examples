@@ -421,7 +421,7 @@ int main (int argc, const char * argv[])
 
 
     // create companion plug-in and bind it to the ARA document controller
-    ARA_LOG("creating plug-in instance and binding it to the ARA document contoller");
+    ARA_LOG("creating plug-in instance and binding it to the ARA document controller");
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
     audioUnit = AudioUnitOpen(audioComponent);
     plugInInstance = AudioUnitBindToARADocumentController(audioUnit, documentControllerRef, roles);

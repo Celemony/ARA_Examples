@@ -505,14 +505,14 @@ function(configure_3rdParty_target target)
 
 endfunction()
 
-# fetch git submodules if needed
+# fetch Git submodules if needed
 if((NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/cpp-base64/base64.h") OR
    (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/ICST_AudioFile/AudioFile.h") OR
    (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/pugixml/src/pugixml.hpp"))
-    message(STATUS "Updating git submodules")
+    message(STATUS "Updating Git submodules")
     execute_process(COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}" submodule update --init --recursive RESULT_VARIABLE result)
     if(result)
-        message(FATAL_ERROR "Couldn't fetch/update git submodules: ${result}.")
+        message(FATAL_ERROR "Couldn't fetch/update Git submodules: ${result}.")
     endif()
     unset(result)
 endif()

@@ -37,7 +37,7 @@ public:
     // publish inherited constructor
     using ARA::PlugIn::DocumentController::DocumentController;
 
-    // getter for the Companion API implementations
+    // getter for the companion API implementations
     static const ARA::ARAFactory* getARAFactory () noexcept;
 
 protected:

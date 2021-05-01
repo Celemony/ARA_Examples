@@ -171,7 +171,7 @@ VST3Binary* VST3LoadBinary (const char* binaryName)
         result = vst3Binary->pluginFactory->getClassInfo (i, &classInfo);
         ARA_INTERNAL_ASSERT (result == Steinberg::kResultOk);
 
-        // find and instanciate all ARA::IMainFactory classes and ensure they have unique names and IDs
+        // find and instantiate all ARA::IMainFactory classes and ensure they have unique names and IDs
         if (std::strcmp (kARAMainFactoryClass, classInfo.category) == 0)
         {
 #if ARA_VALIDATE_API_CALLS

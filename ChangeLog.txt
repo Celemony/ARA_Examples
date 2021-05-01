@@ -9,9 +9,9 @@ ARA SDK 2.0 draft 15 (aka 1.9.15) (2021/??/??)
 - ARA audio file chunk handling moved from TestCases to AudioFile classes to enable reuse
 - ARA audio file chunk handling now properly deals with potential line feeds in base64 encoding
 - added an appropriate ARA audio file chunk authoring tool for ARATestPlugIn, using a separate archive format
-- added option ARA_SETUP_DEBUGGING to Cmake that allows to suppress debug preparations on build bots
-- allow builds on Cmake 3.12 (even if 3.19 or later is highly recommended due to bug fixes and debugging support)
-- improved debugger support when directly using Cmake in Visual Studio (without generating a solution first)
+- added option ARA_SETUP_DEBUGGING to CMake that allows to suppress debug preparations on build bots
+- allow builds on CMake 3.12 (even if 3.19 or later is highly recommended due to bug fixes and debugging support)
+- improved debugger support when directly using CMake in Visual Studio (without generating a solution first)
 - various other minor refactorings and cleanups
 
 ARA SDK 2.0 draft 14 (aka 1.9.14) (2021/02/26)
@@ -19,8 +19,8 @@ ARA SDK 2.0 draft 14 (aka 1.9.14) (2021/02/26)
 - added support for license management if using ARA plug-ins without UI as analysis or time-stretch engine
 - restructured the entire SDK layout to enable proper modular integration into builds of ARA enabled projects
 - improved CMake setup on all platforms, but still work-in-progress
-- Companion APIs can now either be installed using CMake scripts, or provided by specifying their local path
-- 3rd party library code used in the examples implementation is now integrated as git submodules
+- companion APIs can now either be installed using CMake scripts, or provided by specifying their local path
+- 3rd party library code used in the examples implementation is now integrated as Git submodules
   (a copy of the code will be included in .zip distributions of the ARA SDK)
 - migrated from native Visual Studio solution/projects or Xcode projects to CMake
   (CMake is distributed with Visual Studio 2017 and later as optional Visual Studio Installer package,
@@ -37,7 +37,7 @@ ARA SDK 2.0 draft 14 (aka 1.9.14) (2021/02/26)
 - ARATestPlugIn code restructured and targets renamed, Audio Unit IDs updated
   Make sure to delete old versions of the plug-ins that still have the old name to avoid conflicts!
   On the Mac, these are located in ~/Library/Audio/Plug-Ins/Components and ../VST3 respectively,
-  on Windows in C:\Orogram Files\Common Files\VST3.
+  on Windows in C:\Program Files\Common Files\VST3.
 - added ARA factory validation to VST3 loader code
 - VST3 loader code now creates all ARA::IMainFactories upon loading the binary to guarantee
   proper life time of ARAFactory pointers it hands out to the calling code
@@ -85,7 +85,7 @@ ARA SDK 2.0 draft 9 (aka 1.9.9) (2019/12/06)
 - added test cases for partial persistency
 - prepared TestHost for using actual audio files instead of dummy sine signal
 - various improvements and refactorings in TestHost
-  (check detailled diffs if your implementation has copied from that code)
+  (check detailed diffs if your implementation has copied from that code)
 - dropped support for long-deprecated, Carbon Ressource Fork based AudioUnit version 1 loader
 
 ARA SDK 2.0 draft 8 (aka 1.9.8) (2019/06/28)
