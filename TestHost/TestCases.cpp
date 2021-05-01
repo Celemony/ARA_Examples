@@ -31,9 +31,6 @@
 
 #include "ARA_API/ARAAudioFileChunks.h"
 
-#include "3rdParty/pugixml/src/pugixml.hpp"
-#include "3rdParty/cpp-base64/base64.h"
-
 #include <cmath>
 #include <cstring>
 #include <cstdio>
@@ -798,84 +795,36 @@ void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileL
     auto index { 0 };
     for (const auto& audioFile : audioFiles)
     {
-        // load this wav file, ensure it has a valid iXML data chunk
-        pugi::xml_document iXMLChunk;
-        size_t iXMLBufLen { 0 };
-        auto iXMLBuf { audioFile->getiXMLChunk (&iXMLBufLen) };
-        iXMLChunk.load_buffer (iXMLBuf, iXMLBufLen);
-        if (iXMLChunk.document_element ().empty ())
-        {
-            ARA_LOG ("No valid iXML chunk found in audio file %s", audioFile->getName ().c_str ());
-            continue;
-        }
-
-// enable this to log chunk data without parsing
-//      iXMLChunk.save (std::cout);
-
         // find matching ARA archive
-        const auto broadcastWaveEl { iXMLChunk.child ("BWFXML") };
-        const auto araSectionEl { broadcastWaveEl.child (ARA::kARAXMLName_ARAVendorKeyword) };
-        const auto audioSourceArchiveEl { araSectionEl.child (ARA::kARAXMLName_AudioSources) };
-        pugi::xml_node archiveEl;
-        const char* documentArchiveID { nullptr };
-        for (const auto& currentArchiveEl : audioSourceArchiveEl.children (ARA::kARAXMLName_AudioSource))
+        bool openAutomatically { false };
+        std::string plugInName, plugInVersion, manufacturer, informationURL, persistentID;
+        auto documentArchiveID { araFactory->documentArchiveID };
+        auto data { audioFile->getiXMLARAAudioSourceData (documentArchiveID, openAutomatically,
+                                                          plugInName, plugInVersion, manufacturer, informationURL, persistentID) };
+        for (auto i { 0U }; data.empty () && (i < araFactory->compatibleDocumentArchiveIDsCount); ++i)
         {
-            documentArchiveID = currentArchiveEl.child_value (ARA::kARAXMLName_DocumentArchiveID);
-            if (0 == std::strcmp (documentArchiveID, araFactory->documentArchiveID))
-            {
-                archiveEl = currentArchiveEl;
-                break;
-            }
-
-            for (auto i { 0U }; i < araFactory->compatibleDocumentArchiveIDsCount; ++i)
-            {
-                if (0 == std::strcmp (documentArchiveID, araFactory->compatibleDocumentArchiveIDs[i]))
-                {
-                    archiveEl = currentArchiveEl;
-                    break;
-                }
-            }
+            documentArchiveID = araFactory->compatibleDocumentArchiveIDs[i];
+            data = audioFile->getiXMLARAAudioSourceData (documentArchiveID, openAutomatically,
+                                                         plugInName, plugInVersion, manufacturer, informationURL, persistentID);
         }
-        if (!archiveEl)
+        if (data.empty ())
         {
             ARA_LOG ("No matching ARA archive chunk found in iXML chunk in audio file %s", audioFile->getName ().c_str ());
             continue;
         }
         ARA_LOG ("Found matching ARA archive in audio file %s:", audioFile->getName ().c_str ());
-
-        // check whether to open automatically
-        auto openAutomatically { "false" };
-        if (const auto openAutomaticallyEl { archiveEl.child (ARA::kARAXMLName_OpenAutomatically) })
-        {
-            openAutomatically = openAutomaticallyEl.child_value ();
-            ARA_INTERNAL_ASSERT ((0 == std::strcmp (openAutomatically, "true")) ||
-                                 (0 == std::strcmp (openAutomatically, "false")));
-        }
         ARA_LOG ("Open automatically: %s", openAutomatically);
-
-        // evaluate suggested plug-in
-        const auto suggestedPlugInEl { archiveEl.child (ARA::kARAXMLName_SuggestedPlugIn) };
-        ARA_INTERNAL_ASSERT (suggestedPlugInEl);
         ARA_LOG ("Suggested plug-in for loading the chunk:");
-        ARA_INTERNAL_ASSERT (suggestedPlugInEl.child (ARA::kARAXMLName_PlugInName));
-        ARA_LOG ("    name: %s", suggestedPlugInEl.child_value (ARA::kARAXMLName_PlugInName));
-        ARA_INTERNAL_ASSERT (suggestedPlugInEl.child (ARA::kARAXMLName_LowestSupportedVersion));
-        ARA_LOG ("    minimum version: %s", suggestedPlugInEl.child_value (ARA::kARAXMLName_LowestSupportedVersion));
-        ARA_INTERNAL_ASSERT (suggestedPlugInEl.child (ARA::kARAXMLName_ManufacturerName));
-        ARA_LOG ("    manufacturer: %s", suggestedPlugInEl.child_value (ARA::kARAXMLName_ManufacturerName));
-        ARA_INTERNAL_ASSERT (suggestedPlugInEl.child (ARA::kARAXMLName_InformationURL));
-        ARA_LOG ("    website: %s", suggestedPlugInEl.child_value (ARA::kARAXMLName_InformationURL));
+        ARA_VALIDATE_API_STATE (!plugInName.empty ());
+        ARA_LOG ("    name: %s", plugInName.c_str ());
+        ARA_VALIDATE_API_STATE (!plugInVersion.empty ());
+        ARA_LOG ("    minimum version: %s", plugInVersion.c_str ());
+        ARA_VALIDATE_API_STATE (!manufacturer.empty ());
+        ARA_LOG ("    manufacturer: %s", manufacturer.c_str ());
+        ARA_VALIDATE_API_STATE (!informationURL.empty ());
+        ARA_LOG ("    website: %s", informationURL.c_str ());
 
-        // read persistent ID and archive data
-        // (the decoded archive data will be copied into an TestArchive object for further generic processing)
-        ARA_INTERNAL_ASSERT (archiveEl.child (ARA::kARAXMLName_PersistentID));
-        const std::string audioSourceArchivePersistentID { archiveEl.child_value (ARA::kARAXMLName_PersistentID) };
-        ARA_INTERNAL_ASSERT (audioSourceArchivePersistentID.length () > 0);
-        ARA_INTERNAL_ASSERT (archiveEl.child (ARA::kARAXMLName_ArchiveData));
-        const std::string encodedArchiveData { archiveEl.child_value (ARA::kARAXMLName_ArchiveData) };
-        ARA_INTERNAL_ASSERT (encodedArchiveData.length () > 0);
-        const auto decodedArchiveData { base64_decode (encodedArchiveData) };
-        MemoryArchive archive { decodedArchiveData, documentArchiveID };
+        MemoryArchive archive { data, documentArchiveID };
 
         // begin loading chunk
         araDocumentController->beginEditing ();
@@ -885,7 +834,7 @@ void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileL
         auto audioSource { testHost->addAudioSource (document->getName (), audioFile.get (), newPersistentID) };
 
         // partial persistence - restore this audio source using the archive stored in the XML data
-        const auto oldID { audioSourceArchivePersistentID.c_str () };
+        const auto oldID { persistentID.c_str () };
         const auto newID { newPersistentID.c_str () };
         const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARARestoreObjectsFilter, audioModificationCurrentIDs)> restoreObjectsFilter { ARA::kARAFalse,
                                                                                                                                 1U, &oldID, &newID,
@@ -948,27 +897,7 @@ void testAudioFileChunkSaving (const PlugInEntry* plugInEntry)
             audioSampleBuffers.push_back (audioFile.GetSafePt (static_cast<unsigned int> (c)));
         audioSource->getAudioFile ()->readSamples (0, audioSource->getSampleCount (), reinterpret_cast<void**> (audioSampleBuffers.data ()), false);
 
-        // create the ARA sound file XML chunk document
-        pugi::xml_document iXMLChunk;
-        auto broadcastWaveEl { iXMLChunk.append_child ("BWFXML") };
-        auto araSectionEl { broadcastWaveEl.append_child (ARA::kARAXMLName_ARAVendorKeyword) };
-        auto audioSourceArchiveEl { araSectionEl.append_child (ARA::kARAXMLName_AudioSources) };
-        auto archiveEl { audioSourceArchiveEl.append_child (ARA::kARAXMLName_AudioSource) };
-
-        // write the archive entry information
-        archiveEl.append_child (ARA::kARAXMLName_DocumentArchiveID).append_child (pugi::node_pcdata).set_value (araFactory->documentArchiveID);
-
-        archiveEl.append_child (ARA::kARAXMLName_OpenAutomatically).append_child (pugi::node_pcdata).set_value ("false");
-
-        auto suggestedPlugInEl { archiveEl.append_child (ARA::kARAXMLName_SuggestedPlugIn) };
-        suggestedPlugInEl.append_child (ARA::kARAXMLName_PlugInName).append_child (pugi::node_pcdata).set_value (araFactory->plugInName);
-        suggestedPlugInEl.append_child (ARA::kARAXMLName_LowestSupportedVersion).append_child (pugi::node_pcdata).set_value (araFactory->version);
-        suggestedPlugInEl.append_child (ARA::kARAXMLName_ManufacturerName).append_child (pugi::node_pcdata).set_value (araFactory->manufacturerName);
-        suggestedPlugInEl.append_child (ARA::kARAXMLName_InformationURL).append_child (pugi::node_pcdata).set_value (araFactory->informationURL);
-
-        archiveEl.append_child (ARA::kARAXMLName_PersistentID).append_child (pugi::node_pcdata).set_value ( audioSource->getPersistentID ().c_str ());
-
-        // partial persistence - store archive for this audio source into the XML chunk
+        // partial persistence - create an archive of the audio source for the XML chunk
         MemoryArchive archive { araFactory->documentArchiveID };
         ARA::ARAAudioSourceRef audioSourceRef { araDocumentController->getRef (audioSource.get ()) };
         const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAStoreObjectsFilter, audioModificationRefs)> storeObjectsFilter { ARA::kARAFalse,
@@ -978,22 +907,16 @@ void testAudioFileChunkSaving (const PlugInEntry* plugInEntry)
         const auto archivingSuccess { araDocumentController->storeObjectsToArchive (&archive, &storeObjectsFilter) };
         ARA_VALIDATE_API_STATE (archivingSuccess);      // our archive writer implementation never returns false, so this must always succeed
 
-        std::string encodedArchiveData { base64_encode (archive) };
-        archiveEl.append_child (ARA::kARAXMLName_ArchiveData).append_child (pugi::node_pcdata).set_value (encodedArchiveData.c_str ());
-
-        std::ostringstream writer;
-        iXMLChunk.save (writer);
-        const std::string iXMLString { writer.str () };
-        audioFile.SetiXMLData (reinterpret_cast<const unsigned char*> (iXMLString.data ()), static_cast<unsigned int> (iXMLString.length ()));
+        auto dataFile { std::make_shared<AudioDataFile> (audioSource->getName (), std::move (audioFile)) };
+        dataFile->setiXMLARAAudioSourceData (araFactory->documentArchiveID, false /*openAutomatically*/,
+                                             araFactory->plugInName, araFactory->version, araFactory->manufacturerName, araFactory->informationURL,
+                                             audioSource->getPersistentID (), archive);
 
 // enable this to store an actual audio file to the current directory
-//      auto wavFileName { audioSource->getName () };
-//      if ((wavFileName.length () < 4) || (wavFileName.substr (wavFileName.length () - 4) != ".wav"))
-//          wavFileName += ".wav";
-//      auto err { audioFile.SaveWave (wavFileName.c_str ()) };
-//      ARA_INTERNAL_ASSERT (err == 0);
+//      const auto success { dataFile->saveToFile (audioSource->getName ()) };
+//      ARA_INTERNAL_ASSERT (success);
 
-        audioFilesWithXMLChunk.emplace_back (std::make_shared<AudioDataFile> (audioSource->getName (), std::move (audioFile)));
+        audioFilesWithXMLChunk.emplace_back (dataFile);
     }
 
     // test our saved iXML chunks in testAudioFileChunkLoading

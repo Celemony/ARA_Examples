@@ -24,6 +24,8 @@
 #include <cstdint>
 #include <string>
 
+class ARAiXMLChunk;
+
 /*******************************************************************************/
 
 // Abstract interface for audio files.
@@ -31,7 +33,7 @@ class AudioFileBase
 {
 public:
     AudioFileBase (const std::string& name) : _name { name } {}
-    virtual ~AudioFileBase () = default;
+    virtual ~AudioFileBase () { setiXMLChunk (nullptr); }
 
     virtual int64_t getSampleCount () const noexcept = 0;
     virtual double getSampleRate () const noexcept = 0;
@@ -41,15 +43,27 @@ public:
     virtual bool readSamples (int64_t samplePosition, int64_t samplesPerChannel,
                               void* const buffers[], bool use64BitSamples) noexcept = 0;
 
-    virtual const uint8_t* getiXMLChunk (size_t* length) { *length = 0; return nullptr; }
+    std::string getiXMLARAAudioSourceData (const std::string& documentArchiveID, bool& openAutomatically,
+                                           std::string& plugInName, std::string& plugInVersion,
+                                           std::string& manufacturer, std::string& informationURL,
+                                           std::string& persistentID);
+    void setiXMLARAAudioSourceData (const std::string& documentArchiveID, bool openAutomatically,
+                                    const std::string& plugInName, const std::string& plugInVersion,
+                                    const std::string& manufacturer, const std::string& informationURL,
+                                    const std::string& persistentID, const std::string& data);
 
     virtual bool saveToFile (const std::string& path) = 0;
 
     const std::string& getName () const noexcept { return _name; }
     void setName (const std::string& name) noexcept { _name = name; }
 
+protected:
+    const ARAiXMLChunk* getiXMLChunk () const noexcept { return _iXMLChunk; }
+    void setiXMLChunk (ARAiXMLChunk* chunk) noexcept;
+
 private:
     std::string _name;
+    ARAiXMLChunk* _iXMLChunk { nullptr };
 };
 
 /*******************************************************************************/
@@ -92,8 +106,6 @@ public:
 
     bool readSamples (int64_t samplePosition, int64_t samplesPerChannel,
                       void* const buffers[], bool use64BitSamples) noexcept override;
-
-    const uint8_t* getiXMLChunk (size_t* length) override;
 
     bool saveToFile (const std::string& path) override;
 
