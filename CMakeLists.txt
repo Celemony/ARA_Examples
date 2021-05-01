@@ -1039,10 +1039,43 @@ endforeach()
 
 
 # ======================
+# common code shared to varying degrees between the various host and plug-in targets
+
+add_library(ARAExamplesCommon ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/Utilities/StdUniquePtrUtilities.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/Archives/Archives.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/Archives/Archives.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/AudioFiles/AudioFiles.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/AudioFiles/AudioFiles.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/SignalProcessing/PulsedSineSignal.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/SignalProcessing/PulsedSineSignal.c"
+)
+
+set_target_properties(ARAExamplesCommon PROPERTIES
+    FOLDER "ExamplesCommon"
+    XCODE_GENERATE_SCHEME OFF
+)
+
+target_link_libraries(ARAExamplesCommon PUBLIC
+    cpp-base64
+    ICST_AudioFile
+    pugixml
+)
+
+target_include_directories(ARAExamplesCommon
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE
+        "${ARA_LIBRARY_DIR}/.."
+)
+
+configure_ARA_Examples_target(ARAExamplesCommon)
+
+
+# ======================
 # common code shared between the various TestPlugIn targets
 
 add_library(ARATestPlugInCommon ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
-    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/Utilities/StdUniquePtrUtilities.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/ARATestAudioSource.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/ARATestAudioSource.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/ARATestDocumentController.h"
@@ -1062,10 +1095,11 @@ set_target_properties(ARATestPlugInCommon PROPERTIES
 
 target_link_libraries(ARATestPlugInCommon PUBLIC
     ARA_PlugIn_Library
+    ARAExamplesCommon
 )
 
-target_include_directories(ARATestPlugInCommon PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}"
+target_include_directories(ARATestPlugInCommon PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn"
 )
 
 configure_ARA_Examples_target(ARATestPlugInCommon)
@@ -1095,10 +1129,6 @@ endif()
 set_target_properties(ARATestPlugInVST3 PROPERTIES
     FOLDER "Plug-In Examples/ARATestPlugIn"
     OUTPUT_NAME "ARATestPlugIn"
-)
-
-target_include_directories(ARATestPlugInVST3 PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn"
 )
 
 target_link_libraries(ARATestPlugInVST3 PRIVATE
@@ -1173,10 +1203,6 @@ if(APPLE)
         -Wno-zero-as-null-pointer-constant
     )
 
-    target_include_directories(ARATestPlugInAudioUnit PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn"
-    )
-
     target_link_libraries(ARATestPlugInAudioUnit PRIVATE
         ARATestPlugInCommon
         CoreAudioUtilityClasses
@@ -1205,50 +1231,46 @@ endif(APPLE)
 
 
 # ======================
-# common code shared between the multiple host applications
+# plug-in hosting code shared between the multiple host applications
 
-add_library(ARAHostExamplesCommon ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
-    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/SignalProcessing/PulsedSineSignal.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/SignalProcessing/PulsedSineSignal.c"
+add_library(ARAPlugInHosting ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
     "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/VST3Loader.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/VST3Loader.cpp"
 )
 if(APPLE)
-    target_sources(ARAHostExamplesCommon PRIVATE
+    target_sources(ARAPlugInHosting PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/AudioUnitLoader.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/AudioUnitLoader.m"
     )
 endif()
 
-set_target_properties(ARAHostExamplesCommon PROPERTIES
+set_target_properties(ARAPlugInHosting PROPERTIES
     FOLDER "Host Examples"
     XCODE_GENERATE_SCHEME OFF
 )
 
-target_include_directories(ARAHostExamplesCommon
-    PUBLIC
-        "${CMAKE_CURRENT_SOURCE_DIR}"
-    PRIVATE
+target_include_directories(ARAPlugInHosting PRIVATE
         "${ARA_VST3_SDK_DIR}"
 )
 
-target_link_libraries(ARAHostExamplesCommon PUBLIC
+target_link_libraries(ARAPlugInHosting PUBLIC
     ARA_Host_Library
+    ARAExamplesCommon
 )
 if(APPLE)
-    target_link_libraries(ARAHostExamplesCommon PUBLIC
+    target_link_libraries(ARAPlugInHosting PUBLIC
         "-framework CoreServices"
         "-framework AVFoundation"
         "-framework AudioUnit"
     )
 elseif(UNIX)
-    target_link_libraries(ARAHostExamplesCommon PUBLIC
+    target_link_libraries(ARAPlugInHosting PUBLIC
         "m"
         "dl"
     )
 endif()
 
-configure_ARA_Examples_target(ARAHostExamplesCommon)
+configure_ARA_Examples_target(ARAPlugInHosting)
 
 
 # ======================
@@ -1264,7 +1286,8 @@ set_target_properties(ARAMiniHost PROPERTIES
 )
 
 target_link_libraries(ARAMiniHost PRIVATE
-    ARAHostExamplesCommon
+    ARA_API
+    ARAPlugInHosting
 )
 
 target_compile_definitions(ARAMiniHost PRIVATE
@@ -1296,7 +1319,6 @@ endif()
 # command line tool target Test Host
 
 add_executable(ARATestHost
-    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/Utilities/StdUniquePtrUtilities.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/ARAHostInterfaces/ARAArchivingController.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/ARAHostInterfaces/ARAArchivingController.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/ARAHostInterfaces/ARAAudioAccessController.h"
@@ -1307,12 +1329,8 @@ add_executable(ARATestHost
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/ARAHostInterfaces/ARAModelUpdateController.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/ARAHostInterfaces/ARAPlaybackController.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/ARAHostInterfaces/ARAPlaybackController.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/ARAArchives.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/ARAArchives.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/ARADocumentController.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/ARADocumentController.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/AudioFiles.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/AudioFiles.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/CompanionAPIs.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/CompanionAPIs.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/ModelObjects.h"
@@ -1333,10 +1351,8 @@ target_include_directories(ARATestHost PRIVATE
 )
 
 target_link_libraries(ARATestHost PRIVATE
-    ARAHostExamplesCommon
-    cpp-base64
-    ICST_AudioFile
-    pugixml
+    ARAPlugInHosting
+    ARAExamplesCommon
 )
 if(APPLE)
     target_link_libraries(ARATestHost PRIVATE
@@ -1429,7 +1445,7 @@ if(APPLE)
     )
 
     target_link_libraries(ARAIPCDemoPlugInProcess PRIVATE
-        ARAHostExamplesCommon
+        ARAPlugInHosting
     )
 
     configure_ARA_Examples_target(ARAIPCDemoPlugInProcess)
@@ -1464,7 +1480,7 @@ if(APPLE)
     )
 
     target_link_libraries(ARAIPCDemoMainProcess PRIVATE
-        ARAHostExamplesCommon
+        ARAPlugInHosting
     )
 
     configure_ARA_Examples_target(ARAIPCDemoMainProcess)

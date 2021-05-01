@@ -55,11 +55,9 @@
 AudioFileList createDummyAudioFiles (size_t numFiles)
 {
     // add an audio source with 5 seconds of single channel audio with a sample rate of 44100
-    constexpr auto testAudioSourceDuration { 5.0 };
-    constexpr auto testAudioSourceSampleRate { 44100.0 };
     AudioFileList dummyFiles;
     for (size_t i { 0 }; i < numFiles; ++i)
-        dummyFiles.emplace_back (new SineAudioFile ("Sin Source " + std::to_string (i), ARA::samplePositionAtTime (testAudioSourceDuration, testAudioSourceSampleRate), testAudioSourceSampleRate, 1));
+        dummyFiles.emplace_back (new SineAudioFile ("Sin Source " + std::to_string (i), 5.0, 44100.0, 1));
     return dummyFiles;
 }
 
@@ -360,9 +358,9 @@ void testArchiving (const PlugInEntry* plugInEntry, const AudioFileList& audioFi
 
 #if defined (ARA_TEST_ARCHIVE_FILENAME)
     std::remove (ARA_TEST_ARCHIVE_FILENAME);
-    auto archive = new ARAFileArchive { ARA_TEST_ARCHIVE_FILENAME, factory->documentArchiveID };
+    auto archive = new FileArchive { ARA_TEST_ARCHIVE_FILENAME, factory->documentArchiveID };
 #else
-    auto archive = new ARAMemoryArchive { factory->documentArchiveID };
+    auto archive = new MemoryArchive { factory->documentArchiveID };
 #endif
 
     // create and archive the document,
@@ -532,7 +530,7 @@ void testDragAndDrop (const PlugInEntry* plugInEntry, const AudioFileList& audio
 
     // store only the dragged audio source's data in the archive
     ARA_LOG ("Dragging audio source with persistent ID \"%s\" from %s", draggedAudioSource->getPersistentID ().c_str (), dragDocument->getName ().c_str ());
-    ARAMemoryArchive clipBoardArchive { plugInEntry->getARAFactory ()->documentArchiveID };
+    MemoryArchive clipBoardArchive { plugInEntry->getARAFactory ()->documentArchiveID };
     const bool archivingSuccess { dragDocumentController->storeObjectsToArchive (&clipBoardArchive, &storeObjectsFilter) };
     ARA_VALIDATE_API_STATE (archivingSuccess);      // our archive writer implementation never returns false, so this must always succeed
 
@@ -877,7 +875,7 @@ void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileL
         const std::string encodedArchiveData { archiveEl.child_value (ARA::kARAXMLName_ArchiveData) };
         ARA_INTERNAL_ASSERT (encodedArchiveData.length () > 0);
         const auto decodedArchiveData { base64_decode (encodedArchiveData) };
-        ARAMemoryArchive archive { decodedArchiveData, documentArchiveID };
+        MemoryArchive archive { decodedArchiveData, documentArchiveID };
 
         // begin loading chunk
         araDocumentController->beginEditing ();
@@ -971,7 +969,7 @@ void testAudioFileChunkSaving (const PlugInEntry* plugInEntry)
         archiveEl.append_child (ARA::kARAXMLName_PersistentID).append_child (pugi::node_pcdata).set_value ( audioSource->getPersistentID ().c_str ());
 
         // partial persistence - store archive for this audio source into the XML chunk
-        ARAMemoryArchive archive { araFactory->documentArchiveID };
+        MemoryArchive archive { araFactory->documentArchiveID };
         ARA::ARAAudioSourceRef audioSourceRef { araDocumentController->getRef (audioSource.get ()) };
         const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAStoreObjectsFilter, audioModificationRefs)> storeObjectsFilter { ARA::kARAFalse,
                                                                                                                       1U, &audioSourceRef,

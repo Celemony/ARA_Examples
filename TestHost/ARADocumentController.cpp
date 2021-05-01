@@ -298,7 +298,7 @@ bool ARADocumentController::supportsPartialPersistency ()
     return _documentController->supportsPartialPersistency ();
 }
 
-bool ARADocumentController::storeObjectsToArchive (ARAArchive* archive, const ARA::ARAStoreObjectsFilter* filter)
+bool ARADocumentController::storeObjectsToArchive (ArchiveBase* archive, const ARA::ARAStoreObjectsFilter* filter)
 {
     ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
     _currentArchive = archive;
@@ -307,7 +307,7 @@ bool ARADocumentController::storeObjectsToArchive (ARAArchive* archive, const AR
     return result;
 }
 
-bool ARADocumentController::restoreObjectsFromArchive (const ARAArchive* archive, const ARA::ARARestoreObjectsFilter* filter)
+bool ARADocumentController::restoreObjectsFromArchive (const ArchiveBase* archive, const ARA::ARARestoreObjectsFilter* filter)
 {
     ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
     _currentArchive = archive;
@@ -316,7 +316,7 @@ bool ARADocumentController::restoreObjectsFromArchive (const ARAArchive* archive
     return result;
 }
 
-bool ARADocumentController::storeDocumentToArchive (ARAArchive* archive)
+bool ARADocumentController::storeDocumentToArchive (ArchiveBase* archive)
 {
     ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
     _currentArchive = archive;
@@ -325,7 +325,7 @@ bool ARADocumentController::storeDocumentToArchive (ARAArchive* archive)
     return result;
 }
 
-bool ARADocumentController::beginRestoringDocumentFromArchive (const ARAArchive* archive)
+bool ARADocumentController::beginRestoringDocumentFromArchive (const ArchiveBase* archive)
 {
     ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
     _currentArchive = archive;
@@ -333,7 +333,7 @@ bool ARADocumentController::beginRestoringDocumentFromArchive (const ARAArchive*
     return _documentController->beginRestoringDocumentFromArchive (toHostRef (archive));
 }
 
-bool ARADocumentController::endRestoringDocumentFromArchive (const ARAArchive* archive)
+bool ARADocumentController::endRestoringDocumentFromArchive (const ArchiveBase* archive)
 {
     ARA_INTERNAL_ASSERT (_currentArchive == archive);
     const auto result { _documentController->endRestoringDocumentFromArchive (toHostRef (archive)) };
@@ -342,7 +342,7 @@ bool ARADocumentController::endRestoringDocumentFromArchive (const ARAArchive* a
     return result;
 }
 
-bool ARADocumentController::isUsingArchive (const ARAArchive* archive)
+bool ARADocumentController::isUsingArchive (const ArchiveBase* archive)
 {
     return ((_currentArchive != nullptr) && (archive == nullptr || archive == _currentArchive));
 }

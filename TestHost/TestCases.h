@@ -23,7 +23,7 @@
 // ARA API elements is left out.
 //------------------------------------------------------------------------------
 
-#include "AudioFiles.h"
+#include "ExamplesCommon/AudioFiles/AudioFiles.h"
 #include "CompanionAPIs.h"
 
 using AudioFileList = std::vector<std::shared_ptr<AudioFileBase>>;

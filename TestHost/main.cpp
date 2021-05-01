@@ -55,6 +55,8 @@
 
 #include "TestCases.h"
 
+#include "ARA_Library/Utilities/ARAStdVectorUtilities.h"
+
 #include <cstring>
 
 // asserts

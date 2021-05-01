@@ -31,10 +31,9 @@
 #include "ARA_Library/Utilities/ARASamplePositionConversion.h"
 
 #include "ExamplesCommon/Utilities/StdUniquePtrUtilities.h"
+#include "ExamplesCommon/AudioFiles/AudioFiles.h"
 
 #include <string>
-
-#include "AudioFiles.h"
 
 class Document;
 class MusicalContext;

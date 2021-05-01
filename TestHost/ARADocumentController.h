@@ -29,7 +29,7 @@
 #include "ARA_Library/Debug/ARADebug.h"
 #include "ARA_Library/Debug/ARAContentLogger.h"
 
-#include "ARAArchives.h"
+#include "ExamplesCommon/Archives/Archives.h"
 #include "ModelObjects.h"
 
 #include <map>
@@ -42,7 +42,7 @@ ARA_MAP_HOST_REF (AudioSource, ARA::ARAAudioSourceHostRef)
 ARA_MAP_HOST_REF (AudioModification, ARA::ARAAudioModificationHostRef)
 ARA_MAP_HOST_REF (PlaybackRegion, ARA::ARAPlaybackRegionHostRef)
 
-ARA_MAP_HOST_REF (ARAArchive, ARA::ARAArchiveReaderHostRef, ARA::ARAArchiveWriterHostRef)
+ARA_MAP_HOST_REF (ArchiveBase, ARA::ARAArchiveReaderHostRef, ARA::ARAArchiveWriterHostRef)
 
 // These property typedefs implicity version our properties structs according to the last member
 using DocumentProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARADocumentProperties, name)>;
@@ -110,17 +110,17 @@ public:
 
     // ARA2 style archiving (aka "partial persistency")
     bool supportsPartialPersistency ();
-    bool storeObjectsToArchive (ARAArchive* archive, const ARA::ARAStoreObjectsFilter* filter = nullptr);
-    bool restoreObjectsFromArchive (const ARAArchive* archive, const ARA::ARARestoreObjectsFilter* filter = nullptr);
+    bool storeObjectsToArchive (ArchiveBase* archive, const ARA::ARAStoreObjectsFilter* filter = nullptr);
+    bool restoreObjectsFromArchive (const ArchiveBase* archive, const ARA::ARARestoreObjectsFilter* filter = nullptr);
 
     // ARA1 style monolithic document archiving functions
-    bool storeDocumentToArchive (ARAArchive* archive);
-    bool beginRestoringDocumentFromArchive (const ARAArchive* archive);
-    bool endRestoringDocumentFromArchive (const ARAArchive* archive);
+    bool storeDocumentToArchive (ArchiveBase* archive);
+    bool beginRestoringDocumentFromArchive (const ArchiveBase* archive);
+    bool endRestoringDocumentFromArchive (const ArchiveBase* archive);
 
     // debug support: used by ARAArchivingController only, to validate the time slots when
     // the plug-in may actually call into the interfaces for reading or writing.
-    bool isUsingArchive (const ARAArchive* archive = nullptr);
+    bool isUsingArchive (const ArchiveBase* archive = nullptr);
 
     /*******************************************************************************/
     // Functions to enable audio source access and read head/tail time
@@ -196,5 +196,5 @@ private:
     std::map<PlaybackRegion*, ARA::ARAPlaybackRegionRef> _playbackRegionRefs;
 
     // for debugging only, see isUsingArchive ()
-    const ARAArchive* _currentArchive { nullptr };
+    const ArchiveBase* _currentArchive { nullptr };
 };
