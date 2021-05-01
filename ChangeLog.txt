@@ -1,8 +1,4 @@
-This is a pre-release build of the ARA Examples 2.0.
-
-Changes since previous releases:
-
-ARA SDK 2.0 draft 15 (aka 1.9.15) (2021/??/??)
+ARA SDK 2.0 release (aka 2.0.001) (2021/05/03)
 - bugfix in ARATestPlugIn: audio source content grade read from host was not properly exported later on
 - decoupled ARATestPlugIn's TestAnalysis and TestPersistency from ARA
 - audio file and archive code moved out of TestHost into ExamplesCommon to enable reuse
