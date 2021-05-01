@@ -1086,6 +1086,7 @@ add_library(ARATestPlugInCommon ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
     "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/TestAnalysis.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/TestPersistency.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/TestPersistency.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/TestPlugInConfig.h"
 )
 
 set_target_properties(ARATestPlugInCommon PROPERTIES

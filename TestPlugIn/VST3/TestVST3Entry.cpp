@@ -19,7 +19,7 @@
 
 #include "TestVST3Processor.h"
 #include "ARATestMainFactory.h"
-#include "ARATestDocumentController.h"
+#include "TestPlugInConfig.h"
 
 ARA_DISABLE_VST3_WARNINGS_BEGIN
 
@@ -61,18 +61,18 @@ DEF_CLASS_IID (ARA::IPlugInEntryPoint2)
 //  VST Plug-in Entry
 //------------------------------------------------------------------------
 
-#define FULL_VERSION_STR ARA_VERSION_STRING "." ARA_IN_QUOTES(ARA_BUILD_VERSION)
+#define FULL_VERSION_STR TEST_VERSION_STRING "." IN_QUOTES(TEST_BUILD_VERSION)
 
-BEGIN_FACTORY_DEF (ARA_MANUFACTURER_NAME,
-                   ARA_INFORMATION_URL,
-                   ARA_MAILTO_URL)
+BEGIN_FACTORY_DEF (TEST_MANUFACTURER_NAME,
+                   TEST_INFORMATION_URL,
+                   TEST_MAILTO_URL)
 
     //---First Plug-in included in this factory-------
     // its kVstAudioEffectClass component
     DEF_CLASS2 (INLINE_UID_FROM_FUID (TestVST3Processor::getClassFUID ()),
                 PClassInfo::kManyInstances,     // cardinality
                 kVstAudioEffectClass,           // the IAudioProcessor component category (do not changed this)
-                ARA_PLUGIN_NAME,                // here the Plug-in name
+                TEST_PLUGIN_NAME,               // here the Plug-in name
                 Vst::kDistributable,            // means that component and controller could be distributed on different computers
                 "Fx|OnlyARA",                   // Subcategory for this Plug-in (see Steinberg::VST::PlugType)
                 FULL_VERSION_STR,               // Plug-in version
@@ -83,7 +83,7 @@ BEGIN_FACTORY_DEF (ARA_MANUFACTURER_NAME,
     DEF_CLASS2 (INLINE_UID_FROM_FUID (TestVST3Processor::getEditControllerClassFUID ()),
                 PClassInfo::kManyInstances,     // cardinality
                 kVstComponentControllerClass,   // the Controller category (do not changed this)
-                ARA_PLUGIN_NAME,                // controller name (could be the same as component name)
+                TEST_PLUGIN_NAME,               // controller name (could be the same as component name)
                 0,                              // not used here
                 "",                             // not used here
                 FULL_VERSION_STR,               // Plug-in version
@@ -94,7 +94,7 @@ BEGIN_FACTORY_DEF (ARA_MANUFACTURER_NAME,
     DEF_CLASS2 (INLINE_UID_FROM_FUID (ARATestMainFactory::getClassFUID ()),
                 PClassInfo::kManyInstances,     // cardinality
                 kARAMainFactoryClass,           // the ARA Main Factory category (do not changed this)
-                ARA_PLUGIN_NAME,                // here the Plug-in name (MUST be the same as component name if multiple kVstAudioEffectClass components are used!)
+                TEST_PLUGIN_NAME,               // here the Plug-in name (MUST be the same as component name if multiple kVstAudioEffectClass components are used!)
                 0,                              // not used here
                 "",                             // not used here
                 FULL_VERSION_STR,               // Plug-in version (to be changed)

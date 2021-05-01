@@ -36,6 +36,9 @@ namespace PlugIn
 class ARATestAudioSource;
 class TestAnalysisTask;
 
+class TestArchiver;
+class TestUnarchiver;
+
 /*******************************************************************************/
 struct TestNote
 {
@@ -45,7 +48,11 @@ struct TestNote
     double _duration;
 };
 
+/*******************************************************************************/
 using TestNoteContent = std::vector<TestNote>;
+
+void encodeTestNoteContent (const TestNoteContent* content, TestArchiver& archiver);
+std::unique_ptr<TestNoteContent> decodeTestNoteContent (TestUnarchiver& unarchiver);
 
 /*******************************************************************************/
 class TestProcessingAlgorithm

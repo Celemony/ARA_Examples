@@ -19,6 +19,7 @@
 //------------------------------------------------------------------------------
 
 #include "TestAnalysis.h"
+#include "TestPersistency.h"
 #include "ARATestAudioSource.h"
 
 #include "ExamplesCommon/Utilities/StdUniquePtrUtilities.h"
@@ -56,6 +57,44 @@
 
 using namespace ARA;
 using namespace PlugIn;
+
+/*******************************************************************************/
+
+void encodeTestNoteContent (const TestNoteContent* content, TestArchiver& archiver)
+{
+    archiver.writeBool (content != nullptr);
+    if (content != nullptr)
+    {
+        const auto numNotes { content->size () };
+        archiver.writeSize (numNotes);
+        for (const auto& noteToPersist : *content)
+        {
+            archiver.writeDouble (noteToPersist._frequency);
+            archiver.writeDouble (noteToPersist._volume);
+            archiver.writeDouble (noteToPersist._startTime);
+            archiver.writeDouble (noteToPersist._duration);
+        }
+    }
+}
+
+std::unique_ptr<TestNoteContent> decodeTestNoteContent (TestUnarchiver& unarchiver)
+{
+    std::unique_ptr<TestNoteContent> result;
+    const bool hasNoteContent { unarchiver.readBool () };
+    if (hasNoteContent)
+    {
+        const auto numNotes { unarchiver.readSize () };
+        result = std::make_unique<TestNoteContent> (numNotes);
+        for (TestNote& persistedNote : *result)
+        {
+            persistedNote._frequency = static_cast<float> (unarchiver.readDouble ());
+            persistedNote._volume = static_cast<float> (unarchiver.readDouble ());
+            persistedNote._startTime = unarchiver.readDouble ();
+            persistedNote._duration = unarchiver.readDouble ();
+        }
+    }
+    return result;
+}
 
 /*******************************************************************************/
 

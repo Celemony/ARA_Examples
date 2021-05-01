@@ -26,36 +26,8 @@
 #include <unordered_set>
 
 
-#define ARA_IN_QUOTES_HELPER(x) #x
-#define ARA_IN_QUOTES(x) ARA_IN_QUOTES_HELPER(x)
-
-#define ARA_PLUGIN_NAME "ARATestPlugIn"
-#define ARA_MANUFACTURER_NAME "ARA Demo Company"
-#define ARA_INFORMATION_URL "https://www.arademocompany.com"
-#define ARA_MAILTO_URL "mailto:info@arademocompany.com"
-#define ARA_VERSION_STRING ARA_IN_QUOTES(ARA_MAJOR_VERSION) "." ARA_IN_QUOTES(ARA_MINOR_VERSION) "." ARA_IN_QUOTES(ARA_PATCH_VERSION)
-
-
 class ARATestAudioSource;
 class ARATestPlaybackRenderer;
-
-/*******************************************************************************/
-class ARATestNoteContentReader : public ARA::PlugIn::ContentReader
-{
-public:
-    explicit ARATestNoteContentReader (const ARA::PlugIn::AudioSource* audioSource, const ARA::ARAContentTimeRange* range = nullptr);
-    explicit ARATestNoteContentReader (const ARA::PlugIn::AudioModification* audioModification, const ARA::ARAContentTimeRange* range = nullptr);
-    explicit ARATestNoteContentReader (const ARA::PlugIn::PlaybackRegion* playbackRegion, const ARA::ARAContentTimeRange* range = nullptr);
-
-    ARA::ARAInt32 getEventCount () noexcept override;
-    const void* getDataForEvent (ARA::ARAInt32 eventIndex) noexcept override;
-
-private:
-    ARATestNoteContentReader (const ARA::PlugIn::AudioSource* audioSource, const ARA::ARAContentTimeRange& range, double timeOffset = 0.0);
-
-private:
-    std::vector<ARA::ARAContentNote> _exportedNotes;
-};
 
 /*******************************************************************************/
 class ARATestDocumentController : public ARA::PlugIn::DocumentController
@@ -142,16 +114,17 @@ private:
 
     // because our modifications and playback regions pull their content from the audio sources,
     // we always must notify their changes when changing the audio source content.
-    void notifyAudioSourceDependendObjectsContentChanged (ARATestAudioSource* audioSource, ARA::ContentUpdateScopes scopeFlags);
+    void notifyAudioSourceDependentObjectsContentChanged (ARATestAudioSource* audioSource, ARA::ContentUpdateScopes scopeFlags);
 
     bool tryCopyHostNoteContent (ARATestAudioSource* audioSource);
 
     // if audio samples or note content or processing algorithm changes, we need to:
     // - stop a potentially ongoing analysis
     // - clear our current analysis result
-    // - try read analysis from the host or else start a new analysis
-    // - this returns true if content changed (i.e. callers must notify host)
-    bool updateAudioSourceAfterContentOrAlgorithmChanged (ARATestAudioSource* audioSource);
+    // - try read analysis from the host, or else start a new analysis
+    // - notify the host about the resulting content changes, also for the
+    //   dependent audio modifications and playback regions
+    void updateAudioSourceAfterContentOrAlgorithmChanged (ARATestAudioSource* audioSource, bool hostChangedContent);
 
 private:
     std::unordered_set<ARATestAudioSource*> _audioSourcesScheduledForAnalysis;

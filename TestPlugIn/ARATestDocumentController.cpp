@@ -21,6 +21,8 @@
 #include "ARATestAudioSource.h"
 #include "ARATestPlaybackRenderer.h"
 #include "TestPersistency.h"
+#include "TestPlugInConfig.h"
+
 #include "ExamplesCommon/Utilities/StdUniquePtrUtilities.h"
 
 #include "ARA_Library/Debug/ARAContentLogger.h"
@@ -42,43 +44,32 @@
 // By default, the test plug-in only analyzes audio sources when explicitly requested by the host.
 // The define below allows to always trigger audio source analysis when a new audio source instance
 // is created (and the host does not provide all supported content for it), which is closer to the
-// behaviour of actual plug-ins like Melodyne, and also allows for testing analysis and related
+// behavior of actual plug-ins like Melodyne, and also allows for testing analysis and related
 // notifications in hosts that never request audio source analysis.
 #if !defined (ARA_ALWAYS_PERFORM_ANALYSIS)
     #define ARA_ALWAYS_PERFORM_ANALYSIS 0
 #endif
 
 
-ARA_SETUP_DEBUG_MESSAGE_PREFIX(ARA_PLUGIN_NAME);
+ARA_SETUP_DEBUG_MESSAGE_PREFIX(TEST_PLUGIN_NAME);
+
 
 /*******************************************************************************/
 
-ARATestNoteContentReader::ARATestNoteContentReader (const ARA::PlugIn::AudioSource* audioSource, const ARA::ARAContentTimeRange* range)
-: ARATestNoteContentReader { audioSource, (range) ? *range : ARA::ARAContentTimeRange { 0.0, audioSource->getDuration () } }
-{}
-
-ARATestNoteContentReader::ARATestNoteContentReader (const ARA::PlugIn::AudioModification* audioModification, const ARA::ARAContentTimeRange* range)
-// actual plug-ins will take the modification data into account instead of simply forwarding to the audio source detection data
-: ARATestNoteContentReader { audioModification->getAudioSource (), (range) ? *range : ARA::ARAContentTimeRange { 0.0, audioModification->getAudioSource ()->getDuration () } }
-{}
-
-ARATestNoteContentReader::ARATestNoteContentReader (const ARA::PlugIn::PlaybackRegion* playbackRegion, const ARA::ARAContentTimeRange* range)
-// actual plug-ins will take the modification data and the full region transformation into account instead of simply forwarding to the audio source detection data
-: ARATestNoteContentReader { playbackRegion->getAudioModification ()->getAudioSource (),
-                             (range) ? *range : ARA::ARAContentTimeRange { playbackRegion->getStartInPlaybackTime (), playbackRegion->getDurationInPlaybackTime () },
-                             playbackRegion->getStartInPlaybackTime () - playbackRegion->getStartInAudioModificationTime () }
-{}
-
-ARATestNoteContentReader::ARATestNoteContentReader (const ARA::PlugIn::AudioSource* audioSource, const ARA::ARAContentTimeRange& range, double timeOffset)
+// subclass of the SDK's content reader class to export our detected notes
+class ARATestNoteContentReader : public ARA::PlugIn::ContentReader
 {
-    //! \todo is there any elegant way to avoid all those up-casts from ARA::PlugIn::AudioSource* to ARATestAudioSource* in this file?
-    auto testAudioSource { static_cast<const ARATestAudioSource*> (audioSource) };
-    ARA_INTERNAL_ASSERT (testAudioSource->getNoteContent () != nullptr);
-    for (const auto& note : *testAudioSource->getNoteContent ())
+public:
+    explicit ARATestNoteContentReader (const ARATestAudioSource* audioSource, const ARA::ARAContentTimeRange* range)
     {
-        if ((range.start - timeOffset < note._startTime + note._duration) &&
-            (range.start + range.duration - timeOffset >= note._startTime))
+        ARA_INTERNAL_ASSERT (audioSource->getNoteContent () != nullptr);
+        for (const auto& note : *audioSource->getNoteContent ())
         {
+            // skip note if it does not intersect with the time range
+            if (range && ((note._startTime + note._duration <= range->start) ||
+                          (range->start + range->duration <= note._startTime)))
+                continue;
+
             ARA::ARAContentNote exportedNote;
             exportedNote.frequency = note._frequency;
             if (exportedNote.frequency == ARA::kARAInvalidFrequency)
@@ -86,24 +77,49 @@ ARATestNoteContentReader::ARATestNoteContentReader (const ARA::PlugIn::AudioSour
             else
                 exportedNote.pitchNumber = static_cast<ARA::ARAPitchNumber> (floor (0.5f + 69.0f + 12.0f * logf (exportedNote.frequency / 440.0f) / logf (2.0f)));
             exportedNote.volume = note._volume;
-            exportedNote.startPosition = note._startTime + timeOffset;
+            exportedNote.startPosition = note._startTime;
             exportedNote.attackDuration = 0.0;
             exportedNote.noteDuration = note._duration;
             exportedNote.signalDuration = note._duration;
-            _exportedNotes.push_back (exportedNote);
+            _exportedNotes.emplace_back (exportedNote);
         }
     }
-}
 
-ARA::ARAInt32 ARATestNoteContentReader::getEventCount () noexcept
-{
-    return static_cast<ARA::ARAInt32> (_exportedNotes.size ());
-}
+    // since our test plug-in makes no modifications to the audio source, it can simply forward the content reading to the source
+    explicit ARATestNoteContentReader (const ARA::PlugIn::AudioModification* audioModification, const ARA::ARAContentTimeRange* range)
+    : ARATestNoteContentReader { audioModification->getAudioSource<ARATestAudioSource> (), range }
+    {}
 
-const void* ARATestNoteContentReader::getDataForEvent (ARA::ARAInt32 eventIndex) noexcept
-{
-    return &_exportedNotes[static_cast<size_t> (eventIndex)];
-}
+    // since our test plug-in directly plays sections from the audio modification without any time stretching or other adoption,
+    // it can simply copy the modification content and adjust it (and the optional filter range) to the actual playback position
+    explicit ARATestNoteContentReader (const ARA::PlugIn::PlaybackRegion* playbackRegion, const ARA::ARAContentTimeRange* range)
+    {
+        // get filtered notes in modification time via a temporary modification reader
+        const auto timeOffset { playbackRegion->getStartInPlaybackTime () - playbackRegion->getStartInAudioModificationTime () };
+        const ARA::ARAContentTimeRange modificationRange { (range) ? range->start - timeOffset : playbackRegion->getStartInAudioModificationTime (),
+                                                           (range) ? range->start - timeOffset : playbackRegion->getDurationInAudioModificationTime () };
+        ARATestNoteContentReader tempModificationReader { playbackRegion->getAudioModification (), &modificationRange };
+
+        // swap content with temp reader and adjust note starts from modification time to playback time
+        _exportedNotes.swap (tempModificationReader._exportedNotes);
+        for (auto& exportedNote : _exportedNotes)
+            exportedNote.startPosition += timeOffset;
+    }
+
+    ARA::ARAInt32 getEventCount () noexcept override
+    {
+        return static_cast<ARA::ARAInt32> (_exportedNotes.size ());
+
+    }
+
+    const void* getDataForEvent (ARA::ARAInt32 eventIndex) noexcept override
+    {
+        return &_exportedNotes[static_cast<size_t> (eventIndex)];
+    }
+
+private:
+    std::vector<ARA::ARAContentNote> _exportedNotes;
+};
 
 /*******************************************************************************/
 
@@ -134,7 +150,7 @@ public:
     {
         const auto begin { getAlgorithmProperties ().begin () };
         const auto end { getAlgorithmProperties ().end () };
-        const auto it { std::find_if (begin, end,   [algorithm](const AlgorithmPropertiesWrapper& props)
+        const auto it { std::find_if (begin, end, [algorithm] (const AlgorithmPropertiesWrapper& props)
                                                         { return props._algorithm == algorithm; } ) };
         ARA_INTERNAL_ASSERT (it != end);
         return static_cast<ARA::ARAInt32> (it - begin);
@@ -228,14 +244,14 @@ void ARATestDocumentController::processCompletedAnalysisTasks ()
             audioSource->setProcessingAlgorithm (algorithm);
             audioSource->setNoteContent (std::move (noteContent), ARA::kARAContentGradeDetected, false);
             notifyAudioSourceContentChanged (audioSource, ARA::ContentUpdateScopes::notesAreAffected ());
-            notifyAudioSourceDependendObjectsContentChanged (audioSource, ARA::ContentUpdateScopes::notesAreAffected ());
+            notifyAudioSourceDependentObjectsContentChanged (audioSource, ARA::ContentUpdateScopes::notesAreAffected ());
         }
 
         analysisTaskIt = _activeAnalysisTasks.erase (analysisTaskIt);
     }
 }
 
-void ARATestDocumentController::notifyAudioSourceDependendObjectsContentChanged (ARATestAudioSource* audioSource, ARA::ContentUpdateScopes scopeFlags)
+void ARATestDocumentController::notifyAudioSourceDependentObjectsContentChanged (ARATestAudioSource* audioSource, ARA::ContentUpdateScopes scopeFlags)
 {
     for (auto& audioModification : audioSource->getAudioModifications ())
     {
@@ -257,41 +273,46 @@ bool ARATestDocumentController::tryCopyHostNoteContent (ARATestAudioSource* audi
     std::vector<TestNote> notes;
     notes.resize (static_cast<size_t> (hostNoteReader.getEventCount ()));
     for (const auto& hostNote : hostNoteReader)
-        notes.emplace_back ( TestNote { hostNote.frequency, hostNote.volume, hostNote.startPosition, hostNote.signalDuration } );
+        notes.emplace_back (TestNote { hostNote.frequency, hostNote.volume, hostNote.startPosition, hostNote.signalDuration });
     audioSource->setNoteContent (std::make_unique<TestNoteContent> (std::move (notes)), hostNoteReader.getGrade (), true);
 
     return true;
 }
 
-bool ARATestDocumentController::updateAudioSourceAfterContentOrAlgorithmChanged (ARATestAudioSource* audioSource)
+void ARATestDocumentController::updateAudioSourceAfterContentOrAlgorithmChanged (ARATestAudioSource* audioSource, bool hostChangedContent)
 {
-    // if already analyzing this audio source, abort and flag the need to restart analysis
-    bool reanalyze { cancelAnalysisOfAudioSource (audioSource) };
-
-    // clear previous note content but store whether it was present
-    const bool hadNoteContent { audioSource->getNoteContent () != nullptr };
-    audioSource->clearNoteContent ();
-
-    bool notifyContentChanged = hadNoteContent;
+    // abort any currently ongoing analysis
+#if !ARA_ALWAYS_PERFORM_ANALYSIS
+    bool wasAnalyzing =
+#endif
+                        cancelAnalysisOfAudioSource (audioSource);
 
     // we only analyze note content, so if the host provides notes we can skip analysis
+    bool notifyContentChanged;
     if (tryCopyHostNoteContent (audioSource))
     {
         notifyContentChanged = true;
-        reanalyze = false;
     }
     else
     {
+        // clear previous note content, triggering content change if data existed
+        const bool hadNoteContent { audioSource->getNoteContent () != nullptr };
+        audioSource->clearNoteContent ();
+        notifyContentChanged = hadNoteContent;
+
+        // (re-)start analysis if needed
 #if !ARA_ALWAYS_PERFORM_ANALYSIS
-        if (hadNoteContent)
+        if (hadNoteContent || wasAnalyzing)
 #endif
-            reanalyze = true;
+            startOrScheduleAnalysisOfAudioSource (audioSource);
     }
 
-    if (reanalyze)
-        startOrScheduleAnalysisOfAudioSource (audioSource);
-
-    return notifyContentChanged;
+    if (notifyContentChanged)
+    {
+        if (!hostChangedContent)
+            notifyAudioSourceContentChanged (audioSource, ARA::ContentUpdateScopes::notesAreAffected ());
+        notifyAudioSourceDependentObjectsContentChanged (audioSource, ARA::ContentUpdateScopes::notesAreAffected ());
+    }
 }
 
 /*******************************************************************************/
@@ -350,21 +371,7 @@ bool ARATestDocumentController::doRestoreObjectsFromArchive (ARA::PlugIn::HostAr
         // read note content
         const auto noteContentGrade { static_cast<ARA::ARAContentGrade> (unarchiver.readInt64 ()) };
         const auto noteContentFromHost { unarchiver.readBool () };
-
-        std::unique_ptr<TestNoteContent> noteContent;
-        const bool hasNoteContent { unarchiver.readBool () };
-        if (hasNoteContent)
-        {
-            const auto numNotes { unarchiver.readSize () };
-            noteContent = std::make_unique<TestNoteContent> (numNotes);
-            for (TestNote& persistedNote : *noteContent)
-            {
-                persistedNote._frequency = static_cast<float> (unarchiver.readDouble ());
-                persistedNote._volume = static_cast<float> (unarchiver.readDouble ());
-                persistedNote._startTime = unarchiver.readDouble ();
-                persistedNote._duration = unarchiver.readDouble ();
-            }
-        }
+        std::unique_ptr<TestNoteContent> noteContent { decodeTestNoteContent (unarchiver) };
 
         // abort on reader error
         if (!unarchiver.didSucceed ())
@@ -422,21 +429,7 @@ bool ARATestDocumentController::doStoreObjectsToArchive (ARA::PlugIn::HostArchiv
         // write note content
         archiver.writeInt64 (audioSourcesToPersist[i]->getNoteContentGrade ());
         archiver.writeBool (audioSourcesToPersist[i]->getNoteContentWasReadFromHost ());
-
-        const auto analysisResult { audioSourcesToPersist[i]->getNoteContent () };
-        archiver.writeBool (analysisResult != nullptr);
-        if (analysisResult != nullptr)
-        {
-            const auto numNotes { analysisResult->size () };
-            archiver.writeSize (numNotes);
-            for (const auto& noteToPersist : *analysisResult)
-            {
-                archiver.writeDouble (noteToPersist._frequency);
-                archiver.writeDouble (noteToPersist._volume);
-                archiver.writeDouble (noteToPersist._startTime);
-                archiver.writeDouble (noteToPersist._duration);
-            }
-        }
+        encodeTestNoteContent (audioSourcesToPersist[i]->getNoteContent (), archiver);
     }
     archiveWriter->notifyDocumentArchivingProgress (1.0f);
 
@@ -479,12 +472,8 @@ void ARATestDocumentController::willUpdateAudioSourceProperties (ARA::PlugIn::Au
         // if we have a self-analyzed content, clear it and schedule reanalysis
         // (actual plug-ins may instead be able to create a new result based on the old one)
         auto testAudioSource { static_cast<ARATestAudioSource*> (audioSource) };
-        if (!testAudioSource->getNoteContentWasReadFromHost () &&
-            updateAudioSourceAfterContentOrAlgorithmChanged (testAudioSource))
-        {
-            notifyAudioSourceContentChanged (testAudioSource, ARA::ContentUpdateScopes::notesAreAffected ());
-            notifyAudioSourceDependendObjectsContentChanged (testAudioSource, ARA::ContentUpdateScopes::notesAreAffected ());
-        }
+        if (!testAudioSource->getNoteContentWasReadFromHost ())
+            updateAudioSourceAfterContentOrAlgorithmChanged (testAudioSource, false);
     }
 }
 
@@ -499,13 +488,8 @@ void ARATestDocumentController::doUpdateAudioSourceContent (ARA::PlugIn::AudioSo
     if (scopeFlags.affectSamples () && testAudioSource->isSampleAccessEnabled ())
         testAudioSource->updateRenderSampleCache ();
 
-    if (scopeFlags.affectNotes () &&
-        updateAudioSourceAfterContentOrAlgorithmChanged (testAudioSource))
-    {
-        if (!scopeFlags.affectNotes ())
-            notifyAudioSourceContentChanged (testAudioSource, ARA::ContentUpdateScopes::notesAreAffected ());
-        notifyAudioSourceDependendObjectsContentChanged (testAudioSource, ARA::ContentUpdateScopes::notesAreAffected ());
-    }
+    if (scopeFlags.affectNotes ())
+        updateAudioSourceAfterContentOrAlgorithmChanged (testAudioSource, true);
 }
 
 void ARATestDocumentController::willEnableAudioSourceSamplesAccess (ARA::PlugIn::AudioSource* audioSource, bool enable) noexcept
@@ -576,10 +560,9 @@ bool ARATestDocumentController::doIsAudioSourceContentAvailable (const ARA::Plug
     if (type == ARA::kARAContentTypeNotes)
     {
         processCompletedAnalysisTasks ();
-
+        //! \todo is there any elegant way to avoid all those up-casts from ARA::PlugIn::AudioSource* to ARATestAudioSource* in this file?
         return (static_cast<const ARATestAudioSource*> (audioSource)->getNoteContent () != nullptr);
     }
-
     return false;
 }
 
@@ -593,7 +576,7 @@ ARA::ARAContentGrade ARATestDocumentController::doGetAudioSourceContentGrade (co
 ARA::PlugIn::ContentReader* ARATestDocumentController::doCreateAudioSourceContentReader (ARA::PlugIn::AudioSource* audioSource, ARA::ARAContentType type, const ARA::ARAContentTimeRange* range) noexcept
 {
     if (type == ARA::kARAContentTypeNotes)
-        return new ARATestNoteContentReader (audioSource, range);
+        return new ARATestNoteContentReader (static_cast<const ARATestAudioSource*> (audioSource), range);
     return nullptr;
 }
 
@@ -693,12 +676,8 @@ void ARATestDocumentController::doRequestProcessingAlgorithmForAudioSource (ARA:
         // if we have a self-analyzed content, clear it and schedule reanalysis with new algorithm if needed
         // (actual plug-ins may instead always need to perform a new analysis if their internal result
         // representation depends on the processing algorithm)
-        if (!testAudioSource->getNoteContentWasReadFromHost () &&
-            updateAudioSourceAfterContentOrAlgorithmChanged (testAudioSource))
-        {
-            notifyAudioSourceContentChanged (testAudioSource, ARA::ContentUpdateScopes::notesAreAffected ());
-            notifyAudioSourceDependendObjectsContentChanged (testAudioSource, ARA::ContentUpdateScopes::notesAreAffected ());
-        }
+        if (!testAudioSource->getNoteContentWasReadFromHost ())
+            updateAudioSourceAfterContentOrAlgorithmChanged (testAudioSource, false);
     }
 }
 
@@ -753,13 +732,13 @@ static constexpr std::array<ARA::ARAContentType, 1> analyzeableContentTypes { AR
 class ARATestFactoryConfig : public ARA::PlugIn::FactoryConfig
 {
 public:
-    const char* getFactoryID () const noexcept override { return "com.arademocompany.testplugin.arafactory"; }
-    const char* getPlugInName () const noexcept override { return ARA_PLUGIN_NAME; }
-    const char* getManufacturerName () const noexcept override { return ARA_MANUFACTURER_NAME; }
-    const char* getInformationURL () const noexcept override { return ARA_INFORMATION_URL; }
-    const char* getVersion () const noexcept override { return ARA_VERSION_STRING; }
+    const char* getFactoryID () const noexcept override { return TEST_FACTORY_ID; }
+    const char* getPlugInName () const noexcept override { return TEST_PLUGIN_NAME; }
+    const char* getManufacturerName () const noexcept override { return TEST_MANUFACTURER_NAME; }
+    const char* getInformationURL () const noexcept override { return TEST_INFORMATION_URL; }
+    const char* getVersion () const noexcept override { return TEST_VERSION_STRING; }
 
-    const char* getDocumentArchiveID () const noexcept override { return "com.arademocompany.testplugin.aradocumentarchive.version1"; }
+    const char* getDocumentArchiveID () const noexcept override { return TEST_DOCUMENT_ARCHIVE_ID; }
 
     ARA::ARASize getAnalyzeableContentTypesCount () const noexcept override  { return analyzeableContentTypes.size (); }
     const ARA::ARAContentType* getAnalyzeableContentTypes () const noexcept override { return  analyzeableContentTypes.data (); }
