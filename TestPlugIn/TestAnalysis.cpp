@@ -1,8 +1,6 @@
 //------------------------------------------------------------------------------
 //! \file       TestAnalysis.cpp
 //!             dummy implementation of audio source analysis for the ARA test plug-in
-//!             Actual plug-ins will typically have an analysis implementation which is
-//!             independent of ARA - this code is also largely decoupled from ARA.
 //! \project    ARA SDK Examples
 //! \copyright  Copyright (c) 2018-2021, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,11 +18,14 @@
 
 #include "TestAnalysis.h"
 #include "TestPersistency.h"
-#include "ARATestAudioSource.h"
+
+#include "ARA_API/ARAInterface.h"
+#include "ARA_Library/Utilities/ARASamplePositionConversion.h"
 
 #include "ExamplesCommon/Utilities/StdUniquePtrUtilities.h"
 
 #include <chrono>
+#include <thread>
 #include <cmath>
 
 // The test plug-in pretends to be able to do a kARAContentTypeNotes analysis:
@@ -54,9 +55,6 @@
     #define ARA_FAKE_NOTE_MAX_COUNT 100
 #endif
 
-
-using namespace ARA;
-using namespace PlugIn;
 
 /*******************************************************************************/
 
@@ -115,54 +113,52 @@ public:
         return identifier;
     }
 
-    std::unique_ptr<TestNoteContent> analyzeNoteContent (TestAnalysisTask* analysisTask) const noexcept override
+    std::unique_ptr<TestNoteContent> analyzeNoteContent (TestAnalysisCallbacks* analysisCallbacks, const int64_t sampleCount, const double sampleRate, const uint32_t channelCount) const noexcept override
     {
-        auto audioSource = analysisTask->getAudioSource ();
-        audioSource->getDocumentController ()->notifyAudioSourceAnalysisProgressStarted (audioSource);
+        analysisCallbacks->notifyAnalysisProgressStarted ();
 
 #if ARA_FAKE_NOTE_ANALYSIS_SPEED_FACTOR != 0
         // helper variables to artificially slow down analysis as indicated by ARA_FAKE_NOTE_ANALYSIS_SPEED_FACTOR
         const auto analysisStartTime { ARA_GET_CURRENT_TIME () };
-        const auto analysisTargetDuration { audioSource->getDuration () / ARA_FAKE_NOTE_ANALYSIS_SPEED_FACTOR };
+        const auto analysisTargetDuration { ARA::timeAtSamplePosition (sampleCount, sampleRate) / ARA_FAKE_NOTE_ANALYSIS_SPEED_FACTOR };
 #endif
 
         // setup buffers and audio reader for reading samples
         constexpr auto blockSize { 64U };
-        const auto channelCount { static_cast<uint32_t> (audioSource->getChannelCount ()) };
         std::vector<float> buffer (channelCount * blockSize);
         std::vector<void*> dataPointers (channelCount);
         for (auto c { 0U }; c < channelCount; ++c)
             dataPointers[c] = &buffer[c * blockSize];
 
         // search the audio for silence and treat each region between silence as a note
-        ARASamplePosition blockStartIndex { 0 };
-        ARASamplePosition lastNoteStartIndex { 0 };
+        int64_t blockStartIndex { 0 };
+        int64_t lastNoteStartIndex { 0 };
         bool wasZero { true };      // samples before the start of the file are 0
         float volume { 0.0f };
         std::vector<TestNote> foundNotes;
         while (true)
         {
             // check cancel
-            if (analysisTask->shouldCancel ())
+            if (analysisCallbacks->shouldCancel ())
             {
-                audioSource->getDocumentController ()->notifyAudioSourceAnalysisProgressCompleted (audioSource);
+                analysisCallbacks->notifyAnalysisProgressCompleted ();
                 return {};
             }
 
             // calculate size of current block and check if done
-            const auto count { std::min (static_cast<ARASamplePosition> (blockSize), audioSource->getSampleCount () - blockStartIndex) };
+            const auto count { std::min (static_cast<int64_t> (blockSize), sampleCount - blockStartIndex) };
             if (count <= 0)
                 break;
 
             // read samples - note that this test code ignores any errors that the reader might return here!
-            analysisTask->getHostAudioReader ()->readAudioSamples (blockStartIndex, count, dataPointers.data ());
+            analysisCallbacks->readAudioSamples (blockStartIndex, count, dataPointers.data ());
 
             // analyze current block
-            for (ARASamplePosition i { 0 }; (i < count) && (foundNotes.size () < ARA_FAKE_NOTE_MAX_COUNT); ++i)
+            for (int64_t i { 0 }; (i < count) && (foundNotes.size () < ARA_FAKE_NOTE_MAX_COUNT); ++i)
             {
                 // check if current sample is zero on all channels
                 bool isZero { true };
-                for (ARASampleCount c { 0 }; c < channelCount; ++c)
+                for (int64_t c { 0 }; c < channelCount; ++c)
                 {
                     const auto sample = buffer[static_cast<size_t> (i + c * blockSize)];
                     isZero &= (sample == 0.0f);
@@ -177,9 +173,9 @@ public:
                     if (isZero)
                     {
                         // found end of note - construct note
-                        const double noteStartTime { static_cast<double> (lastNoteStartIndex) / audioSource->getSampleRate () };
-                        const double noteDuration { static_cast<double> (index - lastNoteStartIndex) / audioSource->getSampleRate () };
-                        TestNote foundNote { kARAInvalidFrequency, volume, noteStartTime, noteDuration };
+                        const double noteStartTime { static_cast<double> (lastNoteStartIndex) / sampleRate };
+                        const double noteDuration { static_cast<double> (index - lastNoteStartIndex) / sampleRate };
+                        TestNote foundNote { ARA::kARAInvalidFrequency, volume, noteStartTime, noteDuration };
                         foundNotes.push_back (foundNote);
                         volume = 0.0f;
                     }
@@ -195,8 +191,8 @@ public:
             // (in the progress calculation, we're scaling by 0.999 to account for the time needed
             // to store the result after this loop has completed)
             blockStartIndex += count;
-            const float progress { 0.999f * static_cast<float> (blockStartIndex) / static_cast<float> (audioSource->getSampleCount ()) };
-            audioSource->getDocumentController ()->notifyAudioSourceAnalysisProgressUpdated (audioSource, progress);
+            const float progress { 0.999f * static_cast<float> (blockStartIndex) / static_cast<float> (sampleCount) };
+            analysisCallbacks->notifyAnalysisProgressUpdated (progress);
 
 #if ARA_FAKE_NOTE_ANALYSIS_SPEED_FACTOR != 0
             // for testing purposes only, sleep here until dummy analysis time has elapsed -
@@ -211,14 +207,14 @@ public:
         if (!wasZero)
         {
             // last note continued until the end of the audio source - construct last note
-            const double noteStartTime { static_cast<double> (lastNoteStartIndex) / audioSource->getSampleRate () };
-            const double noteDuration { static_cast<double> (audioSource->getSampleCount () - lastNoteStartIndex) / audioSource->getSampleRate () };
-            TestNote foundNote { kARAInvalidFrequency, volume, noteStartTime, noteDuration };
+            const double noteStartTime { static_cast<double> (lastNoteStartIndex) / sampleRate };
+            const double noteDuration { static_cast<double> (sampleCount - lastNoteStartIndex) / sampleRate };
+            TestNote foundNote { ARA::kARAInvalidFrequency, volume, noteStartTime, noteDuration };
             foundNotes.push_back (foundNote);
         }
 
         // complete analysis and store result
-        audioSource->getDocumentController ()->notifyAudioSourceAnalysisProgressCompleted (audioSource);
+        analysisCallbacks->notifyAnalysisProgressCompleted ();
         return std::make_unique<TestNoteContent> (foundNotes);
     }
 };
@@ -242,32 +238,31 @@ public:
         return identifier;
     }
 
-    std::unique_ptr<TestNoteContent> analyzeNoteContent (TestAnalysisTask* analysisTask) const noexcept override
+    std::unique_ptr<TestNoteContent> analyzeNoteContent (TestAnalysisCallbacks* analysisCallbacks, const int64_t sampleCount, const double sampleRate, uint32_t /*channelCount*/) const override
     {
-        auto audioSource = analysisTask->getAudioSource ();
-        audioSource->getDocumentController ()->notifyAudioSourceAnalysisProgressStarted (audioSource);
+        analysisCallbacks->notifyAnalysisProgressStarted ();
 
 #if ARA_FAKE_NOTE_ANALYSIS_SPEED_FACTOR != 0
         // for testing purposes only, sleep here until dummy analysis time has elapsed
-        const auto analysisTargetDuration { audioSource->getDuration () / ARA_FAKE_NOTE_ANALYSIS_SPEED_FACTOR };
+        const auto analysisTargetDuration { ARA::timeAtSamplePosition (sampleCount, sampleRate) / ARA_FAKE_NOTE_ANALYSIS_SPEED_FACTOR };
         constexpr auto sliceDuration { 0.05 };
         const auto count { (analysisTargetDuration > sliceDuration) ? static_cast<int> (analysisTargetDuration / sliceDuration + 0.5) : 1 };
         for (auto i { 0 }; i < count; ++i)
         {
             // check cancel
-            if (analysisTask->shouldCancel ())
+            if (analysisCallbacks->shouldCancel ())
             {
-                audioSource->getDocumentController ()->notifyAudioSourceAnalysisProgressCompleted (audioSource);
+                analysisCallbacks->notifyAnalysisProgressCompleted ();
                 return {};
             }
 
-            audioSource->getDocumentController ()->notifyAudioSourceAnalysisProgressUpdated (audioSource, static_cast<float> (i) / static_cast<float> (count));
+            analysisCallbacks->notifyAnalysisProgressUpdated (static_cast<float> (i) / static_cast<float> (count));
             std::this_thread::sleep_for (std::chrono::milliseconds (std::llround (sliceDuration * 1000)));
         }
 #endif
 
-        TestNote foundNote { kARAInvalidFrequency, 1.0f, 0.0, analysisTask->getAudioSource ()->getDuration () };
-        audioSource->getDocumentController ()->notifyAudioSourceAnalysisProgressCompleted (audioSource);
+        TestNote foundNote { ARA::kARAInvalidFrequency, 1.0f, 0.0, ARA::timeAtSamplePosition (sampleCount, sampleRate) };
+        analysisCallbacks->notifyAnalysisProgressCompleted ();
         return std::make_unique<TestNoteContent> (std::vector<TestNote> { foundNote });
     }
 };
@@ -292,44 +287,7 @@ const TestProcessingAlgorithm* TestProcessingAlgorithm::getAlgorithmWithIdentifi
 {
     const auto begin { getAlgorithms ().begin () };
     const auto end { getAlgorithms ().end () };
-    const auto it { std::find_if (begin, end,   [identifier](const TestProcessingAlgorithm* algorithm)
+    const auto it { std::find_if (begin, end, [identifier] (const TestProcessingAlgorithm* algorithm)
                                                     { return algorithm->getIdentifier ().compare (identifier) == 0; } ) };
     return (it != end) ? *it : nullptr;
-}
-
-/*******************************************************************************/
-
-TestAnalysisTask::TestAnalysisTask (ARATestAudioSource* audioSource, const TestProcessingAlgorithm* processingAlgorithm)
-: _audioSource { audioSource },
-  _processingAlgorithm { processingAlgorithm },
-  _hostAudioReader { std::make_unique<HostAudioReader> (audioSource) }  // create audio reader on the main thread, before dispatching to analysis thread
-{
-    _future = std::async (std::launch::async, [this]()
-    {
-        if (auto newNoteContent = _processingAlgorithm->analyzeNoteContent (this))
-            _noteContent = std::move (newNoteContent);
-    });
-}
-
-bool TestAnalysisTask::isDone () const
-{
-    return _future.wait_for (std::chrono::milliseconds { 0 }) == std::future_status::ready;
-}
-
-bool TestAnalysisTask::shouldCancel () const
-{
-    return _shouldCancel.load ();
-}
-
-void TestAnalysisTask::cancelSynchronously ()
-{
-    _shouldCancel = true;
-    _future.wait ();
-    _noteContent.reset ();   // delete here in case our future completed before recognizing the cancel
-}
-
-std::unique_ptr<TestNoteContent>&& TestAnalysisTask::transferNoteContent ()
-{
-    ARA_INTERNAL_ASSERT (isDone ());
-    return std::move (_noteContent);
 }

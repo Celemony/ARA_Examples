@@ -28,6 +28,7 @@
 
 class ARATestAudioSource;
 class ARATestPlaybackRenderer;
+class ARATestAnalysisTask;
 
 /*******************************************************************************/
 class ARATestDocumentController : public ARA::PlugIn::DocumentController
@@ -109,7 +110,7 @@ private:
 
     void startAnalysisTaskForAudioSource (ARATestAudioSource* audioSource);
     bool cancelAnalysisTaskForAudioSource (ARATestAudioSource* audioSource);
-    TestAnalysisTask* getActiveAnalysisTaskForAudioSource (const ARATestAudioSource* audioSource) noexcept; // returns nullptr if no active analysis for given audio source
+    ARATestAnalysisTask* getActiveAnalysisTaskForAudioSource (const ARATestAudioSource* audioSource) noexcept; // returns nullptr if no active analysis for given audio source
     void processCompletedAnalysisTasks ();
 
     // because our modifications and playback regions pull their content from the audio sources,
@@ -128,7 +129,7 @@ private:
 
 private:
     std::unordered_set<ARATestAudioSource*> _audioSourcesScheduledForAnalysis;
-    std::vector<std::unique_ptr<TestAnalysisTask>> _activeAnalysisTasks;
+    std::vector<std::unique_ptr<ARATestAnalysisTask>> _activeAnalysisTasks;
 
     std::atomic<bool> _renderersCanAccessModelGraph { true };
     std::atomic<int> _countOfRenderersCurrentlyAccessingModelGraph { 0 };

@@ -29,6 +29,8 @@
 
 #include <array>
 #include <map>
+#include <atomic>
+#include <future>
 
 
 // In this test plug-in, we want assertions and logging to be always enabled, even in release builds.
@@ -170,6 +172,86 @@ private:
 
 /*******************************************************************************/
 
+class ARATestAnalysisTask : public TestAnalysisCallbacks
+{
+public:
+    explicit ARATestAnalysisTask (ARATestAudioSource* audioSource, const TestProcessingAlgorithm* processingAlgorithm)
+    : _audioSource { audioSource },
+      _hostAudioReader { std::make_unique<ARA::PlugIn::HostAudioReader> (audioSource) },    // create audio reader on the main thread, before dispatching to analysis thread
+      _processingAlgorithm { processingAlgorithm }
+    {
+        _future = std::async (std::launch::async, [this] ()
+        {
+            if (auto newNoteContent = _processingAlgorithm->analyzeNoteContent (this, _audioSource->getSampleCount (), _audioSource->getSampleRate (),
+                                                                                static_cast<uint32_t> (_audioSource->getChannelCount ())))
+                _noteContent = std::move (newNoteContent);
+        });
+    }
+
+    ARATestAudioSource* getAudioSource () const noexcept
+    {
+        return _audioSource;
+    }
+
+    const TestProcessingAlgorithm* getProcessingAlgorithm () const noexcept
+    {
+        return _processingAlgorithm;
+    }
+
+    bool isDone () const
+    {
+        return _future.wait_for (std::chrono::milliseconds { 0 }) == std::future_status::ready;
+    }
+
+    void cancelSynchronously ()
+    {
+        _shouldCancel = true;
+        _future.wait ();
+        _noteContent.reset ();   // delete here in case our future completed before recognizing the cancel
+    }
+
+    std::unique_ptr<TestNoteContent>&& transferNoteContent ()
+    {
+        ARA_INTERNAL_ASSERT (isDone ());
+        return std::move (_noteContent);
+    }
+
+    void notifyAnalysisProgressStarted () noexcept
+    {
+        _audioSource->getDocumentController ()->notifyAudioSourceAnalysisProgressStarted (_audioSource);
+    }
+
+    void notifyAnalysisProgressUpdated (float progress) noexcept
+    {
+        _audioSource->getDocumentController ()->notifyAudioSourceAnalysisProgressUpdated (_audioSource, progress);
+    }
+
+    void notifyAnalysisProgressCompleted () noexcept
+    {
+        _audioSource->getDocumentController ()->notifyAudioSourceAnalysisProgressCompleted (_audioSource);
+    }
+
+    bool readAudioSamples (int64_t samplePosition, int64_t samplesPerChannel, void* const buffers[]) noexcept
+    {
+        return _hostAudioReader->readAudioSamples(samplePosition, samplesPerChannel, buffers);
+    }
+
+    bool shouldCancel () const noexcept
+    {
+        return _shouldCancel.load ();
+    }
+
+private:
+    ARATestAudioSource* const _audioSource;
+    const std::unique_ptr<ARA::PlugIn::HostAudioReader> _hostAudioReader;
+    const TestProcessingAlgorithm* const _processingAlgorithm;
+    std::unique_ptr<TestNoteContent> _noteContent;
+    std::future<void> _future;
+    std::atomic<bool> _shouldCancel { false };
+};
+
+/*******************************************************************************/
+
 void ARATestDocumentController::startOrScheduleAnalysisOfAudioSource (ARATestAudioSource* audioSource)
 {
     // test if already analyzing
@@ -201,12 +283,12 @@ void ARATestDocumentController::startAnalysisTaskForAudioSource (ARATestAudioSou
     ARA_INTERNAL_ASSERT (audioSource->isSampleAccessEnabled ());
 
     const auto algorithm = audioSource->getProcessingAlgorithm ();
-    _activeAnalysisTasks.emplace_back (std::make_unique<TestAnalysisTask> (audioSource, algorithm));
+    _activeAnalysisTasks.emplace_back (std::make_unique<ARATestAnalysisTask> (audioSource, algorithm));
 }
 
 bool ARATestDocumentController::cancelAnalysisTaskForAudioSource (ARATestAudioSource* audioSource)
 {
-    if (TestAnalysisTask* analysisTask { getActiveAnalysisTaskForAudioSource (audioSource) })
+    if (ARATestAnalysisTask* analysisTask { getActiveAnalysisTaskForAudioSource (audioSource) })
     {
         analysisTask->cancelSynchronously ();
         ARA::find_erase (_activeAnalysisTasks, analysisTask);
@@ -216,7 +298,7 @@ bool ARATestDocumentController::cancelAnalysisTaskForAudioSource (ARATestAudioSo
     return false;
 }
 
-TestAnalysisTask* ARATestDocumentController::getActiveAnalysisTaskForAudioSource (const ARATestAudioSource* audioSource) noexcept
+ARATestAnalysisTask* ARATestDocumentController::getActiveAnalysisTaskForAudioSource (const ARATestAudioSource* audioSource) noexcept
 {
     for (const auto& analysisTask : _activeAnalysisTasks)
     {
