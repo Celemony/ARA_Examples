@@ -62,7 +62,7 @@ private:
     void write8ByteData (uint64_t data) noexcept;
 
 private:
-    const ArchivingFunction& _writeFunction;
+    const ArchivingFunction _writeFunction;
     size_t _location { 0 };
     TestArchiveState _state { TestArchiveState::noError };
 };
@@ -89,7 +89,7 @@ private:
     uint64_t read8ByteData () noexcept;
 
 private:
-    const UnarchivingFunction& _readFunction;
+    const UnarchivingFunction _readFunction;
     size_t _location { 0 };
     TestArchiveState _state { TestArchiveState::noError };
 };
