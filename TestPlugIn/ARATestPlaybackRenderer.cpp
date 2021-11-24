@@ -21,7 +21,7 @@
 #include "ARATestDocumentController.h"
 #include "ARATestAudioSource.h"
 
-void ARATestPlaybackRenderer::renderPlaybackRegions (float** ppOutput, ARA::ARASamplePosition samplePosition,
+void ARATestPlaybackRenderer::renderPlaybackRegions (float* const* ppOutput, ARA::ARASamplePosition samplePosition,
                                                      ARA::ARASampleCount samplesToRender, bool isPlayingBack)
 {
     // initialize output buffers with silence, in case no viable playback region intersects with the

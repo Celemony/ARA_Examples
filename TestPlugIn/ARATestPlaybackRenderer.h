@@ -27,7 +27,7 @@ class ARATestPlaybackRenderer : public ARA::PlugIn::PlaybackRenderer
 public:
     using PlaybackRenderer::PlaybackRenderer;
 
-    void renderPlaybackRegions (float** ppOutput, ARA::ARASamplePosition samplePosition, ARA::ARASampleCount samplesToRender, bool isPlayingBack);
+    void renderPlaybackRegions (float* const* ppOutput, ARA::ARASamplePosition samplePosition, ARA::ARASampleCount samplesToRender, bool isPlayingBack);
 
     void enableRendering (ARA::ARASampleRate sampleRate, ARA::ARAChannelCount channelCount, ARA::ARASampleCount maxSamplesToRender) noexcept;
     void disableRendering () noexcept;
