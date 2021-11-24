@@ -118,6 +118,10 @@ public:
     bool beginRestoringDocumentFromArchive (const ArchiveBase* archive);
     bool endRestoringDocumentFromArchive (const ArchiveBase* archive);
 
+    // audio file chunk authoring
+    bool supportsStoringAudioFileChunks ();
+    bool storeAudioSourceToAudioFileChunk (ArchiveBase* archive, AudioSource* audioSource, ARA::ARAPersistentID* documentArchiveID, bool* openAutomatically);
+
     // debug support: used by ARAArchivingController only, to validate the time slots when
     // the plug-in may actually call into the interfaces for reading or writing.
     bool isUsingArchive (const ArchiveBase* archive = nullptr);

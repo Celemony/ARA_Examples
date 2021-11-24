@@ -813,7 +813,7 @@ void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileL
             continue;
         }
         ARA_LOG ("Found matching ARA archive in audio file %s:", audioFile->getName ().c_str ());
-        ARA_LOG ("Open automatically: %s", openAutomatically);
+        ARA_LOG ("Open automatically: %s", (openAutomatically) ? "true" : "false");
         ARA_LOG ("Suggested plug-in for loading the chunk:");
         ARA_VALIDATE_API_STATE (!plugInName.empty ());
         ARA_LOG ("    name: %s", plugInName.c_str ());
@@ -860,5 +860,56 @@ void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileL
             araDocumentController->logAvailableContent (audioSource);
 
         ++index;
+    }
+}
+
+/*******************************************************************************/
+// Requests plug-in analysis and saves audio source state into an `iXML` data chunk in each audio file
+// (if chunk authoring is supported by the plug-in) -
+// overwrites any current iXML chunk in the files (but only in-memory)
+void testAudioFileChunkSaving (const PlugInEntry* plugInEntry, AudioFileList& audioFiles)
+{
+    ARA_LOG_TEST_HOST_FUNC ("ARA audio file saving XML chunks");
+
+    std::unique_ptr<TestHost> testHost;
+    auto testDocController { createHostAndBasicDocument (plugInEntry, testHost, "ChunkSavingTestDoc", false, {}) };
+    if (!testDocController->supportsStoringAudioFileChunks ())
+    {
+        ARA_LOG ("ARA audio file chunk authoring is not supported by plug-in %s", plugInEntry->getARAFactory ()->plugInName);
+        return;
+    }
+
+    // create basic ARA model graph
+    auto araDocumentController { createHostAndBasicDocument (plugInEntry, testHost, "testAudioFileChunkSaving", true, audioFiles) };
+    const auto araFactory { plugInEntry->getARAFactory () };
+    const auto document { araDocumentController->getDocument () };
+
+    // store the XML data chunk for each audio source
+    for (const auto& audioSource : document->getAudioSources ())
+    {
+        // log the audio source content to store
+        for (auto i { 0U }; i < araFactory->analyzeableContentTypesCount; ++i)
+            araDocumentController->logAvailableContent (audioSource.get ());
+
+        // store archive for this audio source
+        MemoryArchive archive { araFactory->documentArchiveID };
+        ARA::ARAPersistentID documentArchiveID { nullptr };
+        bool openAutomatically { false };
+        const auto archivingSuccess { araDocumentController->storeAudioSourceToAudioFileChunk (&archive, audioSource.get (), &documentArchiveID, &openAutomatically) };
+        ARA_VALIDATE_API_STATE (archivingSuccess);      // our archive writer implementation never returns false, so this must always succeed
+        ARA_VALIDATE_API_ARGUMENT (documentArchiveID, documentArchiveID != nullptr);
+        bool isValidID { documentArchiveID == araFactory->documentArchiveID };
+        for (auto i { 0U }; !isValidID && (i < araFactory->compatibleDocumentArchiveIDsCount); ++i)
+            isValidID = (documentArchiveID == araFactory->compatibleDocumentArchiveIDs[i]);
+        ARA_VALIDATE_API_ARGUMENT (documentArchiveID, isValidID);
+
+        // store ARA audio file XML chunk
+        audioSource->getAudioFile ()->setiXMLARAAudioSourceData (documentArchiveID, openAutomatically,
+                                              araFactory->plugInName, araFactory->version, araFactory->manufacturerName, araFactory->informationURL,
+                                              audioSource->getPersistentID (), archive);
+
+// enable this to update the audio file also on disk
+//      const auto success { audioSource->getAudioFile ()->saveToFile (audioSource->getName ()) };
+//      ARA_INTERNAL_ASSERT (success);
     }
 }

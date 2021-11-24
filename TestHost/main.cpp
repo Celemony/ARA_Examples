@@ -137,7 +137,7 @@ int main (int argc, const char* argv[])
     ARA_LOG ("Testing ARA plug-in '%s' in %s", plugInEntry->getARAFactory ()->plugInName, plugInEntry->getDescription ().c_str ());
 
     // parse any optional test cases or audio files
-    const auto audioFiles { parseAudioFiles (args) };
+    auto audioFiles { parseAudioFiles (args) };
     const auto testCases { parseTestCases (args) };
 
     // conditionally execute each test case
@@ -160,6 +160,8 @@ int main (int argc, const char* argv[])
         testEditorView (plugInEntry.get (), audioFiles);
     if (shouldTest ("Algorithms"))
         testProcessingAlgorithms (plugInEntry.get (), audioFiles);
+    if (shouldTest ("AudioFileChunkSaving"))
+        testAudioFileChunkSaving (plugInEntry.get (), audioFiles);
     if (shouldTest ("AudioFileChunkLoading"))
         testAudioFileChunkLoading (plugInEntry.get (), audioFiles);
 

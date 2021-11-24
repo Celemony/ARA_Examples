@@ -342,6 +342,21 @@ bool ARADocumentController::endRestoringDocumentFromArchive (const ArchiveBase* 
     return result;
 }
 
+bool ARADocumentController::supportsStoringAudioFileChunks ()
+{
+    return _documentController->supportsStoringAudioFileChunks ();
+}
+
+bool ARADocumentController::storeAudioSourceToAudioFileChunk (ArchiveBase* archive, AudioSource* audioSource, ARA::ARAPersistentID* documentArchiveID, bool* openAutomatically)
+{
+    ARA_INTERNAL_ASSERT (supportsStoringAudioFileChunks ());
+    ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
+    _currentArchive = archive;
+    const auto result { _documentController->storeAudioSourceToAudioFileChunk (toHostRef (archive), getRef (audioSource), documentArchiveID, openAutomatically) };
+    _currentArchive = nullptr;
+    return result;
+}
+
 bool ARADocumentController::isUsingArchive (const ArchiveBase* archive)
 {
     return ((_currentArchive != nullptr) && (archive == nullptr || archive == _currentArchive));

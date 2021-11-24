@@ -834,6 +834,8 @@ public:
     const ARA::ARAContentType* getAnalyzeableContentTypes () const noexcept override { return  analyzeableContentTypes.data (); }
     ARA::ARASize getCompatibleDocumentArchiveIDsCount () const noexcept override { return 1; }
     const ARA::ARAPersistentID* getCompatibleDocumentArchiveIDs () const noexcept override { static const auto id { TEST_FILECHUNK_ARCHIVE_ID }; return &id; }
+
+    bool supportsStoringAudioFileChunks () const noexcept override { return true; }
 };
 
 const ARA::ARAFactory* ARATestDocumentController::getARAFactory () noexcept

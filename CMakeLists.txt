@@ -1444,6 +1444,7 @@ if(ARA_SETUP_DEBUGGING)
     #string(APPEND ARATestHost_Dbg_Arguments " -test PlaybackRendering")
     #string(APPEND ARATestHost_Dbg_Arguments " -test EditorView")
     #string(APPEND ARATestHost_Dbg_Arguments " -test Algorithms")
+    #string(APPEND ARATestHost_Dbg_Arguments " -test AudioFileChunkSaving")
     #string(APPEND ARATestHost_Dbg_Arguments " -test AudioFileChunkLoading")
     # optionally, choose specific audio file(s) to selected test:
     #string(APPEND ARATestHost_Dbg_Arguments " -file /some/path/audiofile.wav")

@@ -69,3 +69,8 @@ void testProcessingAlgorithms (const PlugInEntry* plugInEntry, const AudioFileLi
 
 // Loads an `iXML` ARA audio file chunk from a supplied .WAV or .AIFF file
 void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
+
+// Requests plug-in analysis and saves audio source state into an `iXML` data chunk in each audio file
+// (if chunk authoring is supported by the plug-in) -
+// overwrites any current iXML chunk in the files (but only in-memory)
+void testAudioFileChunkSaving (const PlugInEntry* plugInEntry, AudioFileList& audioFiles);
