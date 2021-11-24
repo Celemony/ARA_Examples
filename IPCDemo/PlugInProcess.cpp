@@ -396,7 +396,7 @@ int main (int argc, const char * argv[])
 #endif
 
     ARA_VALIDATE_API_CONDITION (factory->factoryID != nullptr);
-    ARA_VALIDATE_API_CONDITION (strlen (factory->factoryID) > 5);    // at least "xx.y." needed to form a valid url-based unique ID
+    ARA_VALIDATE_API_CONDITION (std::strlen (factory->factoryID) > 5);  // at least "xx.y." needed to form a valid url-based unique ID
     ARA_VALIDATE_API_CONDITION (factory->initializeARAWithConfiguration != nullptr);
     ARA_VALIDATE_API_CONDITION (factory->uninitializeARA != nullptr);
     ARA_VALIDATE_API_CONDITION (factory->createDocumentControllerWithDocument != nullptr);
