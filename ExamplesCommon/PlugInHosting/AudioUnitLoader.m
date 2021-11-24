@@ -50,6 +50,13 @@ AudioComponent AudioUnitFindValidARAComponentWithIDs(OSType type, OSType subtype
             {
                 ARA_VALIDATE_API_CONDITION([avComponent passesAUVal]);
                 component = [avComponent audioComponent];
+
+#if ARA_CPU_ARM
+                // when migrating to ARM machines, we suggest to also add App Sandbox safety
+//              ARA_VALIDATE_API_CONDITION([avComponent isSandboxSafe]);
+                if (![avComponent isSandboxSafe])
+                    ARA_WARN("This Audio Unit is not sandbox-safe, and thus might not work in future macOS releases.");
+#endif
             }
         }
     }

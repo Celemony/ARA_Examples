@@ -196,7 +196,11 @@ void PlugInEntry::initializeARA (const ARA::ARAFactory* factory, ARA::ARAAssertF
 
     // validate factory conditions
     ARA_VALIDATE_API_CONDITION (factory->structSize >= ARA::kARAFactoryMinSize);
+#if ARA_CPU_ARM
+    ARA_VALIDATE_API_CONDITION (factory->lowestSupportedApiGeneration >= ARA::kARAAPIGeneration_2_0_Final);
+#else
     ARA_VALIDATE_API_CONDITION (factory->lowestSupportedApiGeneration >= ARA::kARAAPIGeneration_1_0_Draft);
+#endif
     ARA_VALIDATE_API_CONDITION (factory->highestSupportedApiGeneration >= factory->lowestSupportedApiGeneration);
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->factoryID) > 5);          // at least "xx.y." needed to form a valid url-based unique ID
     ARA_VALIDATE_API_CONDITION (factory->initializeARAWithConfiguration != nullptr);
@@ -220,11 +224,13 @@ void PlugInEntry::initializeARA (const ARA::ARAFactory* factory, ARA::ARAAssertF
     ARA_INTERNAL_ASSERT (factory->lowestSupportedApiGeneration <= ARA::kARAAPIGeneration_2_0_Final);
 #if ARA_SUPPORT_VERSION_1
     ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_1_0_Final);
+#elif ARA_CPU_ARM
+    ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_2_0_Final);
 #else
     ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_2_0_Draft);
 #endif
 
-    ARA::ARAAPIGeneration desiredApiGeneration = ARA::kARAAPIGeneration_2_0_Final;
+    ARA::ARAAPIGeneration desiredApiGeneration { ARA::kARAAPIGeneration_2_0_Final };
     if (desiredApiGeneration > factory->highestSupportedApiGeneration)
         desiredApiGeneration = factory->highestSupportedApiGeneration;
 
