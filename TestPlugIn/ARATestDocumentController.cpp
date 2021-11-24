@@ -53,7 +53,7 @@
 #endif
 
 
-ARA_SETUP_DEBUG_MESSAGE_PREFIX(TEST_PLUGIN_NAME);
+ARA_SETUP_DEBUG_MESSAGE_PREFIX (TEST_PLUGIN_NAME);
 
 
 /*******************************************************************************/
@@ -233,7 +233,7 @@ public:
 
     bool readAudioSamples (int64_t samplePosition, int64_t samplesPerChannel, void* const buffers[]) noexcept
     {
-        return _hostAudioReader->readAudioSamples(samplePosition, samplesPerChannel, buffers);
+        return _hostAudioReader->readAudioSamples (samplePosition, samplesPerChannel, buffers);
     }
 
     bool shouldCancel () const noexcept

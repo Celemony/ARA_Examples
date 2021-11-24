@@ -152,7 +152,7 @@ void audioAccessThreadHandler (bool& keepRunning)
     ARA_LOG ("audio access thread stopped.");
 }
 
-ARA_SETUP_DEBUG_MESSAGE_PREFIX("IPC-Main");
+ARA_SETUP_DEBUG_MESSAGE_PREFIX ("IPC-Main");
 
 int main (int argc, const char * argv[])
 {
@@ -234,7 +234,7 @@ int main (int argc, const char * argv[])
         // and offer the user a way to cancel the operation if desired.
 
         // not modelled via IPC yet, currently sent on the remote side where needed.
-        //documentControllerInterface->notifyModelUpdates(documentControllerRef);
+        //documentControllerInterface->notifyModelUpdates (documentControllerRef);
 
         //done = documentControllerInterface->isAudioSourceContentAnalysisIncomplete (documentControllerRef, audioSourceRef, kARAContentTypeNotes);
         reply = modelPortToPlugIn.sendAndAwaitReply ({ "isAudioSourceContentAnalysisIncomplete",

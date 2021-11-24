@@ -90,7 +90,7 @@ ARADocumentController* createHostAndBasicDocument (const PlugInEntry* plugInEntr
     auto regionSequence { testHost->addRegionSequence (documentName, "Track 1", musicalContext, { 0.0f, 1.0f, 0.0f }) };
 
     double position { 0.0 };
-    for (size_t i { 0 }; i < audioFiles.size(); ++i)
+    for (size_t i { 0 }; i < audioFiles.size (); ++i)
     {
         // add an audio source based on the audio file
         const std::string audioSourcePersistentID { "audioSourceTestPersistentID " + std::to_string (i) };
@@ -103,7 +103,7 @@ ARADocumentController* createHostAndBasicDocument (const PlugInEntry* plugInEntr
 
         // add a playback region encompassing the entire audio source to render modifications in our musical context,
         // enabling time stretching if requested & supported
-        const auto duration { audioSource->getDuration() };
+        const auto duration { audioSource->getDuration () };
         testHost->addPlaybackRegion (documentName, audioModification, ARA::kARAPlaybackTransformationNoChanges, 0.0, duration, position, duration, regionSequence, "Test playback region", { 0.0f, 0.0f, 1.0f });
         position += duration;
     }
@@ -235,9 +235,9 @@ void testContentUpdates (const PlugInEntry* plugInEntry, const AudioFileList& au
     }
 
     ARA_LOG ("Updating musical context %p (ARAMusicalContextRef %p) with new tempo, bar signature, tuning, key signature, and chord data", musicalContext.get (), araDocumentController->getRef (musicalContext.get ()));
-    constexpr auto musicalContextUpdateScope { ARA::ContentUpdateScopes::timelineIsAffected() +
-                                               ARA::ContentUpdateScopes::harmoniesAreAffected() +
-                                               ARA::ContentUpdateScopes::tuningIsAffected() };
+    constexpr auto musicalContextUpdateScope { ARA::ContentUpdateScopes::timelineIsAffected () +
+                                               ARA::ContentUpdateScopes::harmoniesAreAffected () +
+                                               ARA::ContentUpdateScopes::tuningIsAffected () };
     araDocumentController->beginEditing ();
     musicalContext->setTempoEntries (tempoEntries);
     musicalContext->setBarSignatures (barSignatures);
@@ -248,7 +248,7 @@ void testContentUpdates (const PlugInEntry* plugInEntry, const AudioFileList& au
     araDocumentController->endEditing ();
 
     ARA_LOG ("Updating audio source %p (ARAAudioSourceRef %p) with new notes, tempo, bar signature, tuning, key signature, and chord data", audioSource.get (), araDocumentController->getRef (audioSource.get ()));
-    constexpr auto audioSourceUpdateScope { musicalContextUpdateScope + ARA::ContentUpdateScopes::notesAreAffected() };
+    constexpr auto audioSourceUpdateScope { musicalContextUpdateScope + ARA::ContentUpdateScopes::notesAreAffected () };
     araDocumentController->beginEditing ();
     audioSource->setNotes (notes);
     audioSource->setTempoEntries (tempoEntries);
@@ -269,7 +269,7 @@ void testContentReading (const PlugInEntry* plugInEntry, const AudioFileList& au
 
     // create basic ARA model graph and perform analysis
     std::unique_ptr<TestHost> testHost;
-    const auto araDocumentController { createHostAndBasicDocument(plugInEntry, testHost, "testContentReading", true, audioFiles) };
+    const auto araDocumentController { createHostAndBasicDocument (plugInEntry, testHost, "testContentReading", true, audioFiles) };
 
     // read back all content types
     for (const auto& audioSource : araDocumentController->getDocument ()->getAudioSources ())
@@ -426,10 +426,10 @@ void testArchiving (const PlugInEntry* plugInEntry, const AudioFileList& audioFi
             for (size_t j { 0 }; j < audioModificationPersistentIDs[audioSource->getPersistentID ()].size (); j++)
             {
                 const std::string audioModificationName { "Test audio modification " + std::to_string (i) + " " + std::to_string (j) };
-                auto audioModification { testHost->addAudioModification(documentName, audioSource, audioModificationName, audioModificationPersistentIDs[audioSource->getPersistentID()][j]) };
+                auto audioModification { testHost->addAudioModification (documentName, audioSource, audioModificationName, audioModificationPersistentIDs[audioSource->getPersistentID ()][j]) };
 
                 // add a playback region encompassing the entire audio source to render modifications in our musical context
-                const auto playbackDuration { audioSource->getDuration() };
+                const auto playbackDuration { audioSource->getDuration () };
                 testHost->addPlaybackRegion (documentName, audioModification, ARA::kARAPlaybackTransformationNoChanges, 0.0, audioSource->getDuration (), static_cast<double> (i) * playbackDuration, playbackDuration, regionSequence, "Test playback region", { 0.0f, 0.0f, 1.0f });
             }
         }
@@ -459,9 +459,9 @@ void testArchiving (const PlugInEntry* plugInEntry, const AudioFileList& audioFi
         if (supportsARA2Persistency)
         {
             araDocumentController->beginEditing ();
-            auto sourceToRemove { araDocumentController->getDocument()->getAudioSources().front().get() };
-            auto modificationToRemove { sourceToRemove->getAudioModifications().front().get() };
-            auto regionToRemove { modificationToRemove->getPlaybackRegions().front().get() };
+            auto sourceToRemove { araDocumentController->getDocument ()->getAudioSources().front ().get () };
+            auto modificationToRemove { sourceToRemove->getAudioModifications ().front ().get () };
+            auto regionToRemove { modificationToRemove->getPlaybackRegions ().front ().get () };
             testHost->removePlaybackRegion (araDocumentController->getDocument ()->getName (), regionToRemove);
             testHost->removeAudioModification (araDocumentController->getDocument ()->getName (), modificationToRemove);
             testHost->removeAudioSource (araDocumentController->getDocument ()->getName (), sourceToRemove);
@@ -633,7 +633,7 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
 
         for (auto samplePosition { startOfPlaybackRegionSamples }; samplePosition < endOfPlaybackRegionSamples; samplePosition += renderBlockSize)
         {
-            const auto samplesToRender { std::min(renderBlockSize, static_cast<int> (endOfPlaybackRegionSamples - samplePosition)) };
+            const auto samplesToRender { std::min (renderBlockSize, static_cast<int> (endOfPlaybackRegionSamples - samplePosition)) };
             const auto outputPosition { samplePosition - startOfPlaybackRegionSamples };
             plugInInstance->renderSamples (samplesToRender, samplePosition, &outputData[static_cast<size_t> (outputPosition)]);
         }
@@ -652,8 +652,8 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
                 araDocumentController->beginEditing ();
                 for (auto& playbackRegion : playbackRegions)
                 {
-                    playbackRegion->setTransformationFlags (ARA::kARAPlaybackTransformationTimestretch + playbackRegion->getTransformationFlags());
-                    playbackRegion->setDurationInPlaybackTime (timeStretchFactor * playbackRegion->getDurationInPlaybackTime());
+                    playbackRegion->setTransformationFlags (ARA::kARAPlaybackTransformationTimestretch + playbackRegion->getTransformationFlags ());
+                    playbackRegion->setDurationInPlaybackTime (timeStretchFactor * playbackRegion->getDurationInPlaybackTime ());
                     araDocumentController->updatePlaybackRegionProperties (playbackRegion);
                 }
                 araDocumentController->endEditing ();

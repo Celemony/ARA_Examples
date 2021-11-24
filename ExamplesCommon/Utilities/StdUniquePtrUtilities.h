@@ -75,7 +75,7 @@ inline intptr_t index_of (std::vector<std::unique_ptr<T>> const& container, cons
     if (it == container.end ())
         return -1;
 
-    return std::distance(container.begin (), it);
+    return std::distance (container.begin (), it);
 }
 
 }   // namespace ARA

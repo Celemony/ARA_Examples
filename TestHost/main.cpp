@@ -64,7 +64,7 @@ ARA::ARAAssertFunction assertFunction { &ARA::ARAInterfaceAssert };
 ARA::ARAAssertFunction* assertFunctionReference { &assertFunction };
 
 
-ARA_SETUP_DEBUG_MESSAGE_PREFIX("ARATestHost");
+ARA_SETUP_DEBUG_MESSAGE_PREFIX ("ARATestHost");
 
 
 AudioFileList parseAudioFiles (const std::vector<std::string>& args)
@@ -115,7 +115,7 @@ int main (int argc, const char* argv[])
 {
     const std::vector<std::string> args (argv + 1, argv + argc);
 
-    ARA::ARASetExternalAssertReference(assertFunctionReference);
+    ARA::ARASetExternalAssertReference (assertFunctionReference);
 
     // parse the plug-in binary from the command line arguments
     auto plugInEntry { PlugInEntry::parsePlugInEntry (args, assertFunctionReference) };
@@ -141,7 +141,7 @@ int main (int argc, const char* argv[])
     const auto testCases { parseTestCases (args) };
 
     // conditionally execute each test case
-    const auto shouldTest { [&] (const std::string& testCase) { return testCases.empty () || ARA::contains(testCases, testCase); } };
+    const auto shouldTest { [&] (const std::string& testCase) { return testCases.empty () || ARA::contains (testCases, testCase); } };
     if (shouldTest ("PropertyUpdates"))
         testPropertyUpdates (plugInEntry.get (), audioFiles);
     if (shouldTest ("ContentUpdates"))

@@ -37,7 +37,7 @@
 #include "TestPlugInConfig.h"
 
 
-ARA_SETUP_DEBUG_MESSAGE_PREFIX("ARATestChunkWriter");
+ARA_SETUP_DEBUG_MESSAGE_PREFIX ("ARATestChunkWriter");
 
 
 class SynchronousTestAnalysis : public TestAnalysisCallbacks
