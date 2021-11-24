@@ -101,20 +101,20 @@
 // ARAAudioAccessControllerInterface (required)
 static ARAAudioReaderHostRef ARA_CALL ARACreateAudioReaderForSource(ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioSourceHostRef audioSourceHostRef, ARABool use64BitSamples)
 {
-    ARAAudioReaderHostRef readerHostRef = (use64BitSamples) ? kAudioReader64BitHostRef : kAudioReader32BitHostRef;
-    ARA_LOG("createAudioReaderForSource() returns fake host ref %p", readerHostRef);
-    return readerHostRef;
+    ARAAudioReaderHostRef audioReaderHostRef = (use64BitSamples) ? kAudioReader64BitHostRef : kAudioReader32BitHostRef;
+    ARA_LOG("createAudioReaderForSource() returns fake host ref %p", audioReaderHostRef);
+    return audioReaderHostRef;
 }
-static ARABool ARA_CALL ARAReadAudioSamples(ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef readerHostRef,
+static ARABool ARA_CALL ARAReadAudioSamples(ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef,
                                             ARASamplePosition samplePosition, ARASampleCount samplesPerChannel, void * const buffers[])
 {
     RenderPulsedSineSignal (samplePosition, kTestAudioSourceSampleRate, kTestAudioSourceSampleCount,
-                            1, samplesPerChannel, buffers, (readerHostRef == kAudioReader64BitHostRef) ? kARATrue : kARAFalse);
+                            1, samplesPerChannel, buffers, (audioReaderHostRef == kAudioReader64BitHostRef) ? kARATrue : kARAFalse);
     return kARATrue;
 }
-static void ARA_CALL ARADestroyAudioReader(ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef readerHostRef)
+static void ARA_CALL ARADestroyAudioReader(ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef)
 {
-    ARA_LOG("destroyAudioReader() called for fake host ref %p", readerHostRef);
+    ARA_LOG("destroyAudioReader() called for fake host ref %p", audioReaderHostRef);
 }
 static const ARAAudioAccessControllerInterface hostAudioAccessControllerInterface = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAAudioAccessControllerInterface, destroyAudioReader),
                                                                                         &ARACreateAudioReaderForSource, &ARAReadAudioSamples, &ARADestroyAudioReader };
@@ -203,29 +203,29 @@ static ARAContentReaderHostRef ARA_CALL ARACreateAudioSourceContentReader(ARACon
 {
     return NULL;
 }
-static ARAInt32 ARA_CALL ARAGetContentReaderEventCount(ARAContentAccessControllerHostRef controllerHostRef, ARAContentReaderHostRef readerHostRef)
+static ARAInt32 ARA_CALL ARAGetContentReaderEventCount(ARAContentAccessControllerHostRef controllerHostRef, ARAContentReaderHostRef contentReaderHostRef)
 {
-    if (readerHostRef == kHostTempoContentReaderHostRef)
+    if (contentReaderHostRef == kHostTempoContentReaderHostRef)
         return sizeof(tempoSyncPoints) / sizeof(tempoSyncPoints[0]);
 
-    if (readerHostRef == kHostSignaturesContentReaderHostRef)
+    if (contentReaderHostRef == kHostSignaturesContentReaderHostRef)
         return 1;
 
     return 0;
 }
-static const void * ARA_CALL ARAGetContentReaderDataForEvent(ARAContentAccessControllerHostRef controllerHostRef, ARAContentReaderHostRef readerHostRef, ARAInt32 eventIndex)
+static const void * ARA_CALL ARAGetContentReaderDataForEvent(ARAContentAccessControllerHostRef controllerHostRef, ARAContentReaderHostRef contentReaderHostRef, ARAInt32 eventIndex)
 {
-    if (readerHostRef == kHostTempoContentReaderHostRef)
+    if (contentReaderHostRef == kHostTempoContentReaderHostRef)
         return &tempoSyncPoints[eventIndex];
 
-    if (readerHostRef == kHostSignaturesContentReaderHostRef)
+    if (contentReaderHostRef == kHostSignaturesContentReaderHostRef)
         return &signatureDefinition;
 
     return NULL;
 }
-static void ARA_CALL ARADestroyContentReader(ARAContentAccessControllerHostRef controllerHostRef, ARAContentReaderHostRef readerHostRef)
+static void ARA_CALL ARADestroyContentReader(ARAContentAccessControllerHostRef controllerHostRef, ARAContentReaderHostRef contentReaderHostRef)
 {
-    ARA_LOG("plug-in destroyed content reader host ref %p", readerHostRef);
+    ARA_LOG("plug-in destroyed content reader host ref %p", contentReaderHostRef);
 }
 static const ARAContentAccessControllerInterface hostContentAccessControllerInterface = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAContentAccessControllerInterface, destroyContentReader),
                                                                         &ARAIsMusicalContextContentAvailable, &ARAGetMusicalContextContentGrade, &ARACreateMusicalContextContentReader,

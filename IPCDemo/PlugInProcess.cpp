@@ -122,10 +122,10 @@ ARABool _readAudioSamples (const IPCMessage& reply, ARASampleCount samplesPerCha
     return success;
 }
 
-ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef readerHostRef,
+ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef,
                                         ARASamplePosition samplePosition, ARASampleCount samplesPerChannel, void* const buffers[])
 {
-    auto remoteAudioReader { reinterpret_cast<ARARemoteAudioReader *> (readerHostRef) };
+    auto remoteAudioReader { reinterpret_cast<ARARemoteAudioReader *> (audioReaderHostRef) };
     IPCMessage reply { audioAccessFromPlugInPort.sendAndAwaitReply ({ "readAudioSamples",
                                                                           "controllerHostRef", controllerHostRef,
                                                                           "readerRef", remoteAudioReader->mainHostRef,
@@ -138,9 +138,9 @@ ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controller
         return _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->properties.channelCount, buffers);
 }
 
-void ARA_CALL ARADestroyAudioReader (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef readerHostRef)
+void ARA_CALL ARADestroyAudioReader (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef)
 {
-    auto remoteAudioReader { reinterpret_cast<ARARemoteAudioReader *> (readerHostRef) };
+    auto remoteAudioReader { reinterpret_cast<ARARemoteAudioReader *> (audioReaderHostRef) };
     audioAccessFromPlugInPort.sendWithoutReply ({ "destroyAudioReader",
                                                   "controllerHostRef", controllerHostRef,
                                                   "readerRef", remoteAudioReader->mainHostRef

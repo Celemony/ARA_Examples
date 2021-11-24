@@ -71,31 +71,31 @@ using namespace ARA;
 // ARAAudioAccessControllerInterface (required)
 ARAAudioReaderHostRef ARA_CALL ARACreateAudioReaderForSource (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioSourceHostRef audioSourceHostRef, ARABool use64BitSamples)
 {
-    ARAAudioReaderHostRef readerRef = (use64BitSamples) ? kAudioReader64BitHostRef : kAudioReader32BitHostRef;
+    ARAAudioReaderHostRef audioReaderHostRef { (use64BitSamples) ? kAudioReader64BitHostRef : kAudioReader32BitHostRef };
     ARA_VALIDATE_API_ARGUMENT (controllerHostRef, controllerHostRef == kAudioAccessControllerHostRef);
     ARA_VALIDATE_API_ARGUMENT (audioSourceHostRef, audioSourceHostRef == kHostAudioSourceHostRef);
-    ARA_LOG ("createAudioReaderForSource() returns fake ref %p.", readerRef);
-    return readerRef;
+    ARA_LOG ("createAudioReaderForSource() returns fake ref %p.", audioReaderHostRef);
+    return audioReaderHostRef;
 }
-ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef readerHostRef,
+ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef,
                                         ARASamplePosition samplePosition, ARASampleCount samplesPerChannel, void* const buffers[])
 {
     ARA_VALIDATE_API_ARGUMENT (controllerHostRef, controllerHostRef == kAudioAccessControllerHostRef);
-    ARA_VALIDATE_API_ARGUMENT (readerHostRef, (readerHostRef == kAudioReader32BitHostRef) || (readerHostRef == kAudioReader64BitHostRef));
+    ARA_VALIDATE_API_ARGUMENT (audioReaderHostRef, (audioReaderHostRef == kAudioReader32BitHostRef) || (audioReaderHostRef == kAudioReader64BitHostRef));
     ARA_VALIDATE_API_ARGUMENT (nullptr, 0 <= samplePosition);
     ARA_VALIDATE_API_ARGUMENT (nullptr, samplePosition + samplesPerChannel <= kTestAudioSourceSampleRate * kTestAudioSourceDuration);
     ARA_VALIDATE_API_ARGUMENT (buffers, buffers != nullptr);
     ARA_VALIDATE_API_ARGUMENT (buffers, buffers[0] != nullptr);
-    ARABool use64BitSamples = (readerHostRef == kAudioReader64BitHostRef) ? kARATrue : kARAFalse;
+    ARABool use64BitSamples = (audioReaderHostRef == kAudioReader64BitHostRef) ? kARATrue : kARAFalse;
     RenderPulsedSineSignal (samplePosition, static_cast<double> (kTestAudioSourceSampleRate), kTestAudioSourceSampleRate * kTestAudioSourceDuration,
                             kTestAudioSourceChannelCount, samplesPerChannel, buffers, use64BitSamples);
     return kARATrue;
 }
-void ARA_CALL ARADestroyAudioReader (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef readerHostRef)
+void ARA_CALL ARADestroyAudioReader (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef)
 {
     ARA_VALIDATE_API_ARGUMENT (controllerHostRef, controllerHostRef == kAudioAccessControllerHostRef);
-    ARA_VALIDATE_API_ARGUMENT (readerHostRef, (readerHostRef == kAudioReader32BitHostRef) || (readerHostRef == kAudioReader64BitHostRef));
-    ARA_LOG ("destroyAudioReader() called for fake ref %p.", readerHostRef);
+    ARA_VALIDATE_API_ARGUMENT (audioReaderHostRef, (audioReaderHostRef == kAudioReader32BitHostRef) || (audioReaderHostRef == kAudioReader64BitHostRef));
+    ARA_LOG ("destroyAudioReader() called for fake ref %p.", audioReaderHostRef);
 }
 
 
