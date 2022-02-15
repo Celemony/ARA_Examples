@@ -124,7 +124,7 @@ public:
 #endif
 
         // setup buffers and audio reader for reading samples
-        constexpr auto blockSize { 64U };
+        constexpr auto blockSize { 2048U };
         std::vector<float> buffer (channelCount * blockSize);
         std::vector<void*> dataPointers (channelCount);
         for (auto c { 0U }; c < channelCount; ++c)
