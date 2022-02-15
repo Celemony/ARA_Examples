@@ -672,13 +672,13 @@ ARA::PlugIn::ContentReader* ARATestDocumentController::doCreateAudioSourceConten
 
 bool ARATestDocumentController::doIsAudioModificationContentAvailable (const ARA::PlugIn::AudioModification* audioModification, ARA::ARAContentType type) noexcept
 {
-    // since this demo plug-in does not allow for modifying the content, we can dirctly forward the audio source data
+    // since this demo plug-in does not allow for modifying the content, we can directly forward the audio source data
     return doIsAudioSourceContentAvailable (audioModification->getAudioSource (), type);
 }
 
 ARA::ARAContentGrade ARATestDocumentController::doGetAudioModificationContentGrade (const ARA::PlugIn::AudioModification* audioModification, ARA::ARAContentType type) noexcept
 {
-    // since this demo plug-in does not allow for modifying the content, we can dirctly forward the audio source data
+    // since this demo plug-in does not allow for modifying the content, we can directly forward the audio source data
     return doGetAudioSourceContentGrade (audioModification->getAudioSource (), type);
 }
 
@@ -692,14 +692,14 @@ ARA::PlugIn::ContentReader* ARATestDocumentController::doCreateAudioModification
 bool ARATestDocumentController::doIsPlaybackRegionContentAvailable (const ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::ARAContentType type) noexcept
 {
     // since this demo plug-in plays back all modification data as is (no time stretching etc.),
-    // we can dirctly forward the audio modification data
+    // we can directly forward the audio modification data
     return doIsAudioModificationContentAvailable (playbackRegion->getAudioModification (), type);
 }
 
 ARA::ARAContentGrade ARATestDocumentController::doGetPlaybackRegionContentGrade (const ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::ARAContentType type) noexcept
 {
     // since this demo plug-in plays back all modification data as is (no time stretching etc.),
-    // we can dirctly forward the audio modification data
+    // we can directly forward the audio modification data
     return doGetAudioModificationContentGrade (playbackRegion->getAudioModification (), type);
 }
 
