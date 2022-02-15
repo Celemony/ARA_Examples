@@ -196,29 +196,42 @@ void PlugInEntry::initializeARA (const ARA::ARAFactory* factory, ARA::ARAAssertF
 
     // validate factory conditions
     ARA_VALIDATE_API_CONDITION (factory->structSize >= ARA::kARAFactoryMinSize);
+
 #if ARA_CPU_ARM
     ARA_VALIDATE_API_CONDITION (factory->lowestSupportedApiGeneration >= ARA::kARAAPIGeneration_2_0_Final);
 #else
     ARA_VALIDATE_API_CONDITION (factory->lowestSupportedApiGeneration >= ARA::kARAAPIGeneration_1_0_Draft);
 #endif
     ARA_VALIDATE_API_CONDITION (factory->highestSupportedApiGeneration >= factory->lowestSupportedApiGeneration);
+
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->factoryID) > 5);          // at least "xx.y." needed to form a valid url-based unique ID
+
     ARA_VALIDATE_API_CONDITION (factory->initializeARAWithConfiguration != nullptr);
     ARA_VALIDATE_API_CONDITION (factory->uninitializeARA != nullptr);
+
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->plugInName) > 0);
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->manufacturerName) > 0);
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->informationURL) > 0);
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->version) > 0);
+
     ARA_VALIDATE_API_CONDITION (factory->createDocumentControllerWithDocument != nullptr);
+
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->documentArchiveID) > 5);  // at least "xx.y." needed to form a valid url-based unique ID
     if (factory->compatibleDocumentArchiveIDsCount == 0)
         ARA_VALIDATE_API_CONDITION (factory->compatibleDocumentArchiveIDs == nullptr);
     else
         ARA_VALIDATE_API_CONDITION (factory->compatibleDocumentArchiveIDs != nullptr);
+    for (auto i { 0U }; i < factory->compatibleDocumentArchiveIDsCount; ++i)
+        ARA_VALIDATE_API_CONDITION (std::strlen (factory->compatibleDocumentArchiveIDs[i]) > 5);
+
     if (factory->analyzeableContentTypesCount == 0)
         ARA_VALIDATE_API_CONDITION (factory->analyzeableContentTypes == nullptr);
     else
         ARA_VALIDATE_API_CONDITION (factory->analyzeableContentTypes != nullptr);
+
+    // if content based fades are supported, they shall be supported on both ends
+    if ((factory->supportedPlaybackTransformationFlags & ARA::kARAPlaybackTransformationContentBasedFades) != 0)
+        ARA_INTERNAL_ASSERT ((factory->supportedPlaybackTransformationFlags & ARA::kARAPlaybackTransformationContentBasedFades) == ARA::kARAPlaybackTransformationContentBasedFades);
 
     // ensure that this plug-in is supported by our test host
     ARA_INTERNAL_ASSERT (factory->lowestSupportedApiGeneration <= ARA::kARAAPIGeneration_2_0_Final);
