@@ -940,6 +940,7 @@ function(ara_configure_binary_package target extension apple_plist_file)
         )
     elseif(APPLE)
         list(APPEND target_resources
+            ${apple_plist_file}
             "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/macOS/ARAExamples.entitlements"
         )
     endif()
@@ -1121,11 +1122,6 @@ target_sources(ARATestPlugInVST3 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Processor.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Processor.cpp"
 )
-if(APPLE)
-    target_sources(ARATestPlugInVST3 PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Info.plist"
-    )
-endif()
 
 set_target_properties(ARATestPlugInVST3 PROPERTIES
     FOLDER "Plug-In Examples/ARATestPlugIn"
@@ -1190,7 +1186,6 @@ if(APPLE)
     add_library(ARATestPlugInAudioUnit MODULE
         "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/TestAudioUnit.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/TestAudioUnit.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/TestAudioUnitInfo.plist"
     )
 
     set_target_properties(ARATestPlugInAudioUnit PROPERTIES
