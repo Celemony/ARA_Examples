@@ -44,15 +44,33 @@
 
 #if ARA_ENABLE_IPC
 
-#include "ARA_Library/IPC/ARAIPCProxyHost.h"
-#include "ARA_Library/IPC/ARAIPCProxyPlugIn.h"
-#include "ARA_Library/IPC/ARAIPCEncoding.h"
-#include "IPC/IPCPort.h"
-#include "IPC/IPCMessage.h"
+// select underlying implementation: Apple CFDictionary or a generic pugixml-based
+// Note that the pugixml version is much less efficient because it base64-encodes bytes
+// (used for large sample data) which adds encoding overhead and requires additional copies.
+#ifndef USE_ARA_CF_ENCODING
+    #if defined (__APPLE__)
+        #define USE_ARA_CF_ENCODING 1
+    #else
+        #define USE_ARA_CF_ENCODING 0
+    #endif
+#endif
+
 
 #if defined (__linux__)
     #error "IPC not yet implemented for Linux"
 #endif
+
+
+#include "ARA_Library/IPC/ARAIPCProxyHost.h"
+#include "ARA_Library/IPC/ARAIPCProxyPlugIn.h"
+#include "ARA_Library/IPC/ARAIPCEncoding.h"
+#include "IPC/IPCPort.h"
+#if USE_ARA_CF_ENCODING
+    #include "ARA_Library/IPC/ARAIPCCFEncoding.h"
+#else
+    #include "IPC/IPCXMLMessage.h"
+#endif
+
 
 // minimal set of commands to run a companion API plug-in through IPC
 enum
@@ -122,64 +140,93 @@ static const std::string _createPortID ()
 #endif
 }
 
-// converting IPCMessage to MessageEn-/Decoder
-ARA::IPC::ARAIPCMessageEncoder makeMessageEncoder (IPCMessage& message)
+
+#if !USE_ARA_CF_ENCODING
+// converting IPCXMLMessage to MessageEn-/Decoder
+ARA::IPC::ARAIPCMessageEncoder createMessageEncoder (IPCXMLMessage* message = nullptr)
 {
-    static const ARA::IPC::ARAIPCMessageEncoderInterface encoderMethods
+    const auto appendInt32 { [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, int32_t argValue) -> void
+        { reinterpret_cast<IPCXMLMessage*> (messageEncoderRef)->appendInt32 (argKey, argValue); } };
+    const auto appendInt64 { [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, int64_t argValue) -> void
+        { reinterpret_cast<IPCXMLMessage*> (messageEncoderRef)->appendInt64 (argKey, argValue); } };
+    const auto appendSize { [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, size_t argValue) -> void
+        { reinterpret_cast<IPCXMLMessage*> (messageEncoderRef)->appendSize (argKey, argValue); } };
+    const auto appendFloat { [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, float argValue) -> void
+        { reinterpret_cast<IPCXMLMessage*> (messageEncoderRef)->appendFloat (argKey, argValue); } };
+    const auto appendDouble { [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, double argValue) -> void
+        { reinterpret_cast<IPCXMLMessage*> (messageEncoderRef)->appendDouble (argKey, argValue); } };
+    const auto appendString { [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, const char* argValue) -> void
+        { reinterpret_cast<IPCXMLMessage*> (messageEncoderRef)->appendString (argKey, argValue); } };
+    const auto appendBytes { [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, const uint8_t* argValue, size_t argSize, bool copy) -> void
+        { reinterpret_cast<IPCXMLMessage*> (messageEncoderRef)->appendBytes (argKey, argValue, argSize, copy); } };
+    const auto appendSubMessage { [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey) -> ARA::IPC::ARAIPCMessageEncoderRef
+        { return reinterpret_cast<ARA::IPC::ARAIPCMessageEncoderRef> (reinterpret_cast<IPCXMLMessage*> (messageEncoderRef)->appendSubMessage (argKey)); } };
+
+    static const ARA::IPC::ARAIPCMessageEncoderInterface encoderMethodsReferencingMessage
     {
-        [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef) -> void
-            { delete reinterpret_cast<IPCMessage*> (messageEncoderRef); },
-        [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, int32_t argValue) -> void
-            { reinterpret_cast<IPCMessage*> (messageEncoderRef)->appendInt32 (argKey, argValue); },
-        [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, int64_t argValue) -> void
-            { reinterpret_cast<IPCMessage*> (messageEncoderRef)->appendInt64 (argKey, argValue); },
-        [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, size_t argValue) -> void
-            { reinterpret_cast<IPCMessage*> (messageEncoderRef)->appendSize (argKey, argValue); },
-        [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, float argValue) -> void
-            { reinterpret_cast<IPCMessage*> (messageEncoderRef)->appendFloat (argKey, argValue); },
-        [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, double argValue) -> void
-            { reinterpret_cast<IPCMessage*> (messageEncoderRef)->appendDouble (argKey, argValue); },
-        [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, const char* argValue) -> void
-            { reinterpret_cast<IPCMessage*> (messageEncoderRef)->appendString (argKey, argValue); },
-        [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey, const uint8_t* argValue, size_t argSize, bool copy) -> void
-            { reinterpret_cast<IPCMessage*> (messageEncoderRef)->appendBytes (argKey, argValue, argSize, copy); },
-        [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef, ARA::IPC::ARAIPCMessageKey argKey) -> ARA::IPC::ARAIPCMessageEncoderRef
-            { return reinterpret_cast<ARA::IPC::ARAIPCMessageEncoderRef> (reinterpret_cast<IPCMessage*> (messageEncoderRef)->appendSubMessage (argKey)); }
+        [] (ARA::IPC::ARAIPCMessageEncoderRef /*messageEncoderRef*/) -> void
+            { /* nothing to do here since we're not owning the IPCXMLMessage but merely referencing it */ },
+        appendInt32,
+        appendInt64,
+        appendSize,
+        appendFloat,
+        appendDouble,
+        appendString,
+        appendBytes,
+        appendSubMessage
     };
 
-    return { reinterpret_cast<ARA::IPC::ARAIPCMessageEncoderRef> (&message), &encoderMethods };
+    static const ARA::IPC::ARAIPCMessageEncoderInterface encoderMethodsOwningMessage
+    {
+        [] (ARA::IPC::ARAIPCMessageEncoderRef messageEncoderRef) -> void
+            { delete reinterpret_cast<IPCXMLMessage*> (messageEncoderRef); },
+        appendInt32,
+        appendInt64,
+        appendSize,
+        appendFloat,
+        appendDouble,
+        appendString,
+        appendBytes,
+        appendSubMessage
+    };
+
+    if (message != nullptr)
+        return { reinterpret_cast<ARA::IPC::ARAIPCMessageEncoderRef> (message), &encoderMethodsReferencingMessage };
+    else
+        return { reinterpret_cast<ARA::IPC::ARAIPCMessageEncoderRef> (new IPCXMLMessage), &encoderMethodsOwningMessage };
 }
 
-ARA::IPC::ARAIPCMessageDecoder makeMessageDecoder (const IPCMessage& message)
+ARA::IPC::ARAIPCMessageDecoder createMessageDecoder (const IPCXMLMessage& message)
 {
     static const ARA::IPC::ARAIPCMessageDecoderInterface decoderMethods
     {
-        [] (ARA::IPC::ARAIPCMessageDecoderRef messageDecoderRef) -> void
-            { delete reinterpret_cast<const IPCMessage*> (messageDecoderRef); },
+        [] (ARA::IPC::ARAIPCMessageDecoderRef /*messageDecoderRef*/) -> void
+            { /* nothing to do here since we're not owning the IPCXMLMessage but merely referencing it */ },
         [] (ARA::IPC::ARAIPCMessageDecoderRef messageDecoderRef) -> bool
-            { return reinterpret_cast<const IPCMessage*> (messageDecoderRef)->isEmpty (); },
+            { return reinterpret_cast<const IPCXMLMessage*> (messageDecoderRef)->isEmpty (); },
         [] (ARA::IPC::ARAIPCMessageDecoderRef messageDecoderRef, ARA::IPC::ARAIPCMessageKey argKey, int32_t* argValue) -> bool
-            { return reinterpret_cast<const IPCMessage*> (messageDecoderRef)->readInt32 (argKey, *argValue); },
+            { return reinterpret_cast<const IPCXMLMessage*> (messageDecoderRef)->readInt32 (argKey, *argValue); },
         [] (ARA::IPC::ARAIPCMessageDecoderRef messageDecoderRef, ARA::IPC::ARAIPCMessageKey argKey, int64_t* argValue) -> bool
-            { return reinterpret_cast<const IPCMessage*> (messageDecoderRef)->readInt64 (argKey, *argValue); },
+            { return reinterpret_cast<const IPCXMLMessage*> (messageDecoderRef)->readInt64 (argKey, *argValue); },
         [] (ARA::IPC::ARAIPCMessageDecoderRef messageDecoderRef, ARA::IPC::ARAIPCMessageKey argKey, size_t* argValue) -> bool
-            { return reinterpret_cast<const IPCMessage*> (messageDecoderRef)->readSize (argKey, *argValue); },
+            { return reinterpret_cast<const IPCXMLMessage*> (messageDecoderRef)->readSize (argKey, *argValue); },
         [] (ARA::IPC::ARAIPCMessageDecoderRef messageDecoderRef, ARA::IPC::ARAIPCMessageKey argKey, float* argValue) -> bool
-            { return reinterpret_cast<const IPCMessage*> (messageDecoderRef)->readFloat (argKey, *argValue); },
+            { return reinterpret_cast<const IPCXMLMessage*> (messageDecoderRef)->readFloat (argKey, *argValue); },
         [] (ARA::IPC::ARAIPCMessageDecoderRef messageDecoderRef, ARA::IPC::ARAIPCMessageKey argKey, double* argValue) -> bool
-            { return reinterpret_cast<const IPCMessage*> (messageDecoderRef)->readDouble (argKey, *argValue); },
+            { return reinterpret_cast<const IPCXMLMessage*> (messageDecoderRef)->readDouble (argKey, *argValue); },
         [] (ARA::IPC::ARAIPCMessageDecoderRef messageDecoderRef, ARA::IPC::ARAIPCMessageKey argKey, const char** argValue) -> bool
-            { return reinterpret_cast<const IPCMessage*> (messageDecoderRef)->readString (argKey, *argValue); },
+            { return reinterpret_cast<const IPCXMLMessage*> (messageDecoderRef)->readString (argKey, *argValue); },
         [] (ARA::IPC::ARAIPCMessageDecoderRef messageDecoderRef, ARA::IPC::ARAIPCMessageKey argKey, size_t* argSize) -> bool
-            { return reinterpret_cast<const IPCMessage*> (messageDecoderRef)->readBytesSize (argKey, *argSize); },
+            { return reinterpret_cast<const IPCXMLMessage*> (messageDecoderRef)->readBytesSize (argKey, *argSize); },
         [] (ARA::IPC::ARAIPCMessageDecoderRef messageDecoderRef, ARA::IPC::ARAIPCMessageKey argKey, uint8_t* argValue) -> void
-            { return reinterpret_cast<const IPCMessage*> (messageDecoderRef)->readBytes (argKey, argValue); },
+            { return reinterpret_cast<const IPCXMLMessage*> (messageDecoderRef)->readBytes (argKey, argValue); },
         [] (ARA::IPC::ARAIPCMessageDecoderRef messageDecoderRef, ARA::IPC::ARAIPCMessageKey argKey) -> ARA::IPC::ARAIPCMessageDecoderRef
-            { return reinterpret_cast<ARA::IPC::ARAIPCMessageDecoderRef> (reinterpret_cast<const IPCMessage*> (messageDecoderRef)->readSubMessage (argKey)); }
+            { return reinterpret_cast<ARA::IPC::ARAIPCMessageDecoderRef> (reinterpret_cast<const IPCXMLMessage*> (messageDecoderRef)->readSubMessage (argKey)); }
     };
 
-    return { reinterpret_cast<const ARA::IPC::ARAIPCMessageDecoderRef> (const_cast<IPCMessage *> (&message)), &decoderMethods };
+    return { reinterpret_cast<const ARA::IPC::ARAIPCMessageDecoderRef> (const_cast<IPCXMLMessage *> (&message)), &decoderMethods };
 }
+#endif
 
 // implementation of the abstract ARAIPCMessageSender interface
 class IPCSender
@@ -192,7 +239,11 @@ public:
 
     ARA::IPC::ARAIPCMessageEncoder createEncoder ()
     {
-        return makeMessageEncoder (*new IPCMessage);
+#if USE_ARA_CF_ENCODING
+        return ARA::IPC::ARAIPCCFCreateMessageEncoder ();
+#else
+        return createMessageEncoder ();
+#endif
     }
 
     void sendMessage (ARA::IPC::ARAIPCMessageID messageID, const ARA::IPC::ARAIPCMessageEncoder& encoder,
@@ -200,22 +251,43 @@ public:
     {
         ARA_INTERNAL_ASSERT (isValidMessageID (messageID));
 
-        IPCPort::ReceivedData replyData { _port.sendAndAwaitReply (messageID, reinterpret_cast<const IPCMessage*> (encoder.ref)->createEncodedMessage ()) };
-#if defined (__APPLE__)
-        IPCMessage reply { replyData };
-        CFRelease (replyData);
-#else
-        IPCMessage reply { replyData.c_str (), replyData.size () };
-#endif
+#if USE_ARA_CF_ENCODING
+        const auto messageData { ARAIPCCFCreateMessageEncoderData (encoder.ref) };
+        IPCPort::ReceivedData replyData { _port.sendAndAwaitReply (messageID, messageData) };
         if (replyHandler)
         {
-            auto replyDecoder { makeMessageDecoder (reply) };
+            const auto replyDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (replyData) };
             (*replyHandler) (replyDecoder, replyHandlerUserData);
+            replyDecoder.methods->destroyDecoder (replyDecoder.ref);
+        }
+#if ARA_ENABLE_INTERNAL_ASSERTS
+        else
+        {
+            const auto replyDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (replyData) };
+            ARA_INTERNAL_ASSERT (replyDecoder.methods->isEmpty (replyDecoder.ref));
+            replyDecoder.methods->destroyDecoder (replyDecoder.ref);
+        }
+#endif
+        CFRelease (replyData);
+#else
+        const auto replyData { _port.sendAndAwaitReply (messageID, reinterpret_cast<const IPCXMLMessage*> (encoder.ref)->createEncodedMessage ()) };
+    #if defined (__APPLE__)
+        const IPCXMLMessage reply { replyData };
+        CFRelease (replyData);
+    #else
+        const IPCXMLMessage reply { replyData.c_str (), replyData.size () };
+    #endif
+        if (replyHandler)
+        {
+            const auto replyDecoder { createMessageDecoder (reply) };
+            (*replyHandler) (replyDecoder, replyHandlerUserData);
+            replyDecoder.methods->destroyDecoder (replyDecoder.ref);
         }
         else
         {
             ARA_INTERNAL_ASSERT (reply.isEmpty ());
         }
+#endif
     }
 
     bool receiverEndianessMatches ()
@@ -544,16 +616,26 @@ private:
                                     [] (const ARA::IPC::ARAIPCMessageID messageID, IPCPort::ReceivedData const messageData) -> IPCPort::DataToSend /*__attribute__((cf_returns_retained))*/
                                         {
                                             ARA_INTERNAL_ASSERT (isValidMessageID (messageID));
-#if defined (__APPLE__)
-                                            IPCMessage message { messageData };
-#else
-                                            IPCMessage message { messageData.c_str (), messageData.size () };
-#endif
-                                            auto messageDecoder { makeMessageDecoder (message) };
-                                            IPCMessage reply;
-                                            auto replyEncoder { makeMessageEncoder (reply) };
+#if USE_ARA_CF_ENCODING
+                                            const auto messageDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
+                                            auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
                                             ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher (messageID, &messageDecoder, &replyEncoder);
-                                            return reply.createEncodedMessage ();
+                                            const auto result { ARAIPCCFCreateMessageEncoderData (replyEncoder.ref) };
+#else
+    #if defined (__APPLE__)
+                                            const IPCXMLMessage message { messageData };
+    #else
+                                            const IPCXMLMessage message { messageData.c_str (), messageData.size () };
+    #endif
+                                            const auto messageDecoder { createMessageDecoder (message) };
+                                            IPCXMLMessage reply;
+                                            auto replyEncoder { createMessageEncoder (&reply) };
+                                            ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher (messageID, &messageDecoder, &replyEncoder);
+                                            const auto result { reply.createEncodedMessage () };
+#endif
+                                            replyEncoder.methods->destroyEncoder (replyEncoder.ref);
+                                            messageDecoder.methods->destroyDecoder (messageDecoder.ref);
+                                            return result;
                                         });
 
         while (!_terminateCallbacksThread)
@@ -631,12 +713,20 @@ __attribute__((cf_returns_retained))
 IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::ReceivedData const messageData)
 {
     ARA_INTERNAL_ASSERT (isValidMessageID (messageID));
-#if defined (__APPLE__)
-    IPCMessage message { messageData };
+
+#if USE_ARA_CF_ENCODING
+    auto messageDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
 #else
-    IPCMessage message { messageData.c_str (), messageData.size () };
+#if defined (__APPLE__)
+    IPCXMLMessage message { messageData };
+#else
+    IPCXMLMessage message { messageData.c_str (), messageData.size () };
 #endif
-    auto messageDecoder { makeMessageDecoder (message) };
+    auto messageDecoder { createMessageDecoder (message) };
+#endif
+
+    IPCPort::DataToSend result {};
+
     if (messageID == kIPCCreateARAEffect)
     {
         ARA::ARADocumentControllerRef documentControllerRemoteRef;
@@ -646,11 +736,19 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
         auto plugInInstance { _plugInEntry->createARAPlugInInstanceWithRoles (ARA::IPC::ARAIPCProxyHostTranslateDocumentControllerRef (documentControllerRemoteRef), assignedRoles) };
         auto plugInExtensionRef { ARA::IPC::ARAIPCProxyHostCreatePlugInExtension (plugInInstance->getARAPlugInExtensionInstance ()) };
 
-        IPCMessage reply;
-        auto replyEncoder { makeMessageEncoder (reply) };
+#if USE_ARA_CF_ENCODING
+        auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
         ARA::IPC::encodeArguments (replyEncoder, reinterpret_cast<size_t> (plugInInstance.get ()), plugInExtensionRef);
         plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
-        return reply.createEncodedMessage ();
+        result = ARAIPCCFCreateMessageEncoderData (replyEncoder.ref);
+#else
+        IPCXMLMessage reply;
+        auto replyEncoder { createMessageEncoder (&reply) };
+        ARA::IPC::encodeArguments (replyEncoder, reinterpret_cast<size_t> (plugInInstance.get ()), plugInExtensionRef);
+        plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
+        result = reply.createEncodedMessage ();
+#endif
+        replyEncoder.methods->destroyEncoder (replyEncoder.ref);
     }
     else if (messageID == kIPCStartRendering)
     {
@@ -660,7 +758,6 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
         ARA::IPC::decodeArguments (&messageDecoder, plugInInstanceRef, maxBlockSize, sampleRate);
 
         reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->startRendering (maxBlockSize, sampleRate);
-        return {};
     }
     else if (messageID == kIPCRenderSamples)
     {
@@ -675,10 +772,17 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
         // \todo this ignores potential float data alignment or byte order issues...
         reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->renderSamples (static_cast<int> (buffer.size () / sizeof(float)),
                                                                         samplePosition, reinterpret_cast<float*> (buffer.data ()));
-        IPCMessage reply;
-        auto replyEncoder { makeMessageEncoder (reply) };
+#if USE_ARA_CF_ENCODING
+        auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
         ARA::IPC::encodeReply (&replyEncoder, ARA::IPC::BytesEncoder { buffer, false });
-        return reply.createEncodedMessage ();
+        result = ARAIPCCFCreateMessageEncoderData (replyEncoder.ref);
+#else
+        IPCXMLMessage reply;
+        auto replyEncoder { createMessageEncoder (&reply) };
+        ARA::IPC::encodeReply (&replyEncoder, ARA::IPC::BytesEncoder { buffer, false });
+        result = reply.createEncodedMessage ();
+#endif
+        replyEncoder.methods->destroyEncoder (replyEncoder.ref);
     }
     else if (messageID == kIPCStopRendering)
     {
@@ -686,7 +790,6 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
         ARA::IPC::decodeArguments (&messageDecoder, plugInInstanceRef);
 
         reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->stopRendering ();
-        return {};
     }
     else if (messageID == kIPCDestroyEffect)
     {
@@ -696,20 +799,28 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
 
         ARA::IPC::ARAIPCProxyHostDestroyPlugInExtension (plugInExtensionRef);
         delete reinterpret_cast<PlugInInstance*> (plugInInstanceRef);
-        return {};
     }
     else if (messageID == kIPCTerminate)
     {
         _shutDown = true;
-        return {};
     }
     else
     {
-        IPCMessage reply;
-        auto replyEncoder { makeMessageEncoder (reply) };
+#if USE_ARA_CF_ENCODING
+        auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
         ARA::IPC::ARAIPCProxyHostCommandHandler (messageID, &messageDecoder, &replyEncoder);
-        return reply.createEncodedMessage ();
+        result = ARAIPCCFCreateMessageEncoderData (replyEncoder.ref);
+#else
+        IPCXMLMessage reply;
+        auto replyEncoder { createMessageEncoder (&reply) };
+        ARA::IPC::ARAIPCProxyHostCommandHandler (messageID, &messageDecoder, &replyEncoder);
+        result = reply.createEncodedMessage ();
+#endif
+        replyEncoder.methods->destroyEncoder (replyEncoder.ref);
     }
+
+    messageDecoder.methods->destroyDecoder (messageDecoder.ref);
+    return result;
 }
 
 namespace RemoteHost
