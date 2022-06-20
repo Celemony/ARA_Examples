@@ -48,7 +48,7 @@
 // paths or IDs as pre-configured arguments under Run -> Arguments, along with a list of the
 // available test for convenient configuration.
 // If you prefer the command line:
-// our own ARA SDK test plug-in: "-vst3 ARATestPlugIn.vst3" or "-au aufx AraT ADeC"
+// our own ARA SDK test plug-in: "-vst3 ARATestPlugIn.vst3" or "-au aufx AraT ADeC" or "-au aufx Ara3 ADeC"
 // the JUCE_ARA demo plug-in: "-vst3 ~/Library/Audio/Plug-Ins/VST3/ARAPluginDemo.vst3" or "-au aufx AraD ADeC"
 // Melodyne: "-vst3 /Library/Audio/Plug-Ins/VST3/Melodyne.vst3" or "-au aumf MPLG CLMY"
 //------------------------------------------------------------------------------

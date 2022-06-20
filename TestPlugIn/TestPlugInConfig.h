@@ -21,6 +21,10 @@
 #define _IN_QUOTES_HELPER(x) #x
 #define IN_QUOTES(x) _IN_QUOTES_HELPER(x)
 
+#if (!defined(ARA_MAJOR_VERSION)) || (!defined(ARA_MINOR_VERSION)) || (!defined(ARA_PATCH_VERSION))
+    #error "ARA version macros not set up properly!"
+#endif
+
 #define TEST_PLUGIN_NAME "ARATestPlugIn"
 #define TEST_MANUFACTURER_NAME "ARA Demo Company"
 #define TEST_INFORMATION_URL "https://www.arademocompany.com"

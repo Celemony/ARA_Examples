@@ -1,0 +1,751 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 50;
+	objects = {
+
+/* Begin PBXAggregateTarget section */
+		AD1D15E32666583F0071A9F7 /* ARA_Version */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = AD1D15E42666583F0071A9F7 /* Build configuration list for PBXAggregateTarget "ARA_Version" */;
+			buildPhases = (
+				AD1D15E9266658870071A9F7 /* Generate ARA_Version.xcconfig */,
+			);
+			dependencies = (
+			);
+			name = ARA_Version;
+			productName = ARA_Version;
+		};
+/* End PBXAggregateTarget section */
+
+/* Begin PBXBuildFile section */
+		1F24CA82265EABF1004005DA /* TestAUv3App.m in Sources */ = {isa = PBXBuildFile; fileRef = 1F24CA7F265EABF1004005DA /* TestAUv3App.m */; };
+		1F24CA83265EABF1004005DA /* TestAUv3App.xib in Resources */ = {isa = PBXBuildFile; fileRef = 1F24CA80265EABF1004005DA /* TestAUv3App.xib */; };
+		1F24CA8D265EAF64004005DA /* ARAExamples.icns in Resources */ = {isa = PBXBuildFile; fileRef = 1F24CA8A265EAF64004005DA /* ARAExamples.icns */; };
+		1F24CAB1265EB127004005DA /* ARATestPlugInAUv3.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 1F24CA93265EB127004005DA /* ARATestPlugInAUv3.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		1F24CACD265FC103004005DA /* TestAUv3Extension.m in Sources */ = {isa = PBXBuildFile; fileRef = 1F24CACC265FC103004005DA /* TestAUv3Extension.m */; };
+		1F24CAD7265FC223004005DA /* ARATestPlugInAUv3.h in Headers */ = {isa = PBXBuildFile; fileRef = 1F24CAD5265FC223004005DA /* ARATestPlugInAUv3.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		1F24CAE5265FC22D004005DA /* TestAUv3AudioUnit.h in Headers */ = {isa = PBXBuildFile; fileRef = 1F24CAC1265FBD32004005DA /* TestAUv3AudioUnit.h */; };
+		1F24CAE6265FC22D004005DA /* TestAUv3AudioUnit.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1F24CAC3265FBD32004005DA /* TestAUv3AudioUnit.mm */; };
+		1F24CAE7265FC22D004005DA /* TestAUv3DSPKernel.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 1F24CAC7265FBD33004005DA /* TestAUv3DSPKernel.hpp */; };
+		1F24CAE8265FC22D004005DA /* TestAUv3Factory.h in Headers */ = {isa = PBXBuildFile; fileRef = 1F24CAC2265FBD32004005DA /* TestAUv3Factory.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		1F24CAE9265FC22D004005DA /* TestAUv3Factory.m in Sources */ = {isa = PBXBuildFile; fileRef = 1F24CAC5265FBD33004005DA /* TestAUv3Factory.m */; };
+		1F24CAED265FC3B9004005DA /* ARATestPlugInAUv3.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F24CAD3265FC223004005DA /* ARATestPlugInAUv3.framework */; };
+		1F24CAF0265FCB8F004005DA /* ARATestPlugInAUv3.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 1F24CAD3265FC223004005DA /* ARATestPlugInAUv3.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		1F24CAF2265FEBE4004005DA /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F24CAF1265FEBE4004005DA /* AVFoundation.framework */; };
+		1FAB7BDC2667696A005299C9 /* ARAExamples.icns in Resources */ = {isa = PBXBuildFile; fileRef = 1F24CA8A265EAF64004005DA /* ARAExamples.icns */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1F24CAAF265EB127004005DA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1F24CA4D265EAB20004005DA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1F24CA92265EB127004005DA;
+			remoteInfo = ARATestPlugInAUv3Extension;
+		};
+		1F24CAEB265FC2FE004005DA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1F24CA4D265EAB20004005DA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1F24CAD2265FC223004005DA;
+			remoteInfo = ARATestPlugInAUv3Framework;
+		};
+		AD1D15E7266658700071A9F7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1F24CA4D265EAB20004005DA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AD1D15E32666583F0071A9F7;
+			remoteInfo = ARA_Version;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		1F24CAB2265EB127004005DA /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1F24CAB1265EB127004005DA /* ARATestPlugInAUv3.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F24CADF265FC223004005DA /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				1F24CAF0265FCB8F004005DA /* ARATestPlugInAUv3.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		1F24CA6D265EABA1004005DA /* ARATestPlugInAUv3.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ARATestPlugInAUv3.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1F24CA7F265EABF1004005DA /* TestAUv3App.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TestAUv3App.m; sourceTree = "<group>"; };
+		1F24CA80265EABF1004005DA /* TestAUv3App.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = TestAUv3App.xib; sourceTree = "<group>"; };
+		1F24CA81265EABF1004005DA /* TestAUv3AppInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = TestAUv3AppInfo.plist; sourceTree = "<group>"; };
+		1F24CA85265EAC3B004005DA /* TestAUv3App.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = TestAUv3App.entitlements; sourceTree = "<group>"; };
+		1F24CA89265EAF64004005DA /* ARAExamples.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = ARAExamples.entitlements; sourceTree = "<group>"; };
+		1F24CA8A265EAF64004005DA /* ARAExamples.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = ARAExamples.icns; sourceTree = "<group>"; };
+		1F24CA93265EB127004005DA /* ARATestPlugInAUv3.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ARATestPlugInAUv3.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1F24CAB7265F8526004005DA /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		1F24CABB265F9BE3004005DA /* TestAUv3ExtensionInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = TestAUv3ExtensionInfo.plist; sourceTree = "<group>"; };
+		1F24CABC265FBC40004005DA /* TestAUv3Extension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TestAUv3Extension.entitlements; sourceTree = "<group>"; };
+		1F24CABE265FBD32004005DA /* BufferedAudioBus.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = BufferedAudioBus.hpp; sourceTree = "<group>"; };
+		1F24CAC1265FBD32004005DA /* TestAUv3AudioUnit.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestAUv3AudioUnit.h; sourceTree = "<group>"; };
+		1F24CAC2265FBD32004005DA /* TestAUv3Factory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestAUv3Factory.h; sourceTree = "<group>"; };
+		1F24CAC3265FBD32004005DA /* TestAUv3AudioUnit.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TestAUv3AudioUnit.mm; sourceTree = "<group>"; };
+		1F24CAC5265FBD33004005DA /* TestAUv3Factory.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TestAUv3Factory.m; sourceTree = "<group>"; };
+		1F24CAC7265FBD33004005DA /* TestAUv3DSPKernel.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = TestAUv3DSPKernel.hpp; sourceTree = "<group>"; };
+		1F24CACC265FC103004005DA /* TestAUv3Extension.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TestAUv3Extension.m; sourceTree = "<group>"; };
+		1F24CAD3265FC223004005DA /* ARATestPlugInAUv3.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = ARATestPlugInAUv3.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		1F24CAD5265FC223004005DA /* ARATestPlugInAUv3.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARATestPlugInAUv3.h; sourceTree = "<group>"; };
+		1F24CAD6265FC223004005DA /* TestAUv3FrameworkInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = TestAUv3FrameworkInfo.plist; sourceTree = "<group>"; };
+		1F24CAF1265FEBE4004005DA /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1F24CA6A265EABA1004005DA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F24CA90265EB127004005DA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F24CAED265FC3B9004005DA /* ARATestPlugInAUv3.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F24CAD0265FC223004005DA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F24CAF2265FEBE4004005DA /* AVFoundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1F24CA4C265EAB20004005DA = {
+			isa = PBXGroup;
+			children = (
+				1F24CA86265EAF1B004005DA /* ExamplesCommon */,
+				1F24CA7E265EABF1004005DA /* App */,
+				1F24CABA265F9B99004005DA /* Extension */,
+				1F24CABD265FBCEC004005DA /* Framework */,
+				1F24CABA265F9B99004005DA /* Extension */,
+				1F24CA7E265EABF1004005DA /* App */,
+				AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */,
+				1F24CA56265EAB20004005DA /* Products */,
+				1F24CAB6265F8526004005DA /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		1F24CA56265EAB20004005DA /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1F24CA6D265EABA1004005DA /* ARATestPlugInAUv3.app */,
+				1F24CA93265EB127004005DA /* ARATestPlugInAUv3.appex */,
+				1F24CAD3265FC223004005DA /* ARATestPlugInAUv3.framework */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		1F24CA7E265EABF1004005DA /* App */ = {
+			isa = PBXGroup;
+			children = (
+				1F24CA85265EAC3B004005DA /* TestAUv3App.entitlements */,
+				1F24CA7F265EABF1004005DA /* TestAUv3App.m */,
+				1F24CA80265EABF1004005DA /* TestAUv3App.xib */,
+				1F24CA81265EABF1004005DA /* TestAUv3AppInfo.plist */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		1F24CA86265EAF1B004005DA /* ExamplesCommon */ = {
+			isa = PBXGroup;
+			children = (
+				1F24CA87265EAF64004005DA /* macOS */,
+			);
+			name = ExamplesCommon;
+			path = ../../ExamplesCommon;
+			sourceTree = "<group>";
+		};
+		1F24CA87265EAF64004005DA /* macOS */ = {
+			isa = PBXGroup;
+			children = (
+				1F24CA89265EAF64004005DA /* ARAExamples.entitlements */,
+				1F24CA8A265EAF64004005DA /* ARAExamples.icns */,
+			);
+			path = macOS;
+			sourceTree = "<group>";
+		};
+		1F24CAB6265F8526004005DA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1F24CAF1265FEBE4004005DA /* AVFoundation.framework */,
+				1F24CAB7265F8526004005DA /* Cocoa.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		1F24CABA265F9B99004005DA /* Extension */ = {
+			isa = PBXGroup;
+			children = (
+				1F24CACC265FC103004005DA /* TestAUv3Extension.m */,
+				1F24CABC265FBC40004005DA /* TestAUv3Extension.entitlements */,
+				1F24CABB265F9BE3004005DA /* TestAUv3ExtensionInfo.plist */,
+			);
+			path = Extension;
+			sourceTree = "<group>";
+		};
+		1F24CABD265FBCEC004005DA /* Framework */ = {
+			isa = PBXGroup;
+			children = (
+				1F24CABE265FBD32004005DA /* BufferedAudioBus.hpp */,
+				1F24CAC7265FBD33004005DA /* TestAUv3DSPKernel.hpp */,
+				1F24CAC1265FBD32004005DA /* TestAUv3AudioUnit.h */,
+				1F24CAC3265FBD32004005DA /* TestAUv3AudioUnit.mm */,
+				1F24CAC2265FBD32004005DA /* TestAUv3Factory.h */,
+				1F24CAC5265FBD33004005DA /* TestAUv3Factory.m */,
+				1F24CAD5265FC223004005DA /* ARATestPlugInAUv3.h */,
+				1F24CAD6265FC223004005DA /* TestAUv3FrameworkInfo.plist */,
+			);
+			path = Framework;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		1F24CACE265FC223004005DA /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F24CAE5265FC22D004005DA /* TestAUv3AudioUnit.h in Headers */,
+				1F24CAD7265FC223004005DA /* ARATestPlugInAUv3.h in Headers */,
+				1F24CAE7265FC22D004005DA /* TestAUv3DSPKernel.hpp in Headers */,
+				1F24CAE8265FC22D004005DA /* TestAUv3Factory.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		1F24CA6C265EABA1004005DA /* App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1F24CA7B265EABA1004005DA /* Build configuration list for PBXNativeTarget "App" */;
+			buildPhases = (
+				1F24CA69265EABA1004005DA /* Sources */,
+				1F24CA6A265EABA1004005DA /* Frameworks */,
+				1F24CA6B265EABA1004005DA /* Resources */,
+				1F24CAB2265EB127004005DA /* Embed App Extensions */,
+				1F24CADF265FC223004005DA /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1F24CAB0265EB127004005DA /* PBXTargetDependency */,
+			);
+			name = App;
+			productName = ARATestPlugInAUv3;
+			productReference = 1F24CA6D265EABA1004005DA /* ARATestPlugInAUv3.app */;
+			productType = "com.apple.product-type.application";
+		};
+		1F24CA92265EB127004005DA /* Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1F24CAB5265EB127004005DA /* Build configuration list for PBXNativeTarget "Extension" */;
+			buildPhases = (
+				1F24CA8F265EB127004005DA /* Sources */,
+				1F24CA90265EB127004005DA /* Frameworks */,
+				1F24CA91265EB127004005DA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1F24CAEC265FC2FE004005DA /* PBXTargetDependency */,
+			);
+			name = Extension;
+			productName = ARATestPlugInAUv3Extension;
+			productReference = 1F24CA93265EB127004005DA /* ARATestPlugInAUv3.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		1F24CAD2265FC223004005DA /* Framework */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1F24CADC265FC223004005DA /* Build configuration list for PBXNativeTarget "Framework" */;
+			buildPhases = (
+				1F24CACE265FC223004005DA /* Headers */,
+				1F24CACF265FC223004005DA /* Sources */,
+				1F24CAD0265FC223004005DA /* Frameworks */,
+				1F24CAD1265FC223004005DA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AD1D15E8266658700071A9F7 /* PBXTargetDependency */,
+			);
+			name = Framework;
+			productName = ARATestPlugInAUv3Framework;
+			productReference = 1F24CAD3265FC223004005DA /* ARATestPlugInAUv3.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1F24CA4D265EAB20004005DA /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1340;
+				ORGANIZATIONNAME = "ARA Demo Company";
+				TargetAttributes = {
+					1F24CA6C265EABA1004005DA = {
+						CreatedOnToolsVersion = 11.3.1;
+					};
+					1F24CA92265EB127004005DA = {
+						CreatedOnToolsVersion = 11.3.1;
+					};
+					1F24CAD2265FC223004005DA = {
+						CreatedOnToolsVersion = 11.3.1;
+					};
+					AD1D15E32666583F0071A9F7 = {
+						CreatedOnToolsVersion = 11.3.1;
+					};
+				};
+			};
+			buildConfigurationList = 1F24CA50265EAB20004005DA /* Build configuration list for PBXProject "ARATestPlugInAUv3" */;
+			compatibilityVersion = "Xcode 9.3";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 1F24CA4C265EAB20004005DA;
+			productRefGroup = 1F24CA56265EAB20004005DA /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1F24CA6C265EABA1004005DA /* App */,
+				1F24CA92265EB127004005DA /* Extension */,
+				1F24CAD2265FC223004005DA /* Framework */,
+				AD1D15E32666583F0071A9F7 /* ARA_Version */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1F24CA6B265EABA1004005DA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F24CA83265EABF1004005DA /* TestAUv3App.xib in Resources */,
+				1F24CA8D265EAF64004005DA /* ARAExamples.icns in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F24CA91265EB127004005DA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1FAB7BDC2667696A005299C9 /* ARAExamples.icns in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F24CAD1265FC223004005DA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AD1D15E9266658870071A9F7 /* Generate ARA_Version.xcconfig */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Generate ARA_Version.xcconfig";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "cat \"${SOURCE_ROOT}/../../../ARA_API/ARA_Version.cmake\" | grep '^set' | sed -e 's;set(;;g' -e 's;);;g' -e 's; ;=;g' >  \"${SOURCE_ROOT}/ARA_Version.xcconfig\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1F24CA69265EABA1004005DA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F24CA82265EABF1004005DA /* TestAUv3App.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F24CA8F265EB127004005DA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F24CACD265FC103004005DA /* TestAUv3Extension.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F24CACF265FC223004005DA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F24CAE6265FC22D004005DA /* TestAUv3AudioUnit.mm in Sources */,
+				1F24CAE9265FC22D004005DA /* TestAUv3Factory.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		1F24CAB0265EB127004005DA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1F24CA92265EB127004005DA /* Extension */;
+			targetProxy = 1F24CAAF265EB127004005DA /* PBXContainerItemProxy */;
+		};
+		1F24CAEC265FC2FE004005DA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1F24CAD2265FC223004005DA /* Framework */;
+			targetProxy = 1F24CAEB265FC2FE004005DA /* PBXContainerItemProxy */;
+		};
+		AD1D15E8266658700071A9F7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AD1D15E32666583F0071A9F7 /* ARA_Version */;
+			targetProxy = AD1D15E7266658700071A9F7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1F24CA64265EAB22004005DA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = c11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"ARA_MAJOR_VERSION=$(ARA_MAJOR_VERSION)",
+					"ARA_MINOR_VERSION=$(ARA_MINOR_VERSION)",
+					"ARA_PATCH_VERSION=$(ARA_PATCH_VERSION)",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = ARATestPlugInAUv3;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		1F24CA65265EAB22004005DA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = c11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"ARA_MAJOR_VERSION=$(ARA_MAJOR_VERSION)",
+					"ARA_MINOR_VERSION=$(ARA_MINOR_VERSION)",
+					"ARA_PATCH_VERSION=$(ARA_PATCH_VERSION)",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = ARATestPlugInAUv3;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		1F24CA7C265EABA1004005DA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/TestAUv3App.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = App/TestAUv3AppInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.arademocompany.ARATestPlugInAUv3;
+			};
+			name = Debug;
+		};
+		1F24CA7D265EABA1004005DA /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/TestAUv3App.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = App/TestAUv3AppInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.arademocompany.ARATestPlugInAUv3;
+			};
+			name = Release;
+		};
+		1F24CAB3265EB127004005DA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CODE_SIGN_ENTITLEMENTS = Extension/TestAUv3Extension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				INFOPLIST_FILE = Extension/TestAUv3ExtensionInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.arademocompany.ARATestPlugInAUv3.AppExtension;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		1F24CAB4265EB127004005DA /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CODE_SIGN_ENTITLEMENTS = Extension/TestAUv3Extension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				INFOPLIST_FILE = Extension/TestAUv3ExtensionInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.arademocompany.ARATestPlugInAUv3.AppExtension;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		1F24CADD265FC223004005DA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				INFOPLIST_FILE = Framework/TestAUv3FrameworkInfo.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.arademocompany.ARATestPlugInAUv3.Framework;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		1F24CADE265FC223004005DA /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				INFOPLIST_FILE = Framework/TestAUv3FrameworkInfo.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.arademocompany.ARATestPlugInAUv3.Framework;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Release;
+		};
+		AD1D15E52666583F0071A9F7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		AD1D15E62666583F0071A9F7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1F24CA50265EAB20004005DA /* Build configuration list for PBXProject "ARATestPlugInAUv3" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F24CA64265EAB22004005DA /* Debug */,
+				1F24CA65265EAB22004005DA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1F24CA7B265EABA1004005DA /* Build configuration list for PBXNativeTarget "App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F24CA7C265EABA1004005DA /* Debug */,
+				1F24CA7D265EABA1004005DA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1F24CAB5265EB127004005DA /* Build configuration list for PBXNativeTarget "Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F24CAB3265EB127004005DA /* Debug */,
+				1F24CAB4265EB127004005DA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1F24CADC265FC223004005DA /* Build configuration list for PBXNativeTarget "Framework" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F24CADD265FC223004005DA /* Debug */,
+				1F24CADE265FC223004005DA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AD1D15E42666583F0071A9F7 /* Build configuration list for PBXAggregateTarget "ARA_Version" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AD1D15E52666583F0071A9F7 /* Debug */,
+				AD1D15E62666583F0071A9F7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 1F24CA4D265EAB20004005DA /* Project object */;
+}
