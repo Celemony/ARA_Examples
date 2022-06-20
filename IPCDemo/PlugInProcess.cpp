@@ -218,7 +218,7 @@ ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controller
 void ARA_CALL ARADestroyAudioReader (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef)
 {
     auto remoteAudioReader { reinterpret_cast<ARARemoteAudioReader *> (audioReaderHostRef) };
-    audioAccessFromPlugInPort.sendWithoutReply (HOST_METHOD_ID (ARAAudioAccessControllerInterface, destroyAudioReader),
+    audioAccessFromPlugInPort.sendBlocking (HOST_METHOD_ID (ARAAudioAccessControllerInterface, destroyAudioReader),
                                                 encodeArguments (controllerHostRef, remoteAudioReader->mainHostRef));
     delete remoteAudioReader;
 }

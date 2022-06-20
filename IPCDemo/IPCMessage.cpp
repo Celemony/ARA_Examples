@@ -98,10 +98,12 @@ CFStringRef IPCMessage::_getEncodedKey (size_t argKey)
 
 IPCMessage::IPCMessage (CFDataRef data)
 {
-    auto dictionary { (CFDictionaryRef) CFPropertyListCreateWithData (kCFAllocatorDefault, data, kCFPropertyListImmutable, nullptr, nullptr) };
-    ARA_INTERNAL_ASSERT (dictionary && (CFGetTypeID (dictionary) == CFDictionaryGetTypeID ()));
-    _setup (dictionary, false);
-    CFRelease (dictionary);
+    if (auto dictionary { (CFDictionaryRef) CFPropertyListCreateWithData (kCFAllocatorDefault, data, kCFPropertyListImmutable, nullptr, nullptr) })
+    {
+        ARA_INTERNAL_ASSERT (dictionary && (CFGetTypeID (dictionary) == CFDictionaryGetTypeID ()));
+        _setup (dictionary, false);
+        CFRelease (dictionary);
+    }
 }
 
 void IPCMessage::_appendArg (size_t argKey, int32_t argValue)
