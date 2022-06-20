@@ -42,6 +42,7 @@
 
 #if ARA_ENABLE_IPC
     #include "IPC/IPCMessage.h"
+    #include "IPC/ARAIPCEncoding.h"
 #endif
 
 
