@@ -90,12 +90,21 @@ public:
     }
 
     // getters for receiving code: extract arguments, specifying the desired return type as template argument
+    // the optional variant returns the default value of the argument type if key wasn't not found
     template <typename ArgT>
     ArgT getArgValue (const char* argKey) const
     {
         typename _ArgWrapper<ArgT>::WrappedType result;
         _readArg (argKey, result);
         return (ArgT) result;
+    }
+    template <typename ArgT>
+    std::pair<ArgT, bool> getOptionalArgValue (const char* argKey) const
+    {
+        typename _ArgWrapper<ArgT>::WrappedType result;
+        bool didFindKey { false };
+        _readArg (argKey, result, &didFindKey);
+        return { (ArgT) result, didFindKey };
     }
 
 private:
@@ -130,19 +139,21 @@ private:
 
     // helpers for getters for receiving code
     // since we cannot overload by return type, we are returning via reference argument
-    void _readArg (const char* argKey, int32_t& argValue) const;
-    void _readArg (const char* argKey, int64_t& argValue) const;
-    void _readArg (const char* argKey, size_t& argValue) const;
-    void _readArg (const char* argKey, float& argValue) const;
-    void _readArg (const char* argKey, double& argValue) const;
-    void _readArg (const char* argKey, const char*& argValue) const;
-    void _readArg (const char* argKey, std::vector<uint8_t>& argValue) const;
+    void _readArg (const char* argKey, int32_t& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (const char* argKey, int64_t& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (const char* argKey, size_t& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (const char* argKey, float& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (const char* argKey, double& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (const char* argKey, const char*& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (const char* argKey, std::vector<uint8_t>& argValue, bool* didFindKey = nullptr) const;
     template<typename T, typename std::enable_if<!std::is_same<T, uint8_t>::value, bool>::type = true>
-    void _readArg (const char* argKey, std::vector<T>& argValue) const
+    void _readArg (const char* argKey, std::vector<T>& argValue, bool* didFindKey = nullptr) const
     {
         argValue.clear ();
         IPCMessage msg;
-        _readArg (argKey, msg);
+        _readArg (argKey, msg, didFindKey);
+        if (didFindKey && !*didFindKey)
+            return;
         size_t count;
         msg._readArg ("count", count);
         argValue.reserve (count);
@@ -153,7 +164,8 @@ private:
             argValue.push_back (value);
         }
     }
-    void _readArg (const char* argKey, IPCMessage& argValue) const;
+    void _readArg (const char* argKey, IPCMessage& argValue, bool* didFindKey = nullptr) const;
+    static bool _checkKeyFound (bool found, bool* didFindKey);
 
 private:
     CFDictionaryRef _dictionary {};   // if constructed for sending, actually a CFMutableDictionaryRef
