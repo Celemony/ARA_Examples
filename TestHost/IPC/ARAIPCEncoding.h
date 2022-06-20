@@ -536,26 +536,6 @@ _ARA_BEGIN_DECODE_SIZED (ARAFactory)
 _ARA_END_DECODE
 
 
-// ARAAudioAccessControllerInterface::readAudioSamples() must return the output sample data in addition
-// to the actual return value, we need a special struct to encode this through IPC.
-// The samples are transferred as raw bytes, with an endianness flag to handle swapping if needed.
-// \todo If the communication channel could tell the receiver whether swapping was needed,
-//       we would not need this struct and could instead just send an array of bytes..
-struct ARAIPCReadSamplesReply
-{
-    ARASize dataCount;      // dataCount == 0 indicates failure, receiver then must zero-out buffers
-    const ARAByte* data;
-    ARABool isLittleEndian;
-};
-_ARA_BEGIN_ENCODE (ARAIPCReadSamplesReply)
-    _ARA_ENCODE_VARIABLE_ARRAY (data, dataCount)
-    _ARA_ENCODE_MEMBER (isLittleEndian)
-_ARA_END_ENCODE
-_ARA_BEGIN_DECODE (ARAIPCReadSamplesReply)
-    _ARA_DECODE_VARIABLE_ARRAY (data, dataCount, true)
-    _ARA_DECODE_MEMBER (isLittleEndian)
-_ARA_END_DECODE
-
 // ARADocumentControllerInterface::storeAudioSourceToAudioFileChunk() must return the documentArchiveID and the
 // openAutomatically flag in addition to the return value, we need a special struct to encode this through IPC.
 struct ARAIPCStoreAudioSourceToAudioFileChunkReply
@@ -963,6 +943,8 @@ public:
     {
         return decodeReply<RetT> (_port.sendAndAwaitReply (methodID, encodeArguments (args...)));
     }
+
+    bool portEndianessMatches () { return _port.endianessMatches (); }
 
 private:
     IPCPort& _port;
