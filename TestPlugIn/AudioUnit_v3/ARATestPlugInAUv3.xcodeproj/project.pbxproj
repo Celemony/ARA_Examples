@@ -11,7 +11,7 @@
 			isa = PBXAggregateTarget;
 			buildConfigurationList = AD1D15E42666583F0071A9F7 /* Build configuration list for PBXAggregateTarget "ARA_Version" */;
 			buildPhases = (
-				AD1D15E9266658870071A9F7 /* Generate ARA_Version.xcconfig */,
+				AD1D15E9266658870071A9F7 /* Re-generate ARA_Version_from_CMake.xcconfig */,
 			);
 			dependencies = (
 			);
@@ -35,7 +35,17 @@
 		1F24CAED265FC3B9004005DA /* ARATestPlugInAUv3.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F24CAD3265FC223004005DA /* ARATestPlugInAUv3.framework */; };
 		1F24CAF0265FCB8F004005DA /* ARATestPlugInAUv3.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 1F24CAD3265FC223004005DA /* ARATestPlugInAUv3.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1F24CAF2265FEBE4004005DA /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F24CAF1265FEBE4004005DA /* AVFoundation.framework */; };
+		1F83FFB227A9D28E00B10C32 /* ARAChannelArrangement.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1F83FFB027A9D28E00B10C32 /* ARAChannelArrangement.cpp */; };
 		1FAB7BDC2667696A005299C9 /* ARAExamples.icns in Resources */ = {isa = PBXBuildFile; fileRef = 1F24CA8A265EAF64004005DA /* ARAExamples.icns */; };
+		1FD1FCBA2660E26C00151CCD /* ARATestAudioSource.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FD1FC8A2660E24C00151CCD /* ARATestAudioSource.cpp */; };
+		1FD1FCBB2660E26C00151CCD /* ARATestDocumentController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FD1FC8C2660E24C00151CCD /* ARATestDocumentController.cpp */; };
+		1FD1FCBC2660E26C00151CCD /* ARATestPlaybackRenderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FD1FC8E2660E24C00151CCD /* ARATestPlaybackRenderer.cpp */; };
+		1FD1FCBD2660E26C00151CCD /* TestAnalysis.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FD1FCAF2660E24C00151CCD /* TestAnalysis.cpp */; };
+		1FD1FCBE2660E26C00151CCD /* TestPersistency.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FD1FCB12660E24C00151CCD /* TestPersistency.cpp */; };
+		1FD1FE932660E46C00151CCD /* ARAPlug.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FD1FCDE2660E41A00151CCD /* ARAPlug.cpp */; };
+		1FD1FE942660E47600151CCD /* ARAPlugInDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FD1FCDA2660E41A00151CCD /* ARAPlugInDispatch.cpp */; };
+		1FD1FE952660E47C00151CCD /* ARADebug.c in Sources */ = {isa = PBXBuildFile; fileRef = 1FD1FCD32660E41A00151CCD /* ARADebug.c */; };
+		1FD1FE962660E49500151CCD /* ARAPitchInterpretation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FD1FCE22660E41A00151CCD /* ARAPitchInterpretation.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -110,6 +120,46 @@
 		1F24CAD5265FC223004005DA /* ARATestPlugInAUv3.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARATestPlugInAUv3.h; sourceTree = "<group>"; };
 		1F24CAD6265FC223004005DA /* TestAUv3FrameworkInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = TestAUv3FrameworkInfo.plist; sourceTree = "<group>"; };
 		1F24CAF1265FEBE4004005DA /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		1F79D615266581F7006D95C3 /* ARAAudioUnit_v3.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARAAudioUnit_v3.h; sourceTree = "<group>"; };
+		1F83FFB027A9D28E00B10C32 /* ARAChannelArrangement.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; path = ARAChannelArrangement.cpp; sourceTree = "<group>"; };
+		1F83FFB127A9D28E00B10C32 /* ARAChannelArrangement.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; path = ARAChannelArrangement.h; sourceTree = "<group>"; };
+		1FD1FC8A2660E24C00151CCD /* ARATestAudioSource.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ARATestAudioSource.cpp; sourceTree = "<group>"; };
+		1FD1FC8B2660E24C00151CCD /* ARATestAudioSource.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARATestAudioSource.h; sourceTree = "<group>"; };
+		1FD1FC8C2660E24C00151CCD /* ARATestDocumentController.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ARATestDocumentController.cpp; sourceTree = "<group>"; };
+		1FD1FC8D2660E24C00151CCD /* ARATestDocumentController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARATestDocumentController.h; sourceTree = "<group>"; };
+		1FD1FC8E2660E24C00151CCD /* ARATestPlaybackRenderer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ARATestPlaybackRenderer.cpp; sourceTree = "<group>"; };
+		1FD1FC8F2660E24C00151CCD /* ARATestPlaybackRenderer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARATestPlaybackRenderer.h; sourceTree = "<group>"; };
+		1FD1FCAF2660E24C00151CCD /* TestAnalysis.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TestAnalysis.cpp; sourceTree = "<group>"; };
+		1FD1FCB02660E24C00151CCD /* TestAnalysis.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TestAnalysis.h; sourceTree = "<group>"; };
+		1FD1FCB12660E24C00151CCD /* TestPersistency.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TestPersistency.cpp; sourceTree = "<group>"; };
+		1FD1FCB22660E24C00151CCD /* TestPersistency.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TestPersistency.h; sourceTree = "<group>"; };
+		1FD1FCB32660E24C00151CCD /* TestPlugInConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TestPlugInConfig.h; sourceTree = "<group>"; };
+		1FD1FCC02660E40F00151CCD /* ARAAudioFileChunks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARAAudioFileChunks.h; sourceTree = "<group>"; };
+		1FD1FCC22660E40F00151CCD /* ARAInterface.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARAInterface.h; sourceTree = "<group>"; };
+		1FD1FCC42660E40F00151CCD /* ARA_API.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = ARA_API.pdf; sourceTree = "<group>"; };
+		1FD1FCC62660E40F00151CCD /* ARA_Version.cmake */ = {isa = PBXFileReference; lastKnownFileType = text; path = ARA_Version.cmake; sourceTree = "<group>"; };
+		1FD1FCC82660E40F00151CCD /* ChangeLog.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ChangeLog.txt; sourceTree = "<group>"; };
+		1FD1FCC92660E40F00151CCD /* LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
+		1FD1FCCA2660E40F00151CCD /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		1FD1FCCF2660E41A00151CCD /* ChangeLog.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ChangeLog.txt; sourceTree = "<group>"; };
+		1FD1FCD12660E41A00151CCD /* ARAContentLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARAContentLogger.h; sourceTree = "<group>"; };
+		1FD1FCD22660E41A00151CCD /* ARAContentValidator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARAContentValidator.h; sourceTree = "<group>"; };
+		1FD1FCD32660E41A00151CCD /* ARADebug.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ARADebug.c; sourceTree = "<group>"; };
+		1FD1FCD42660E41A00151CCD /* ARADebug.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARADebug.h; sourceTree = "<group>"; };
+		1FD1FCD62660E41A00151CCD /* ARAContentReader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARAContentReader.h; sourceTree = "<group>"; };
+		1FD1FCD72660E41A00151CCD /* ARADispatchBase.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARADispatchBase.h; sourceTree = "<group>"; };
+		1FD1FCDA2660E41A00151CCD /* ARAPlugInDispatch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ARAPlugInDispatch.cpp; sourceTree = "<group>"; };
+		1FD1FCDB2660E41A00151CCD /* ARAPlugInDispatch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARAPlugInDispatch.h; sourceTree = "<group>"; };
+		1FD1FCDC2660E41A00151CCD /* LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
+		1FD1FCDE2660E41A00151CCD /* ARAPlug.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ARAPlug.cpp; sourceTree = "<group>"; };
+		1FD1FCDF2660E41A00151CCD /* ARAPlug.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARAPlug.h; sourceTree = "<group>"; };
+		1FD1FCE02660E41A00151CCD /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		1FD1FCE22660E41A00151CCD /* ARAPitchInterpretation.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ARAPitchInterpretation.cpp; sourceTree = "<group>"; };
+		1FD1FCE32660E41A00151CCD /* ARAPitchInterpretation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARAPitchInterpretation.h; sourceTree = "<group>"; };
+		1FD1FCE42660E41A00151CCD /* ARASamplePositionConversion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARASamplePositionConversion.h; sourceTree = "<group>"; };
+		1FD1FCE52660E41A00151CCD /* ARAStdVectorUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARAStdVectorUtilities.h; sourceTree = "<group>"; };
+		1FD1FCE62660E41A00151CCD /* ARATimelineConversion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARATimelineConversion.h; sourceTree = "<group>"; };
+		ADD47DEB26F9FA790071A9F7 /* ARA_Version_from_CMake.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ARA_Version_from_CMake.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -142,13 +192,14 @@
 		1F24CA4C265EAB20004005DA = {
 			isa = PBXGroup;
 			children = (
+				1FD1FCBF2660E40F00151CCD /* ARA_API */,
+				1FD1FCCB2660E41A00151CCD /* ARA_Library */,
 				1F24CA86265EAF1B004005DA /* ExamplesCommon */,
-				1F24CA7E265EABF1004005DA /* App */,
-				1F24CABA265F9B99004005DA /* Extension */,
+				1FD1FC892660E24C00151CCD /* TestPlugIn */,
 				1F24CABD265FBCEC004005DA /* Framework */,
 				1F24CABA265F9B99004005DA /* Extension */,
 				1F24CA7E265EABF1004005DA /* App */,
-				AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */,
+				ADD47DEB26F9FA790071A9F7 /* ARA_Version_from_CMake.xcconfig */,
 				1F24CA56265EAB20004005DA /* Products */,
 				1F24CAB6265F8526004005DA /* Frameworks */,
 			);
@@ -227,6 +278,101 @@
 			path = Framework;
 			sourceTree = "<group>";
 		};
+		1FD1FC892660E24C00151CCD /* TestPlugIn */ = {
+			isa = PBXGroup;
+			children = (
+				1FD1FC8A2660E24C00151CCD /* ARATestAudioSource.cpp */,
+				1FD1FC8B2660E24C00151CCD /* ARATestAudioSource.h */,
+				1FD1FC8C2660E24C00151CCD /* ARATestDocumentController.cpp */,
+				1FD1FC8D2660E24C00151CCD /* ARATestDocumentController.h */,
+				1FD1FC8E2660E24C00151CCD /* ARATestPlaybackRenderer.cpp */,
+				1FD1FC8F2660E24C00151CCD /* ARATestPlaybackRenderer.h */,
+				1FD1FCAF2660E24C00151CCD /* TestAnalysis.cpp */,
+				1FD1FCB02660E24C00151CCD /* TestAnalysis.h */,
+				1FD1FCB12660E24C00151CCD /* TestPersistency.cpp */,
+				1FD1FCB22660E24C00151CCD /* TestPersistency.h */,
+				1FD1FCB32660E24C00151CCD /* TestPlugInConfig.h */,
+			);
+			name = TestPlugIn;
+			path = ..;
+			sourceTree = "<group>";
+		};
+		1FD1FCBF2660E40F00151CCD /* ARA_API */ = {
+			isa = PBXGroup;
+			children = (
+				1FD1FCC02660E40F00151CCD /* ARAAudioFileChunks.h */,
+				1F79D615266581F7006D95C3 /* ARAAudioUnit_v3.h */,
+				1FD1FCC22660E40F00151CCD /* ARAInterface.h */,
+				1FD1FCC42660E40F00151CCD /* ARA_API.pdf */,
+				1FD1FCC62660E40F00151CCD /* ARA_Version.cmake */,
+				1FD1FCC82660E40F00151CCD /* ChangeLog.txt */,
+				1FD1FCC92660E40F00151CCD /* LICENSE.txt */,
+				1FD1FCCA2660E40F00151CCD /* README.md */,
+			);
+			name = ARA_API;
+			path = ../../../ARA_API;
+			sourceTree = "<group>";
+		};
+		1FD1FCCB2660E41A00151CCD /* ARA_Library */ = {
+			isa = PBXGroup;
+			children = (
+				1FD1FCCF2660E41A00151CCD /* ChangeLog.txt */,
+				1FD1FCD02660E41A00151CCD /* Debug */,
+				1FD1FCD52660E41A00151CCD /* Dispatch */,
+				1FD1FCDC2660E41A00151CCD /* LICENSE.txt */,
+				1FD1FCDD2660E41A00151CCD /* PlugIn */,
+				1FD1FCE02660E41A00151CCD /* README.md */,
+				1FD1FCE12660E41A00151CCD /* Utilities */,
+			);
+			name = ARA_Library;
+			path = ../../../ARA_Library;
+			sourceTree = "<group>";
+		};
+		1FD1FCD02660E41A00151CCD /* Debug */ = {
+			isa = PBXGroup;
+			children = (
+				1FD1FCD12660E41A00151CCD /* ARAContentLogger.h */,
+				1FD1FCD22660E41A00151CCD /* ARAContentValidator.h */,
+				1FD1FCD32660E41A00151CCD /* ARADebug.c */,
+				1FD1FCD42660E41A00151CCD /* ARADebug.h */,
+			);
+			path = Debug;
+			sourceTree = "<group>";
+		};
+		1FD1FCD52660E41A00151CCD /* Dispatch */ = {
+			isa = PBXGroup;
+			children = (
+				1FD1FCD62660E41A00151CCD /* ARAContentReader.h */,
+				1FD1FCD72660E41A00151CCD /* ARADispatchBase.h */,
+				1FD1FCDA2660E41A00151CCD /* ARAPlugInDispatch.cpp */,
+				1FD1FCDB2660E41A00151CCD /* ARAPlugInDispatch.h */,
+			);
+			path = Dispatch;
+			sourceTree = "<group>";
+		};
+		1FD1FCDD2660E41A00151CCD /* PlugIn */ = {
+			isa = PBXGroup;
+			children = (
+				1FD1FCDE2660E41A00151CCD /* ARAPlug.cpp */,
+				1FD1FCDF2660E41A00151CCD /* ARAPlug.h */,
+			);
+			path = PlugIn;
+			sourceTree = "<group>";
+		};
+		1FD1FCE12660E41A00151CCD /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				1F83FFB027A9D28E00B10C32 /* ARAChannelArrangement.cpp */,
+				1F83FFB127A9D28E00B10C32 /* ARAChannelArrangement.h */,
+				1FD1FCE22660E41A00151CCD /* ARAPitchInterpretation.cpp */,
+				1FD1FCE32660E41A00151CCD /* ARAPitchInterpretation.h */,
+				1FD1FCE42660E41A00151CCD /* ARASamplePositionConversion.h */,
+				1FD1FCE52660E41A00151CCD /* ARAStdVectorUtilities.h */,
+				1FD1FCE62660E41A00151CCD /* ARATimelineConversion.h */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -268,6 +414,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1F24CAB5265EB127004005DA /* Build configuration list for PBXNativeTarget "Extension" */;
 			buildPhases = (
+				AD1D15E22666294B0071A9F7 /* Set Extension Version */,
 				1F24CA8F265EB127004005DA /* Sources */,
 				1F24CA90265EB127004005DA /* Frameworks */,
 				1F24CA91265EB127004005DA /* Resources */,
@@ -373,7 +520,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		AD1D15E9266658870071A9F7 /* Generate ARA_Version.xcconfig */ = {
+		AD1D15E22666294B0071A9F7 /* Set Extension Version */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -382,14 +529,32 @@
 			);
 			inputPaths = (
 			);
-			name = "Generate ARA_Version.xcconfig";
+			name = "Set Extension Version";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cat \"${SOURCE_ROOT}/../../../ARA_API/ARA_Version.cmake\" | grep '^set' | sed -e 's;set(;;g' -e 's;);;g' -e 's; ;=;g' >  \"${SOURCE_ROOT}/ARA_Version.xcconfig\"\n";
+			shellScript = "# We cannot use variable expansion in ${INFOPLIST_FILE} because value type of `version` is an integer but the expansion value\n# `${ARA_PLUGIN_VERSION_NUMBER}` is of type string, which causes tool parsers and Xcode IDE to fail before expansion takes place!\necho \"${ARA_MAJOR_VERSION}.${ARA_MINOR_VERSION}.${ARA_PATCH_VERSION} => ${ARA_PLUGIN_VERSION_NUMBER}\"\n\n# AudioComponent array index is omitted here to allow replacement to work across multiple plug-ins in the same plist\nplutil -replace NSExtension.NSExtensionAttributes.AudioComponents.version -integer ${ARA_PLUGIN_VERSION_NUMBER} \"${INFOPLIST_FILE}\"\nexit 0\n";
+		};
+		AD1D15E9266658870071A9F7 /* Re-generate ARA_Version_from_CMake.xcconfig */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Re-generate ARA_Version_from_CMake.xcconfig";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SOURCE_ROOT}/generate-version-xcconfig.sh\" \"${SOURCE_ROOT}/../../../ARA_API/ARA_Version.cmake\"  \"${SOURCE_ROOT}/ARA_Version_from_CMake.xcconfig\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -414,8 +579,18 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1FD1FCBB2660E26C00151CCD /* ARATestDocumentController.cpp in Sources */,
+				1FD1FE942660E47600151CCD /* ARAPlugInDispatch.cpp in Sources */,
+				1FD1FCBC2660E26C00151CCD /* ARATestPlaybackRenderer.cpp in Sources */,
+				1FD1FE932660E46C00151CCD /* ARAPlug.cpp in Sources */,
+				1FD1FE952660E47C00151CCD /* ARADebug.c in Sources */,
 				1F24CAE6265FC22D004005DA /* TestAUv3AudioUnit.mm in Sources */,
+				1FD1FCBA2660E26C00151CCD /* ARATestAudioSource.cpp in Sources */,
+				1FD1FCBE2660E26C00151CCD /* TestPersistency.cpp in Sources */,
+				1F83FFB227A9D28E00B10C32 /* ARAChannelArrangement.cpp in Sources */,
+				1FD1FCBD2660E26C00151CCD /* TestAnalysis.cpp in Sources */,
 				1F24CAE9265FC22D004005DA /* TestAUv3Factory.m in Sources */,
+				1FD1FE962660E49500151CCD /* ARAPitchInterpretation.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -563,7 +738,7 @@
 		};
 		1F24CA7C265EABA1004005DA /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			baseConfigurationReference = ADD47DEB26F9FA790071A9F7 /* ARA_Version_from_CMake.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/TestAUv3App.entitlements;
@@ -579,7 +754,7 @@
 		};
 		1F24CA7D265EABA1004005DA /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			baseConfigurationReference = ADD47DEB26F9FA790071A9F7 /* ARA_Version_from_CMake.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/TestAUv3App.entitlements;
@@ -595,7 +770,7 @@
 		};
 		1F24CAB3265EB127004005DA /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			baseConfigurationReference = ADD47DEB26F9FA790071A9F7 /* ARA_Version_from_CMake.xcconfig */;
 			buildSettings = {
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
 				CLANG_CXX_LIBRARY = "libc++";
@@ -615,7 +790,7 @@
 		};
 		1F24CAB4265EB127004005DA /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			baseConfigurationReference = ADD47DEB26F9FA790071A9F7 /* ARA_Version_from_CMake.xcconfig */;
 			buildSettings = {
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
 				CLANG_CXX_LIBRARY = "libc++";
@@ -635,11 +810,12 @@
 		};
 		1F24CADD265FC223004005DA /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			baseConfigurationReference = ADD47DEB26F9FA790071A9F7 /* ARA_Version_from_CMake.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
 				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_WARN_DOCUMENTATION_COMMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEFINES_MODULE = YES;
@@ -648,6 +824,10 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../..",
+					"$(SRCROOT)/../..",
+				);
 				INFOPLIST_FILE = Framework/TestAUv3FrameworkInfo.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.arademocompany.ARATestPlugInAUv3.Framework;
@@ -659,11 +839,12 @@
 		};
 		1F24CADE265FC223004005DA /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AD9AAD26266510B70071A9F7 /* ARA_Version.xcconfig */;
+			baseConfigurationReference = ADD47DEB26F9FA790071A9F7 /* ARA_Version_from_CMake.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
 				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_WARN_DOCUMENTATION_COMMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
@@ -672,6 +853,10 @@
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				GCC_C_LANGUAGE_STANDARD = gnu11;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../..",
+					"$(SRCROOT)/../..",
+				);
 				INFOPLIST_FILE = Framework/TestAUv3FrameworkInfo.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.arademocompany.ARATestPlugInAUv3.Framework;
