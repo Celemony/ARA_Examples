@@ -91,7 +91,7 @@ public:
     const std::string& getDescription () const { return _description; }
 
     // Return pointer to factory describing the ARA plug-in (nullptr if plug-in does not support ARA)
-    const ARA::ARAFactory* getARAFactory () const { return _factory; }
+    const ARA::SizedStructPtr<ARA::ARAFactory> getARAFactory () const { return _factory; }
 
     // Factory function for new ARA document controller instances
     virtual const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
