@@ -41,8 +41,7 @@ IPCMessage encodeMethodCall (Args... args)
 // test whether a message is encoding the given method call
 bool isMethodCall (const IPCMessage& message, const char* methodID)
 {
-    std::string value { message.getArgValue<std::string> (_methodIDKey) };
-    return (0 == std::strcmp (methodID, value.c_str ()));
+    return (0 == std::strcmp (methodID, message.getArgValue<const char*> (_methodIDKey)));
 }
 
 }   // namespace ARA

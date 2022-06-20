@@ -23,7 +23,6 @@
 
 #pragma once
 
-#include <string>
 #include <vector>
 
 #if defined (__APPLE__)
@@ -48,9 +47,10 @@ struct _ArgWrapper<StructT *>
 
 // A simple proof-of-concept wrapper for the IPC messages sent back and forth in the ARA IPC example.
 // Error handling is limited to assertions.
-// The basic data types transmitted are only int32_t, int64_t, size_t, float, double and C or C++
-// std strings (pure ASCII or UTF8). Pointers are encoded as size_t, which means they may not be
-// traversed on the receiving side, but they may be passed back to the sender to be used in callbacks.
+// The basic data types transmitted are only int32_t, int64_t, size_t, float, double and C strings
+// (pure ASCII or UTF8 - note that received string pointers are only valid as long as the message
+// that provided them is alive). Pointers are encoded as size_t - they may not be traversed on the
+// receiving side, but they may be passed back to the sender to be used in callbacks.
 // Types can be aggregated in homogenous arrays (std::vector), and messages can be nested in a hierarchy.
 // The transmission channel handles proper endianness conversion of the numbers if needed.
 // Pointer size is currently limited to 64 bit - if either size had smaller pointers, some additional
@@ -135,7 +135,7 @@ private:
     void _readArg (const char* argKey, size_t& argValue) const;
     void _readArg (const char* argKey, float& argValue) const;
     void _readArg (const char* argKey, double& argValue) const;
-    void _readArg (const char* argKey, std::string& argValue) const;
+    void _readArg (const char* argKey, const char*& argValue) const;
     void _readArg (const char* argKey, std::vector<uint8_t>& argValue) const;
     template<typename T, typename std::enable_if<!std::is_same<T, uint8_t>::value, bool>::type = true>
     void _readArg (const char* argKey, std::vector<T>& argValue) const
