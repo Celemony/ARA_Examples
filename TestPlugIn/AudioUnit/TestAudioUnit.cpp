@@ -157,7 +157,7 @@ OSStatus TestAudioUnit::GetProperty(    AudioUnitPropertyID inID,
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-OSStatus TestAudioUnit::ProcessBufferLists(    AudioUnitRenderActionFlags &    ioActionFlags,
+OSStatus TestAudioUnit::ProcessBufferLists(    AudioUnitRenderActionFlags &    /*ioActionFlags*/,
                                                 const AudioBufferList &            inBuffer,
                                                 AudioBufferList &                outBuffer,
                                                 UInt32                            inFramesToProcess )

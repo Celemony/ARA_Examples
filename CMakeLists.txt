@@ -572,7 +572,6 @@ elseif(GCC_STYLE_COMPILER)
     add_compile_options(
         -Wall
         -Wextra
-        -Wno-unused-parameter
         # this cannot be used for gcc because the necessary -Wno-variadic-macros below does not work, moved to clang-only
         #-Wpedantic
         -Wconversion
@@ -1485,6 +1484,14 @@ target_compile_definitions(ARAMiniHost PRIVATE
 if(MSVC)
     target_compile_options(ARAMiniHost PRIVATE
         /wd4100
+    )
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(ARAMiniHost PRIVATE
+        -Wno-unused-parameter
+    )
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    target_compile_options(ARAMiniHost PRIVATE
+        -Wno-unused-parameter
     )
 endif()
 
