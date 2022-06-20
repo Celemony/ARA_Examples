@@ -65,14 +65,9 @@ CFStringRef IPCMessage::_createEncodedTag (const char* tag)
     return result;
 }
 
-IPCMessage::IPCMessage (const char* messageID)
+IPCMessage::IPCMessage ()
     : IPCMessage { CFDictionaryCreateMutable (kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks) }
-{
-    ARA_INTERNAL_ASSERT (messageID != nullptr);
-    auto msgID { _createEncodedTag (messageID) };
-    CFDictionarySetValue ((CFMutableDictionaryRef) _dictionary, CFSTR ("messageID"), msgID);
-    CFRelease (msgID);
-}
+{}
 
 IPCMessage::IPCMessage (CFDataRef data)
     : IPCMessage { (CFDictionaryRef) CFPropertyListCreateWithData (kCFAllocatorDefault, data, kCFPropertyListImmutable, nullptr, nullptr) }
@@ -136,18 +131,6 @@ CFDataRef IPCMessage::createEncodedMessage () const
         return nullptr;
     auto result { CFPropertyListCreateData (kCFAllocatorDefault, _dictionary, kCFPropertyListBinaryFormat_v1_0, 0, nullptr) };
     ARA_INTERNAL_ASSERT (result);
-    return result;
-}
-
-bool IPCMessage::isMessageWithID (const char* messageID) const
-{
-    if (!_dictionary)
-        return false;
-    auto string { (CFStringRef) CFDictionaryGetValue (_dictionary, CFSTR ("messageID")) };
-    ARA_INTERNAL_ASSERT (string && (CFGetTypeID (string) == CFStringGetTypeID ()));
-    auto msgID { _createEncodedTag (messageID) };
-    bool result { (CFStringCompare (string, msgID, 0) == kCFCompareEqualTo) };
-    CFRelease (msgID);
     return result;
 }
 

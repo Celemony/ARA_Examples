@@ -70,24 +70,23 @@ public:
     explicit IPCMessage (CFDataRef data);
     CFDataRef createEncodedMessage () const;
 
-    // construction with arguments for sending code
-    // the first argument is the message ID, followed by key/value pairs of the message arguments
-    explicit IPCMessage (const char* messageID);
+    // construction with arguments for sending code with 0..n key/value pairs of the message arguments
+    IPCMessage ();
     template <typename ArgT, typename... MoreArgs>
-    IPCMessage (const char* messageID, const char* argKey, ArgT argValue, MoreArgs... moreArgs)
-        : IPCMessage (messageID, moreArgs...)
+    IPCMessage (const char* argKey, ArgT argValue, MoreArgs... moreArgs)
+        : IPCMessage (moreArgs...)
     {
         _appendArg (argKey, _ArgWrapper<ArgT>::wrap (argValue));
     }
 
-    // default c'tor used for empty "no reply" message
-    IPCMessage () = default;
+    // appending arguments to an existing message
+    template <typename ArgT, typename... MoreArgs>
+    void append (const char* argKey, ArgT argValue, MoreArgs... moreArgs)
+    {
+        _appendArg (argKey, _ArgWrapper<ArgT>::wrap (argValue));
+    }
 
-    // getter for receiving code: identify message
-    bool isMessageWithID (const char* messageID) const;
-
-    // getters for receiving code: extract argument after checking isMessageWithID()
-    // specify desired return type as template argument
+    // getters for receiving code: extract arguments, specifying the desired return type as template argument
     template <typename ArgT>
     ArgT getArgValue (const char* argKey) const
     {

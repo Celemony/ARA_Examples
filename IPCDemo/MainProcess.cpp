@@ -28,7 +28,7 @@
 // It also assumes that both processes use the same pointer size.
 // Further, threading issues are ignored - while most ARA calls are restricted
 // to the model thread, audio access is potentially called concurrently from
-// multiple threadeds and may needs to implement proper locking when accessing
+// multiple threads and may need to implement proper locking when accessing
 // the IPC transmission channel.
 // Playback control also may be requested from several threads, but can be
 // enqueued and processed asynchronously through the model update IPC channel.
@@ -40,6 +40,8 @@
 // test code includes
 #include "IPCMessage.h"
 #include "IPCPort.h"
+#include "ARAIPCEncoding.h"
+
 #include "ExamplesCommon/SignalProcessing/PulsedSineSignal.h"
 
 #include <thread>
@@ -109,19 +111,19 @@ IPCMessage _readAudioSamples (ARAAudioAccessControllerHostRef controllerHostRef,
     for (auto i { 0 }; i < kTestAudioSourceChannelCount; ++i)
         sampleBuffers[i] = bufferData.data () + i * samplesPerChannel;
     ARABool success { ARAReadAudioSamples (controllerHostRef, readerHostRef, samplePosition, samplesPerChannel, sampleBuffers) };
-    return IPCMessage { "readAudioSamplesReply", "result", success, "bufferData", bufferData };
+    return { "result", success, "bufferData", bufferData };
 }
 
 IPCMessage audioAccessFromPlugInCallBack (const IPCMessage& message)
 {
-    if (message.isMessageWithID ("createAudioReaderForSource"))
+    if (isMethodCall (message, "createAudioReaderForSource"))
     {
         ARAAudioReaderHostRef readerRef { ARACreateAudioReaderForSource (message.getArgValue<ARAAudioAccessControllerHostRef> ("controllerHostRef"),
                                                                          message.getArgValue<ARAAudioSourceHostRef> ("audioSourceHostRef"),
                                                                          message.getArgValue<ARABool> ("use64BitSamples")) };
-        return IPCMessage { "createAudioReaderForSourceReply", "readerRef", readerRef };
+        return { "readerRef", readerRef };
     }
-    else if (message.isMessageWithID ("readAudioSamples"))
+    else if (isMethodCall (message, "readAudioSamples"))
     {
         const auto readerRef { message.getArgValue<ARAAudioReaderHostRef> ("readerRef") };
         if (readerRef == kAudioReader64BitHostRef)
@@ -131,15 +133,15 @@ IPCMessage audioAccessFromPlugInCallBack (const IPCMessage& message)
             return _readAudioSamples<float> (message.getArgValue<ARAAudioAccessControllerHostRef> ("controllerHostRef"), readerRef,
                                              message.getArgValue<ARASamplePosition> ("samplePosition"), message.getArgValue<ARASampleCount> ("samplesPerChannel"));
     }
-    else if (message.isMessageWithID ("destroyAudioReader"))
+    else if (isMethodCall (message, "destroyAudioReader"))
     {
         ARADestroyAudioReader (message.getArgValue<ARAAudioAccessControllerHostRef> ("controllerHostRef"),
                                message.getArgValue<ARAAudioReaderHostRef> ("readerRef"));
-        return IPCMessage {};
+        return {};
     }
 
     ARA_INTERNAL_ASSERT (false && "unhandled methodSelector");
-    return IPCMessage {};
+    return {};
 }
 
 
@@ -179,52 +181,44 @@ int main (int argc, const char * argv[])
 
     SizedStruct<ARA_STRUCT_MEMBER (ARADocumentProperties, name)> documentProperties { "Test document" };
     //documentControllerInstance = factory->createDocumentControllerWithDocument (&documentEntry, &documentProperties);
-    IPCMessage reply { modelPortToPlugIn.sendAndAwaitReply ({ "createDocumentControllerWithDocument",
-                                                                 "hostInstance.audioAccessControllerHostRef", kAudioAccessControllerHostRef,
-                                                                 "properties.name", documentProperties.name
-                                                               }) };
+    auto reply { modelPortToPlugIn.sendAndAwaitReply (encodeMethodCall ("createDocumentControllerWithDocument",
+                                                                "hostInstance.audioAccessControllerHostRef", kAudioAccessControllerHostRef,
+                                                                "properties.name", documentProperties.name)) };
     auto remoteDocumentRef { reply.getArgValue<ARADocumentControllerRef> ("controllerRef") };
 
     //documentControllerInterface->beginEditing (documentControllerRef);
-    modelPortToPlugIn.sendWithoutReply ({ "beginEditing",
-                                          "controllerRef", remoteDocumentRef
-                                        });
+    modelPortToPlugIn.sendWithoutReply (encodeMethodCall ("beginEditing", "controllerRef", remoteDocumentRef));
 
     SizedStruct<ARA_STRUCT_MEMBER (ARAAudioSourceProperties, merits64BitSamples)> audioSourceProperties { "Test audio source", "audioSourceTestPersistentID",
                                                                 kTestAudioSourceSampleRate * kTestAudioSourceDuration, static_cast<double> (kTestAudioSourceSampleRate),
                                                                 kTestAudioSourceChannelCount, kARAFalse };
     //audioSourceRef = documentControllerInterface->createAudioSource (documentControllerRef, kHostAudioSourceHostRef, &audioSourceProperties);
-    reply = modelPortToPlugIn.sendAndAwaitReply ({ "createAudioSource",
-                                                   "controllerRef", remoteDocumentRef,
-                                                   "hostRef", kHostAudioSourceHostRef,
-                                                   "properties", IPCMessage { "ARAAudioSourceProperties",
-                                                       "name", audioSourceProperties.name,
-                                                       "persistentID", audioSourceProperties.persistentID,
-                                                       "sampleCount", audioSourceProperties.sampleCount,
-                                                       "sampleRate", audioSourceProperties.sampleRate,
-                                                       "channelCount", audioSourceProperties.channelCount,
-                                                       "merits64BitSamples", audioSourceProperties.merits64BitSamples }
-                                                 });
+    reply = modelPortToPlugIn.sendAndAwaitReply (encodeMethodCall ("createAudioSource",
+                                                                "controllerRef", remoteDocumentRef,
+                                                                "hostRef", kHostAudioSourceHostRef,
+                                                                "properties", IPCMessage {
+                                                                    "name", audioSourceProperties.name,
+                                                                    "persistentID", audioSourceProperties.persistentID,
+                                                                    "sampleCount", audioSourceProperties.sampleCount,
+                                                                    "sampleRate", audioSourceProperties.sampleRate,
+                                                                    "channelCount", audioSourceProperties.channelCount,
+                                                                    "merits64BitSamples", audioSourceProperties.merits64BitSamples }));
     auto audioSourceRef { reply.getArgValue<ARAAudioSourceRef> ("audioSourceRef") };
 
     //documentControllerInterface->endEditing (documentControllerRef);
-    modelPortToPlugIn.sendWithoutReply ({ "endEditing",
-                                          "controllerRef", remoteDocumentRef
-                                        });
+    modelPortToPlugIn.sendWithoutReply (encodeMethodCall ("endEditing", "controllerRef", remoteDocumentRef));
 
     //documentControllerInterface->enableAudioSourceSamplesAccess (documentControllerRef, audioSourceRef, kARATrue);
-    modelPortToPlugIn.sendWithoutReply ({"enableAudioSourceSamplesAccess",
-                                          "controllerRef", remoteDocumentRef,
-                                          "audioSourceRef", audioSourceRef,
-                                          "enable", kARATrue
-                                        });
+    modelPortToPlugIn.sendWithoutReply (encodeMethodCall ("enableAudioSourceSamplesAccess",
+                                                                "controllerRef", remoteDocumentRef,
+                                                                "audioSourceRef", audioSourceRef,
+                                                                "enable", kARATrue));
 
     //documentControllerInterface->requestAudioSourceContentAnalysis (documentControllerRef, audioSourceRef, 1, { kARAContentTypeNotes });
-    modelPortToPlugIn.sendWithoutReply ({ "requestAudioSourceContentAnalysis",
-                                          "controllerRef", remoteDocumentRef,
-                                          "audioSourceRef", audioSourceRef,
-                                          "contentTypes", std::vector<ARAContentType> { kARAContentTypeNotes }
-                                        });
+    modelPortToPlugIn.sendWithoutReply (encodeMethodCall ("requestAudioSourceContentAnalysis",
+                                                                "controllerRef", remoteDocumentRef,
+                                                                "audioSourceRef", audioSourceRef,
+                                                                "contentTypes", std::vector<ARAContentType> { kARAContentTypeNotes }));
 
     //wait for documentControllerInterface->isAudioSourceContentAnalysisIncomplete (documentControllerRef, audioSourceRef, kARAContentTypeNotes);
     while (true)
@@ -238,11 +232,10 @@ int main (int argc, const char * argv[])
         //documentControllerInterface->notifyModelUpdates (documentControllerRef);
 
         //done = documentControllerInterface->isAudioSourceContentAnalysisIncomplete (documentControllerRef, audioSourceRef, kARAContentTypeNotes);
-        reply = modelPortToPlugIn.sendAndAwaitReply ({ "isAudioSourceContentAnalysisIncomplete",
-                                                       "controllerRef", remoteDocumentRef,
-                                                       "audioSourceRef", audioSourceRef,
-                                                       "contentType", kARAContentTypeNotes
-                                                     });
+        reply = modelPortToPlugIn.sendAndAwaitReply (encodeMethodCall ("isAudioSourceContentAnalysisIncomplete",
+                                                                    "controllerRef", remoteDocumentRef,
+                                                                    "audioSourceRef", audioSourceRef,
+                                                                    "contentType", kARAContentTypeNotes));
         if (reply.getArgValue<ARABool> ("result") == kARAFalse)
             break;
 
@@ -250,37 +243,33 @@ int main (int argc, const char * argv[])
     }
 
     //hasEvents = documentControllerInterface->isAudioSourceContentAvailable (documentControllerRef, audioSourceRef, kARAContentTypeNotes);
-    reply = modelPortToPlugIn.sendAndAwaitReply ({ "isAudioSourceContentAvailable",
-                                                    "controllerRef", remoteDocumentRef,
-                                                    "audioSourceRef", audioSourceRef,
-                                                    "contentType", kARAContentTypeNotes
-                                                  });
+    reply = modelPortToPlugIn.sendAndAwaitReply (encodeMethodCall ("isAudioSourceContentAvailable",
+                                                                "controllerRef", remoteDocumentRef,
+                                                                "audioSourceRef", audioSourceRef,
+                                                                "contentType", kARAContentTypeNotes));
     if (reply.getArgValue<ARABool> ("result") != kARAFalse)
     {
         //contentReaderRef = documentControllerInterface->createAudioSourceContentReader (documentControllerRef, audioSourceRef, kARAContentTypeNotes, nullptr);
-        reply = modelPortToPlugIn.sendAndAwaitReply ({ "createAudioSourceContentReader",
-                                                       "controllerRef", remoteDocumentRef,
-                                                       "audioSourceRef", audioSourceRef,
-                                                       "contentType", kARAContentTypeNotes
-                                                       /* optional contentTimeRange argument not implemented here to keep the example simple */
-                                                     });
+        reply = modelPortToPlugIn.sendAndAwaitReply (encodeMethodCall ("createAudioSourceContentReader",
+                                                                    "controllerRef", remoteDocumentRef,
+                                                                    "audioSourceRef", audioSourceRef,
+                                                                    "contentType", kARAContentTypeNotes
+                                                                    /* optional contentTimeRange argument not implemented here to keep the example simple */));
         auto contentReaderRef = reply.getArgValue<ARAContentReaderRef> ("contentReaderRef");
 
         //eventCount = documentControllerInterface->getContentReaderEventCount (documentControllerRef, contentReaderRef);
-        reply = modelPortToPlugIn.sendAndAwaitReply ({ "getContentReaderEventCount",
-                                                       "controllerRef", remoteDocumentRef,
-                                                       "contentReaderRef", contentReaderRef
-                                                     });
+        reply = modelPortToPlugIn.sendAndAwaitReply (encodeMethodCall ("getContentReaderEventCount",
+                                                                    "controllerRef", remoteDocumentRef,
+                                                                    "contentReaderRef", contentReaderRef));
         const auto eventCount { reply.getArgValue<ARAInt32> ("result") };
         ARA_LOG ("%i notes available for audio source %s:", eventCount, audioSourceProperties.name);
         for (ARAInt32 i = 0; i < eventCount; ++i)
         {
             //noteData = (const ARAContentNote *)documentControllerInterface->getContentReaderDataForEvent (documentControllerRef, contentReaderRef, i);
-            reply = modelPortToPlugIn.sendAndAwaitReply ({ "getContentReaderDataForEvent",
-                                                           "controllerRef", remoteDocumentRef,
-                                                           "contentReaderRef", contentReaderRef,
-                                                           "eventIndex", i
-                                                         });
+            reply = modelPortToPlugIn.sendAndAwaitReply (encodeMethodCall ("getContentReaderDataForEvent",
+                                                                        "controllerRef", remoteDocumentRef,
+                                                                        "contentReaderRef", contentReaderRef,
+                                                                        "eventIndex", i));
             ContentLogger::logEvent (i, ARAContentNote { reply.getArgValue<float>("frequency"),
                                                          reply.getArgValue<ARAPitchNumber>("pitchNumber"),
                                                          reply.getArgValue<float>("volume"),
@@ -292,39 +281,30 @@ int main (int argc, const char * argv[])
         }
 
         //documentControllerInterface->destroyContentReader (documentControllerRef, contentReaderRef);
-        modelPortToPlugIn.sendWithoutReply ({ "destroyContentReader",
-                                              "controllerRef", remoteDocumentRef,
-                                              "contentReaderRef", contentReaderRef
-                                            });
+        modelPortToPlugIn.sendWithoutReply (encodeMethodCall ("destroyContentReader",
+                                                                    "controllerRef", remoteDocumentRef,
+                                                                    "contentReaderRef", contentReaderRef));
     }
 
     //documentControllerInterface->enableAudioSourceSamplesAccess (documentControllerRef, audioSourceRef, kARAFalse);
-    modelPortToPlugIn.sendWithoutReply ({ "enableAudioSourceSamplesAccess",
-                                          "controllerRef", remoteDocumentRef,
-                                          "audioSourceRef", audioSourceRef,
-                                          "enable", kARAFalse
-                                        });
+    modelPortToPlugIn.sendWithoutReply (encodeMethodCall ("enableAudioSourceSamplesAccess",
+                                                                "controllerRef", remoteDocumentRef,
+                                                                "audioSourceRef", audioSourceRef,
+                                                                "enable", kARAFalse));
 
     //documentControllerInterface->beginEditing (documentControllerRef);
-    modelPortToPlugIn.sendWithoutReply ({ "beginEditing",
-                                          "controllerRef", remoteDocumentRef
-                                        });
+    modelPortToPlugIn.sendWithoutReply (encodeMethodCall ("beginEditing", "controllerRef", remoteDocumentRef));
 
     //documentControllerInterface->destroyAudioSource (documentControllerRef, audioSourceRef);
-    modelPortToPlugIn.sendWithoutReply ({ "destroyAudioSource",
-                                          "controllerRef", remoteDocumentRef,
-                                          "audioSourceRef", audioSourceRef,
-                                        });
+    modelPortToPlugIn.sendWithoutReply (encodeMethodCall ("destroyAudioSource",
+                                                                "controllerRef", remoteDocumentRef,
+                                                                "audioSourceRef", audioSourceRef));
 
     //documentControllerInterface->endEditing (documentControllerRef);
-    modelPortToPlugIn.sendWithoutReply ({ "endEditing",
-                                         "controllerRef", remoteDocumentRef
-                                        });
+    modelPortToPlugIn.sendWithoutReply (encodeMethodCall ("endEditing", "controllerRef", remoteDocumentRef));
 
     //documentControllerInterface->destroyDocumentController (documentControllerRef);
-    modelPortToPlugIn.sendWithoutReply ({ "destroyDocumentController",
-                                          "controllerRef", remoteDocumentRef
-                                        });
+    modelPortToPlugIn.sendWithoutReply (encodeMethodCall ("destroyDocumentController", "controllerRef", remoteDocumentRef));
 
     // shut everything down
     keepRunning = false;

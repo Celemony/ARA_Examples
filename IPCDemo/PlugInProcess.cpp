@@ -24,6 +24,7 @@
 // test code includes
 #include "IPCMessage.h"
 #include "IPCPort.h"
+#include "ARAIPCEncoding.h"
 
 // ARA framework includes
 #include "ARA_Library/Debug/ARADebug.h"
@@ -96,11 +97,10 @@ ARAAudioReaderHostRef ARA_CALL ARACreateAudioReaderForSource (ARAAudioAccessCont
     remoteAudioReader->audioSource = remoteAudioSource;
     remoteAudioReader->use64BitSamples = use64BitSamples;
 
-    IPCMessage reply { audioAccessFromPlugInPort.sendAndAwaitReply ({ "createAudioReaderForSource",
-                                                                         "controllerHostRef", controllerHostRef,
-                                                                         "audioSourceHostRef", remoteAudioSource->mainHostRef,
-                                                                         "use64BitSamples", use64BitSamples
-                                                                       }) };
+    const auto reply { audioAccessFromPlugInPort.sendAndAwaitReply (encodeMethodCall ("createAudioReaderForSource",
+                                                                        "controllerHostRef", controllerHostRef,
+                                                                        "audioSourceHostRef", remoteAudioSource->mainHostRef,
+                                                                        "use64BitSamples", use64BitSamples)) };
     remoteAudioReader->mainHostRef = reply.getArgValue<ARAAudioReaderHostRef> ("readerRef");
     return reinterpret_cast<ARAAudioReaderHostRef> (remoteAudioReader);
 }
@@ -156,12 +156,11 @@ ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controller
     static os_unfair_lock_s lock { OS_UNFAIR_LOCK_INIT };
     os_unfair_lock_lock (&lock);
 
-    IPCMessage reply { audioAccessFromPlugInPort.sendAndAwaitReply ({ "readAudioSamples",
-                                                                          "controllerHostRef", controllerHostRef,
-                                                                          "readerRef", remoteAudioReader->mainHostRef,
-                                                                          "samplePosition", samplePosition,
-                                                                          "samplesPerChannel", samplesPerChannel
-                                                                        }) };
+    const auto reply { audioAccessFromPlugInPort.sendAndAwaitReply (encodeMethodCall ("readAudioSamples",
+                                                                                      "controllerHostRef", controllerHostRef,
+                                                                                      "readerRef", remoteAudioReader->mainHostRef,
+                                                                                      "samplePosition", samplePosition,
+                                                                                      "samplesPerChannel", samplesPerChannel)) };
     const auto result { (remoteAudioReader->use64BitSamples != kARAFalse) ?
                         _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->properties.channelCount, buffers):
                         _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->properties.channelCount, buffers)};
@@ -173,10 +172,9 @@ ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controller
 void ARA_CALL ARADestroyAudioReader (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef)
 {
     auto remoteAudioReader { reinterpret_cast<ARARemoteAudioReader *> (audioReaderHostRef) };
-    audioAccessFromPlugInPort.sendWithoutReply ({ "destroyAudioReader",
-                                                  "controllerHostRef", controllerHostRef,
-                                                  "readerRef", remoteAudioReader->mainHostRef
-                                                });
+    audioAccessFromPlugInPort.sendWithoutReply (encodeMethodCall ("destroyAudioReader",
+                                                                        "controllerHostRef", controllerHostRef,
+                                                                        "readerRef", remoteAudioReader->mainHostRef));
     delete remoteAudioReader;
 }
 static const SizedStruct<ARA_STRUCT_MEMBER (ARAAudioAccessControllerInterface, destroyAudioReader)> hostAudioAccessControllerInterface {
@@ -215,7 +213,7 @@ static const SizedStruct<ARA_STRUCT_MEMBER (ARAArchivingControllerInterface, get
 
 IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
 {
-    if (message.isMessageWithID ("createDocumentControllerWithDocument"))
+    if (isMethodCall (message, "createDocumentControllerWithDocument"))
     {
         auto remoteDocument { new ARARemoteDocument };
 
@@ -230,9 +228,9 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
         ARA_VALIDATE_API_CONDITION (documentControllerInstance != nullptr);
         ARA_VALIDATE_API_INTERFACE (documentControllerInstance->documentControllerInterface, ARADocumentControllerInterface);
         remoteDocument->documentController = *documentControllerInstance;
-        return IPCMessage { "createDocumentControllerWithDocumentReply", "controllerRef", remoteDocument };
+        return { "controllerRef", remoteDocument };
     }
-    else if (message.isMessageWithID ("destroyDocumentController"))
+    else if (isMethodCall (message, "destroyDocumentController"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         remoteDocument->documentController.documentControllerInterface->destroyDocumentController (remoteDocument->documentController.documentControllerRef);
@@ -240,21 +238,21 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
         delete remoteDocument;
         CFRunLoopStop (CFRunLoopGetCurrent ()); // will terminate run loop & shut down
 
-        return IPCMessage {};
+        return {};
     }
-    else if (message.isMessageWithID ("beginEditing"))
+    else if (isMethodCall (message, "beginEditing"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         remoteDocument->documentController.documentControllerInterface->beginEditing (remoteDocument->documentController.documentControllerRef);
-        return IPCMessage {};
+        return {};
     }
-    else if (message.isMessageWithID ("endEditing"))
+    else if (isMethodCall (message, "endEditing"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         remoteDocument->documentController.documentControllerInterface->endEditing (remoteDocument->documentController.documentControllerRef);
-        return IPCMessage {};
+        return {};
     }
-    else if (message.isMessageWithID ("createAudioSource"))
+    else if (isMethodCall (message, "createAudioSource"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
 
@@ -273,26 +271,26 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
 
         remoteAudioSource->plugInRef = remoteDocument->documentController.documentControllerInterface->createAudioSource (
                                         remoteDocument->documentController.documentControllerRef, reinterpret_cast<ARAAudioSourceHostRef> (remoteAudioSource), &remoteAudioSource->properties);
-        return IPCMessage { "createAudioSourceReply", "audioSourceRef", remoteAudioSource };
+        return { "audioSourceRef", remoteAudioSource };
     }
-    else if (message.isMessageWithID ("enableAudioSourceSamplesAccess"))
+    else if (isMethodCall (message, "enableAudioSourceSamplesAccess"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
         auto enable { message.getArgValue<ARABool> ("enable") };
         remoteDocument->documentController.documentControllerInterface->enableAudioSourceSamplesAccess (remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, enable);
-        return IPCMessage {};
+        return {};
     }
-    else if (message.isMessageWithID ("destroyAudioSource"))
+    else if (isMethodCall (message, "destroyAudioSource"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
         remoteDocument->documentController.documentControllerInterface->destroyAudioSource (remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef);
 
         delete remoteAudioSource;
-        return IPCMessage {};
+        return {};
     }
-    else if (message.isMessageWithID ("isAudioSourceContentAvailable"))
+    else if (isMethodCall (message, "isAudioSourceContentAvailable"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
@@ -302,9 +300,9 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
         remoteDocument->documentController.documentControllerInterface->notifyModelUpdates (remoteDocument->documentController.documentControllerRef);
 
         auto available = remoteDocument->documentController.documentControllerInterface->isAudioSourceContentAvailable (remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, contentType);
-        return IPCMessage { "isAudioSourceContentAvailableReply", "result", available };
+        return { "result", available };
     }
-    else if (message.isMessageWithID ("isAudioSourceContentAnalysisIncomplete"))
+    else if (isMethodCall (message, "isAudioSourceContentAnalysisIncomplete"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
@@ -314,17 +312,17 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
         remoteDocument->documentController.documentControllerInterface->notifyModelUpdates (remoteDocument->documentController.documentControllerRef);
 
         auto incomplete = remoteDocument->documentController.documentControllerInterface->isAudioSourceContentAnalysisIncomplete (remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, contentType);
-        return IPCMessage { "isAudioSourceContentAnalysisIncompleteReply", "result", incomplete };
+        return { "result", incomplete };
     }
-    else if (message.isMessageWithID ("requestAudioSourceContentAnalysis"))
+    else if (isMethodCall (message, "requestAudioSourceContentAnalysis"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
         auto contentTypes { message.getArgValue<std::vector<ARAContentType>> ("contentTypes") };
         remoteDocument->documentController.documentControllerInterface->requestAudioSourceContentAnalysis (remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, contentTypes.size (), contentTypes.data ());
-        return IPCMessage {};
+        return {};
     }
-    else if (message.isMessageWithID ("createAudioSourceContentReader"))
+    else if (isMethodCall (message, "createAudioSourceContentReader"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
@@ -335,16 +333,16 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
         remoteContentReader->plugInRef = remoteDocument->documentController.documentControllerInterface->createAudioSourceContentReader (remoteDocument->documentController.documentControllerRef,
                                             remoteAudioSource->plugInRef, contentType, nullptr);
         remoteContentReader->contentType = contentType;
-        return IPCMessage { "createAudioSourceContentReaderReply", "contentReaderRef", remoteContentReader };
+        return { "contentReaderRef", remoteContentReader };
     }
-    else if (message.isMessageWithID ("getContentReaderEventCount"))
+    else if (isMethodCall (message, "getContentReaderEventCount"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         auto remoteContentReader { message.getArgValue<ARARemoteContentReader*> ("contentReaderRef") };
         ARAInt32 eventCount { remoteDocument->documentController.documentControllerInterface->getContentReaderEventCount (remoteDocument->documentController.documentControllerRef, remoteContentReader->plugInRef) };
-        return IPCMessage { "getContentReaderEventCountReply", "result", eventCount };
+        return { "result", eventCount };
     }
-    else if (message.isMessageWithID ("getContentReaderDataForEvent"))
+    else if (isMethodCall (message, "getContentReaderDataForEvent"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         auto remoteContentReader { message.getArgValue<ARARemoteContentReader*> ("contentReaderRef") };
@@ -354,30 +352,29 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
         if (remoteContentReader->contentType == kARAContentTypeNotes)
         {
             const auto note { static_cast<const ARAContentNote*> (eventData) };
-            return IPCMessage { "contentData",
-                                "frequency", note->frequency,
-                                "pitchNumber", note->pitchNumber,
-                                "volume", note->volume,
-                                "startPosition", note->startPosition,
-                                "attackDuration", note->attackDuration,
-                                "noteDuration", note->noteDuration,
-                                "signalDuration", note->signalDuration };
+            return { "frequency", note->frequency,
+                     "pitchNumber", note->pitchNumber,
+                     "volume", note->volume,
+                     "startPosition", note->startPosition,
+                     "attackDuration", note->attackDuration,
+                     "noteDuration", note->noteDuration,
+                     "signalDuration", note->signalDuration };
         }
 
         ARA_INTERNAL_ASSERT (false && "other content types are not implemented yet");
-        return IPCMessage {};
+        return {};
     }
-    else if (message.isMessageWithID ("destroyContentReader"))
+    else if (isMethodCall (message, "destroyContentReader"))
     {
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         auto remoteContentReader { message.getArgValue<ARARemoteContentReader*> ("contentReaderRef") };
         remoteDocument->documentController.documentControllerInterface->destroyContentReader (remoteDocument->documentController.documentControllerRef, remoteContentReader->plugInRef);
 
         delete remoteContentReader;
-        return IPCMessage {};
+        return {};
     }
     ARA_INTERNAL_ASSERT (false && "unhandled message ID");
-    return IPCMessage {};
+    return {};
 }
 
 
