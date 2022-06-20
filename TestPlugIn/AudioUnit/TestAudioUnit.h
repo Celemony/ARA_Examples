@@ -21,9 +21,6 @@
 #define __TestAudioUnit_h__
 
 #include "AUEffectBase.h"
-#if AU_DEBUG_DISPATCHER
-    #include "AUDebugDispatcher.h"
-#endif
 
 #if !CA_USE_AUDIO_PLUGIN_ONLY
     #error "Audio Unit v1 is no longer supported."
@@ -31,13 +28,10 @@
 
 #include "ARA_Library/PlugIn/ARAPlug.h"
 
-class TestAudioUnit : public AUEffectBase
+class TestAudioUnit : public ausdk::AUEffectBase
 {
 public:
     TestAudioUnit(AudioUnit component);
-#if AU_DEBUG_DISPATCHER
-    virtual ~TestAudioUnit () { delete mDebugDispatcher; }
-#endif
 
     virtual OSStatus            Initialize();
     virtual void                Cleanup();
@@ -49,7 +43,7 @@ public:
                                                 AudioUnitScope            inScope,
                                                 AudioUnitElement        inElement,
                                                 UInt32 &                outDataSize,
-                                                Boolean    &                outWritable );
+                                                bool &                  outWritable );
     virtual OSStatus            GetProperty(AudioUnitPropertyID inID,
                                             AudioUnitScope         inScope,
                                             AudioUnitElement     inElement,
