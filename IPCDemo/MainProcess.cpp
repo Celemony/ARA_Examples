@@ -105,13 +105,17 @@ template<typename FloatT>
 IPCMessage _readAudioSamples (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef readerHostRef,
                                  ARASamplePosition samplePosition, ARASampleCount samplesPerChannel)
 {
-    std::vector<FloatT> bufferData;
-    bufferData.resize (static_cast<size_t> (kTestAudioSourceChannelCount * samplesPerChannel));
+    std::vector<ARAByte> bufferData;
+    bufferData.resize (sizeof (FloatT) * kTestAudioSourceChannelCount * static_cast<size_t> (samplesPerChannel));
     void* sampleBuffers[kTestAudioSourceChannelCount];
-    for (auto i { 0 }; i < kTestAudioSourceChannelCount; ++i)
-        sampleBuffers[i] = bufferData.data () + i * samplesPerChannel;
-    ARABool success { ARAReadAudioSamples (controllerHostRef, readerHostRef, samplePosition, samplesPerChannel, sampleBuffers) };
-    return { "result", success, "bufferData", bufferData };
+    for (auto i { 0u }; i < kTestAudioSourceChannelCount; ++i)
+        sampleBuffers[i] = bufferData.data () + sizeof (FloatT) * i * static_cast<size_t> (samplesPerChannel);
+
+    const auto success { ARAReadAudioSamples (controllerHostRef, readerHostRef, samplePosition, samplesPerChannel, sampleBuffers) };
+
+    const auto endian { CFByteOrderGetCurrent() };
+    ARA_INTERNAL_ASSERT (endian != CFByteOrderUnknown);
+    return { "result", success, "bufferData", bufferData, "isLittleEndian", (endian == CFByteOrderLittleEndian) ? kARATrue : kARAFalse };
 }
 
 IPCMessage audioAccessFromPlugInCallBack (const IPCMessage& message)

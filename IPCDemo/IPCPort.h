@@ -26,7 +26,7 @@
 #include "IPCMessage.h"
 
 // A simple proof-of-concept wrapper for an IPC communication channel.
-// Error handling is limited to assertions, and no endianess, alignment or other encoding issues are handled.
+// Error handling is limited to assertions.
 class IPCPort
 {
     IPCPort (const IPCPort& other) = delete;

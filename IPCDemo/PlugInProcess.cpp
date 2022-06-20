@@ -105,21 +105,48 @@ ARAAudioReaderHostRef ARA_CALL ARACreateAudioReaderForSource (ARAAudioAccessCont
     return reinterpret_cast<ARAAudioReaderHostRef> (remoteAudioReader);
 }
 
+void _swap (float* ptr)
+{
+    *((uint32_t*) ptr) = CFSwapInt32 (*((const uint32_t*) ptr));
+}
+void _swap (double* ptr)
+{
+    *((uint64_t*) ptr) = CFSwapInt64 (*((const uint64_t*) ptr));
+}
+
 template<typename FloatT>
 ARABool _readAudioSamples (const IPCMessage& reply, ARASampleCount samplesPerChannel, ARAChannelCount channelCount, void* const buffers[])
 {
     const auto success { reply.getArgValue<ARABool> ("result") };
-    auto bufferData { reply.getArgValue<std::vector<FloatT>> ("bufferData") };
-    ARA_INTERNAL_ASSERT (bufferData.size () == static_cast<size_t> (samplesPerChannel * channelCount));
-    const FloatT* sourcePtr = bufferData.data ();
+    auto bufferData { reply.getArgValue<std::vector<ARAByte>> ("bufferData") };
+    if (success != kARAFalse)
+        ARA_INTERNAL_ASSERT (bufferData.size () == sizeof (FloatT) * static_cast<size_t> (samplesPerChannel * channelCount));
+    else
+        ARA_INTERNAL_ASSERT (bufferData.size () == 0);
+
+    const auto isLittleEndian { reply.getArgValue<ARABool> ("isLittleEndian") };
+    const auto endian { CFByteOrderGetCurrent() };
+    ARA_INTERNAL_ASSERT (endian != CFByteOrderUnknown);
+    bool needSwap { endian != ((isLittleEndian != kARAFalse) ? CFByteOrderLittleEndian : CFByteOrderBigEndian) };
+
+    auto sourcePtr = bufferData.data ();
+    const auto channelSize { sizeof (FloatT) * static_cast<size_t> (samplesPerChannel) };
     for (auto i { 0 }; i < channelCount; ++i)
     {
-        auto destinationPtr { static_cast<FloatT*> (buffers[i]) };
         if (success != kARAFalse)
-            std::copy (sourcePtr, sourcePtr + samplesPerChannel, destinationPtr);
+        {
+            std::memcpy (buffers[i], sourcePtr, channelSize);
+            if (needSwap)
+            {
+                for (auto f { 0 }; f < samplesPerChannel; ++f)
+                    _swap (static_cast<FloatT*> (buffers[i]) + f);
+            }
+        }
         else
-            std::fill (destinationPtr, destinationPtr + samplesPerChannel, FloatT {});
-        sourcePtr += samplesPerChannel;
+        {
+            std::memset (buffers[i], 0, channelSize);
+        }
+        sourcePtr += channelSize;
     }
     return success;
 }

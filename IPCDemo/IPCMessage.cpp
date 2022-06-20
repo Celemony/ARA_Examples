@@ -75,6 +75,14 @@ CFStringRef IPCMessage::_createEncodedTag (const char* tag)
     return result;
 }
 
+const char* IPCMessage::_getKeyForArrayIndex (size_t index)
+{
+    static std::vector<std::string> cache;
+    for (auto i = cache.size (); i <= index; ++i)
+        cache.emplace_back (std::to_string (i));
+    return cache[index].c_str ();
+}
+
 IPCMessage::IPCMessage (CFDataRef data)
 {
     auto dictionary { (CFDictionaryRef) CFPropertyListCreateWithData (kCFAllocatorDefault, data, kCFPropertyListImmutable, nullptr, nullptr) };
@@ -114,9 +122,9 @@ void IPCMessage::_appendArg (const char* argKey, const char* argValue)
     _appendEncodedArg (argKey, CFStringCreateWithCString (kCFAllocatorDefault, argValue, kCFStringEncodingUTF8));
 }
 
-void IPCMessage::_appendBytesArg (const char* argKey, const void* valueBytes, size_t valueSize)
+void IPCMessage::_appendArg (const char* argKey, const std::vector<uint8_t>& argValue)
 {
-    _appendEncodedArg (argKey, CFDataCreate (kCFAllocatorDefault, (const UInt8 *) valueBytes, (CFIndex) valueSize));
+    _appendEncodedArg (argKey, CFDataCreate (kCFAllocatorDefault, argValue.data (), (CFIndex) argValue.size ()));
 }
 
 void IPCMessage::_appendArg (const char* argKey, const IPCMessage& argValue)
@@ -215,26 +223,15 @@ void IPCMessage::_readArg (const char* argKey, std::string& argValue) const
     CFRelease (key);
 }
 
-size_t IPCMessage::_readArrayArgCount (const char* argKey, size_t valueSize) const
-{
-    ARA_INTERNAL_ASSERT (_dictionary);
-    auto key { _createEncodedTag (argKey) };
-    auto bytes { (CFDataRef) CFDictionaryGetValue (_dictionary, key) };
-    ARA_INTERNAL_ASSERT (bytes && (CFGetTypeID (bytes) == CFDataGetTypeID ()));
-    const auto length { (size_t) CFDataGetLength (bytes) };
-    ARA_INTERNAL_ASSERT (length % valueSize == 0);
-    CFRelease (key);
-    return length / valueSize;
-}
-
-void IPCMessage::_readArrayArgData (const char* argKey, void* data) const
+void IPCMessage::_readArg (const char* argKey, std::vector<uint8_t>& argValue) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto key { _createEncodedTag (argKey) };
     auto bytes { (CFDataRef) CFDictionaryGetValue (_dictionary, key) };
     ARA_INTERNAL_ASSERT (bytes && (CFGetTypeID (bytes) == CFDataGetTypeID ()));
     const auto length { CFDataGetLength (bytes) };
-    CFDataGetBytes (bytes, CFRangeMake (0, length), (UInt8*) data);
+    argValue.resize (static_cast<size_t> (length));
+    CFDataGetBytes (bytes, CFRangeMake (0, length), argValue.data ());
     CFRelease (key);
 }
 
