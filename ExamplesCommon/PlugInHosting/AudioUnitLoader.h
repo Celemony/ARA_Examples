@@ -35,7 +35,7 @@ AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype,
 const struct ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitComponent);
 AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent);
 const struct ARA_NAMESPACE ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnit, ARA_NAMESPACE ARADocumentControllerRef controllerRef, ARA_NAMESPACE ARAPlugInInstanceRoleFlags assignedRoles);
-void AudioUnitStartRendering(AudioUnitInstance audioUnit, UInt32 blockSize, double sampleRate);
+void AudioUnitStartRendering(AudioUnitInstance audioUnit, UInt32 maxBlockSize, double sampleRate);
 void AudioUnitRenderBuffer(AudioUnitInstance audioUnit, UInt32 blockSize, SInt64 samplePosition, float * buffer);
 void AudioUnitStopRendering(AudioUnitInstance audioUnit);
 void AudioUnitCloseInstance(AudioUnitInstance audioUnit);

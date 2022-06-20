@@ -332,12 +332,12 @@ const ARA::ARAPlugInExtensionInstance* VST3BindToARADocumentController (VST3Effe
 #endif
 }
 
-void VST3StartRendering (VST3Effect vst3Effect, int32_t blockSize, double sampleRate)
+void VST3StartRendering (VST3Effect vst3Effect, int32_t maxBlockSize, double sampleRate)
 {
     FUnknownPtr<IAudioProcessor> processor { vst3Effect->component };
     ARA_INTERNAL_ASSERT (processor);
 
-    ProcessSetup setup = { kRealtime, kSample32, blockSize, sampleRate };
+    ProcessSetup setup = { kRealtime, kSample32, maxBlockSize, sampleRate };
     tresult ARA_MAYBE_UNUSED_VAR (result);
     result = processor->setupProcessing (setup);
     ARA_INTERNAL_ASSERT (result == kResultOk);

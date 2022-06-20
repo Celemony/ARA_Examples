@@ -589,7 +589,7 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
     const auto document { araDocumentController->getDocument () };
 
     // instantiate the plug-in with the PlaybackRenderer role and verify that it's a valid playback renderer instance
-    auto plugInInstance { plugInEntry->createARAPlugInInstanceWithRoles (araDocumentController->getDocumentController (), ARA::kARAPlaybackRendererRole) };
+    auto plugInInstance { plugInEntry->createARAPlugInInstanceWithRoles (araDocumentController->getDocumentController ()->getRef (), ARA::kARAPlaybackRendererRole) };
     auto playbackRenderer { plugInInstance->getPlaybackRenderer () };
     ARA_INTERNAL_ASSERT (playbackRenderer != nullptr);
 
@@ -700,7 +700,7 @@ void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     const auto document { araDocumentController->getDocument () };
 
     // instantiate the plug-in with the EditorView role and verify that it's a valid editor view instance
-    auto plugInInstance { plugInEntry->createARAPlugInInstanceWithRoles (araDocumentController->getDocumentController (), ARA::kARAEditorViewRole) };
+    auto plugInInstance { plugInEntry->createARAPlugInInstanceWithRoles (araDocumentController->getDocumentController ()->getRef (), ARA::kARAEditorViewRole) };
     auto editorView { plugInInstance->getEditorView () };
     ARA_INTERNAL_ASSERT (editorView != nullptr);
 
