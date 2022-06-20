@@ -127,10 +127,35 @@ ARABool _readAudioSamples (const IPCMessage& reply, ARASampleCount samplesPerCha
 ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef,
                                         ARASamplePosition samplePosition, ARASampleCount samplesPerChannel, void* const buffers[])
 {
+    auto remoteAudioReader { reinterpret_cast<ARARemoteAudioReader *> (audioReaderHostRef) };
+
+    // recursively limit message size to keep IPC responsive
+    if (samplesPerChannel > 8192)
+    {
+        const auto samplesPerChannel1 { samplesPerChannel / 2 };
+        const auto result1 { ARAReadAudioSamples (controllerHostRef, audioReaderHostRef, samplePosition, samplesPerChannel1, buffers) };
+
+        const auto sampleSize { (remoteAudioReader->use64BitSamples != kARAFalse) ? sizeof(double) : sizeof(float) };
+        const auto samplesPerChannel2 { samplesPerChannel - samplesPerChannel1 };
+        void* buffers2[remoteAudioReader->audioSource->properties.channelCount];
+        for (auto i { 0 }; i < remoteAudioReader->audioSource->properties.channelCount; ++i)
+            buffers2[i] = static_cast<uint8_t*> (buffers[i]) + static_cast<size_t> (samplesPerChannel1) * sampleSize;
+
+        if (result1 != kARAFalse)
+        {
+            return ARAReadAudioSamples (controllerHostRef, audioReaderHostRef, samplePosition + samplesPerChannel1, samplesPerChannel2, buffers2);
+        }
+        else
+        {
+            for (auto i { 0 }; i < remoteAudioReader->audioSource->properties.channelCount; ++i)
+                std::memset (buffers2[i], 0, static_cast<size_t> (samplesPerChannel2) * sampleSize);
+            return kARAFalse;
+        }
+    }
+
     static os_unfair_lock_s lock { OS_UNFAIR_LOCK_INIT };
     os_unfair_lock_lock (&lock);
 
-    auto remoteAudioReader { reinterpret_cast<ARARemoteAudioReader *> (audioReaderHostRef) };
     IPCMessage reply { audioAccessFromPlugInPort.sendAndAwaitReply ({ "readAudioSamples",
                                                                           "controllerHostRef", controllerHostRef,
                                                                           "readerRef", remoteAudioReader->mainHostRef,
