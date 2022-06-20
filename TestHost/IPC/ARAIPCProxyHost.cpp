@@ -36,7 +36,8 @@ struct RemoteAudioReader
 {
     RemoteAudioSource* audioSource;
     ARAAudioReaderHostRef mainHostRef;
-    ARABool use64BitSamples;
+    size_t sampleSize;
+    void (*swapFunction) (void* buffer, ARASampleCount sampleCount);
 };
 ARA_MAP_HOST_REF (RemoteAudioReader, ARAAudioReaderHostRef)
 
@@ -55,15 +56,6 @@ struct RemoteHostContentReader
 ARA_MAP_HOST_REF (RemoteHostContentReader, ARAContentReaderHostRef)
 
 /*******************************************************************************/
-
-ARAAudioReaderHostRef AudioAccessController::createAudioReaderForSource (ARAAudioSourceHostRef audioSourceHostRef, bool use64BitSamples) noexcept
-{
-    auto remoteAudioReader { new RemoteAudioReader };
-    remoteAudioReader->audioSource = fromHostRef (audioSourceHostRef);
-    remoteAudioReader->use64BitSamples = use64BitSamples;
-    remoteCallWithReply (remoteAudioReader->mainHostRef, HOST_METHOD_ID (ARAAudioAccessControllerInterface, createAudioReaderForSource), _remoteHostRef, remoteAudioReader->audioSource->mainHostRef, use64BitSamples);
-    return toHostRef (remoteAudioReader);
-}
 
 void _swap (float* ptr)
 {
@@ -89,40 +81,30 @@ void _swap (double* ptr)
 }
 
 template<typename FloatT>
-ARABool _readAudioSamples (const std::vector<uint8_t>& reply, ARASampleCount samplesPerChannel, ARAChannelCount channelCount, void* const buffers[], bool needSwap)
+void _swapBuffer (void* buffer, ARASampleCount sampleCount)
 {
-    const bool success { reply.size () > 0 };
-    if (success)
-        ARA_INTERNAL_ASSERT (reply.size () == sizeof (FloatT) * static_cast<size_t> (samplesPerChannel * channelCount));
-    else
-        ARA_INTERNAL_ASSERT (reply.size () == 0);
+    for (auto i { 0 }; i < sampleCount; ++i)
+        _swap (static_cast<FloatT*> (buffer) + i);
+}
 
-    auto sourcePtr = reply.data ();
-    const auto channelSize { sizeof (FloatT) * static_cast<size_t> (samplesPerChannel) };
-    for (auto i { 0 }; i < channelCount; ++i)
-    {
-        if (success != kARAFalse)
-        {
-            std::memcpy (buffers[i], sourcePtr, channelSize);
-            if (needSwap)
-            {
-                for (auto f { 0 }; f < samplesPerChannel; ++f)
-                    _swap (static_cast<FloatT*> (buffers[i]) + f);
-            }
-        }
-        else
-        {
-            std::memset (buffers[i], 0, channelSize);
-        }
-        sourcePtr += channelSize;
-    }
-    return success;
+ARAAudioReaderHostRef AudioAccessController::createAudioReaderForSource (ARAAudioSourceHostRef audioSourceHostRef, bool use64BitSamples) noexcept
+{
+    auto remoteAudioReader { new RemoteAudioReader };
+    remoteAudioReader->audioSource = fromHostRef (audioSourceHostRef);
+    remoteAudioReader->sampleSize = (use64BitSamples) ? sizeof (double) : sizeof (float);
+    if (portEndianessMatches ())
+        remoteAudioReader->swapFunction = nullptr;
+    else
+        remoteAudioReader->swapFunction = (use64BitSamples) ? &_swapBuffer<double> : &_swapBuffer<float>;
+    remoteCallWithReply (remoteAudioReader->mainHostRef, HOST_METHOD_ID (ARAAudioAccessControllerInterface, createAudioReaderForSource), _remoteHostRef, remoteAudioReader->audioSource->mainHostRef, use64BitSamples);
+    return toHostRef (remoteAudioReader);
 }
 
 bool AudioAccessController::readAudioSamples (ARAAudioReaderHostRef audioReaderHostRef, ARASamplePosition samplePosition,
                                               ARASampleCount samplesPerChannel, void* const buffers[]) noexcept
 {
     auto remoteAudioReader { fromHostRef (audioReaderHostRef) };
+    const auto channelCount { static_cast<size_t> (remoteAudioReader->audioSource->channelCount) };
 
     // recursively limit message size to keep IPC responsive
     if (samplesPerChannel > 8192)
@@ -130,21 +112,20 @@ bool AudioAccessController::readAudioSamples (ARAAudioReaderHostRef audioReaderH
         const auto samplesPerChannel1 { samplesPerChannel / 2 };
         const auto result1 { readAudioSamples (audioReaderHostRef, samplePosition, samplesPerChannel1, buffers) };
 
-        const auto sampleSize { (remoteAudioReader->use64BitSamples != kARAFalse) ? sizeof (double) : sizeof (float) };
         const auto samplesPerChannel2 { samplesPerChannel - samplesPerChannel1 };
-        void* buffers2[32];
-        ARA_INTERNAL_ASSERT(remoteAudioReader->audioSource->channelCount < 32);
-        for (auto i { 0 }; i < remoteAudioReader->audioSource->channelCount; ++i)
-            buffers2[i] = static_cast<uint8_t*> (buffers[i]) + static_cast<size_t> (samplesPerChannel1) * sampleSize;
+        std::vector<void*> buffers2;
+        buffers2.reserve (channelCount);
+        for (auto i { 0U }; i < channelCount; ++i)
+            buffers2.emplace_back (static_cast<uint8_t*> (buffers[i]) + static_cast<size_t> (samplesPerChannel1) * remoteAudioReader->sampleSize);
 
         if (result1)
         {
-            return readAudioSamples (audioReaderHostRef, samplePosition + samplesPerChannel1, samplesPerChannel2, buffers2);
+            return readAudioSamples (audioReaderHostRef, samplePosition + samplesPerChannel1, samplesPerChannel2, buffers2.data ());
         }
         else
         {
-            for (auto i { 0 }; i < remoteAudioReader->audioSource->channelCount; ++i)
-                std::memset (buffers2[i], 0, static_cast<size_t> (samplesPerChannel2) * sampleSize);
+            for (auto i { 0U }; i < channelCount; ++i)
+                std::memset (buffers2[i], 0, static_cast<size_t> (samplesPerChannel2) * remoteAudioReader->sampleSize);
             return false;
         }
     }
@@ -153,13 +134,37 @@ bool AudioAccessController::readAudioSamples (ARAAudioReaderHostRef audioReaderH
     IPCMessage replyMsg;
     remoteCallWithReply (replyMsg, HOST_METHOD_ID (ARAAudioAccessControllerInterface, readAudioSamples),
                         _remoteHostRef, remoteAudioReader->mainHostRef, samplePosition, samplesPerChannel);
-    std::vector<uint8_t> reply;
-    BytesDecoder writer { reply };
-    decodeReply (writer, replyMsg);
-    const auto result { (remoteAudioReader->use64BitSamples != kARAFalse) ?
-                        _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers, !portEndianessMatches ()):
-                        _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers, !portEndianessMatches ()) };
-    return (result != kARAFalse);
+
+    const auto bufferSize { remoteAudioReader->sampleSize * static_cast<size_t> (samplesPerChannel) };
+    std::vector<size_t> resultSizes;
+    std::vector<BytesDecoder> decoders;
+    resultSizes.reserve (channelCount);
+    decoders.reserve (channelCount);
+    for (auto i { 0U }; i < channelCount; ++i)
+    {
+        resultSizes.emplace_back (bufferSize);
+        decoders.emplace_back (static_cast<uint8_t*> (buffers[i]), resultSizes[i]);
+    }
+
+    ArrayArgument<BytesDecoder> channelData { decoders.data (), decoders.size () };
+    auto success { decodeReply (channelData, replyMsg) };
+    if (success)
+        ARA_INTERNAL_ASSERT (channelData.count == channelCount);
+
+    for (auto i { 0U }; i < channelCount; ++i)
+    {
+        if (success)
+        {
+            ARA_INTERNAL_ASSERT (resultSizes[i] == bufferSize);
+            if (remoteAudioReader->swapFunction)
+                remoteAudioReader->swapFunction (buffers[i], samplesPerChannel);
+        }
+        else
+        {
+            std::memset (buffers[i], 0, bufferSize);
+        }
+    }
+    return success;
 }
 
 void AudioAccessController::destroyAudioReader (ARAAudioReaderHostRef audioReaderHostRef) noexcept
