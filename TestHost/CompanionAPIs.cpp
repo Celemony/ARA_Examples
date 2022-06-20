@@ -469,26 +469,26 @@ private:
         }
     };
 
-    static ARA::IPC::ARAIPCProxyPlugInFactory* defaultGetFactory(IPCSender& hostCommandsSender)
+    static const ARA::ARAFactory* defaultGetFactory(IPCSender& hostCommandsSender)
     {
-        const auto count { ARA::IPC::ARAIPCProxyPlugInInitializeFactories (hostCommandsSender) };
+        const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (hostCommandsSender) };
         ARA_INTERNAL_ASSERT (count > 0);
-        return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (0U);
+        return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (hostCommandsSender, 0U);
     }
 
 public:
     IPCPlugInEntry (const std::string& launchArgs, ARA::ARAAssertFunction* assertFunctionAddress,
-                    const std::function<ARA::IPC::ARAIPCProxyPlugInFactory* (IPCSender& hostCommandsSender)>& getFactoryFunction = defaultGetFactory)
+                    const std::function<const ARA::ARAFactory* (IPCSender& hostCommandsSender)>& getFactoryFunction = defaultGetFactory)
     : _hostCommandsPortID { _createPortID () },
       _plugInCallbacksPortID { _createPortID () },
       _remoteLauncher { launchArgs, _hostCommandsPortID, _plugInCallbacksPortID },
       _plugInCallbacksThread { &IPCPlugInEntry::_plugInCallbacksThreadFunction, this },
       _hostCommandsPort { IPCPort::createConnectedToID (_hostCommandsPortID.c_str ()) },
       _hostCommandsSender { _hostCommandsPort },
-      _proxyFactory { getFactoryFunction (_hostCommandsSender) }
+      _factory { getFactoryFunction (_hostCommandsSender) }
     {
         setUsesIPC ();
-        initializeARA (ARA::IPC::ARAIPCProxyPlugInGetFactoryData (_proxyFactory), assertFunctionAddress);
+        initializeARA (_factory, assertFunctionAddress);
     }
 
     ~IPCPlugInEntry () override
@@ -502,7 +502,7 @@ public:
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
-        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_proxyFactory, hostInstance, properties);
+        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_hostCommandsSender, _factory->factoryID, hostInstance, properties);
     }
 
     std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
@@ -556,7 +556,7 @@ private:
     IPCPort _hostCommandsPort;
     IPCSender _hostCommandsSender;
 
-    ARA::IPC::ARAIPCProxyPlugInFactory* _proxyFactory;
+    const ARA::ARAFactory* _factory;
 };
 
 /*******************************************************************************/
@@ -566,22 +566,22 @@ class IPCVST3PlugInEntry : public IPCPlugInEntry
 public:
     IPCVST3PlugInEntry (const std::string& binaryName, const std::string& optionalPlugInName, ARA::ARAAssertFunction* assertFunctionAddress)
     : IPCPlugInEntry { std::string { "-vst3 " } + binaryName + " " + optionalPlugInName, assertFunctionAddress,
-                        [&optionalPlugInName] (IPCSender& hostCommandsSender) -> ARA::IPC::ARAIPCProxyPlugInFactory*
+                        [&optionalPlugInName] (IPCSender& hostCommandsSender) -> const ARA::ARAFactory*
                         {
-                            const auto count { ARA::IPC::ARAIPCProxyPlugInInitializeFactories (hostCommandsSender) };
+                            const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (hostCommandsSender) };
                             ARA_INTERNAL_ASSERT (count > 0);
 
                             if (optionalPlugInName.empty ())
-                                return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (0U);
+                                return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (hostCommandsSender, 0U);
 
                             for (auto i { 0U }; i < count; ++i)
                             {
-                                auto proxyFactory { ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (i) };
-                                if (0 == std::strcmp (ARA::IPC::ARAIPCProxyPlugInGetFactoryData (proxyFactory)->plugInName, optionalPlugInName.c_str ()))
-                                    return proxyFactory;
+                                auto factory { ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (hostCommandsSender, i) };
+                                if (0 == std::strcmp (factory->plugInName, optionalPlugInName.c_str ()))
+                                    return factory;
                             }
                             ARA_INTERNAL_ASSERT (false);
-                            return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (0U);
+                            return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (hostCommandsSender, 0U);
                         } }
     {
         _description = createVST3EntryDescription (binaryName, optionalPlugInName, true);
