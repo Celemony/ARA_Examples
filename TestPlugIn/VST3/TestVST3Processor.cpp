@@ -84,10 +84,13 @@ tresult PLUGIN_API TestVST3Processor::setBusArrangements (Vst::SpeakerArrangemen
 {
     // we only support one in and output bus and these buses must have the same number of non-zero channels
     if ((numIns == 1) && (numOuts == 1) &&
-        (inputs[0] == outputs[0]) &&
-        (Vst::SpeakerArr::getChannelCount (outputs[0]) != 0))
+        (inputs[0] == outputs[0]))
     {
-        return AudioEffect::setBusArrangements (inputs, numIns, outputs, numOuts);
+        // at this point, only up to stereo formats are supported because the test code
+        // doesn't handle surround channel arrangements yet.
+        const auto channelCount = Vst::SpeakerArr::getChannelCount (outputs[0]);
+        if ((0 < channelCount) && (channelCount <= 2))
+            return AudioEffect::setBusArrangements (inputs, numIns, outputs, numOuts);
     }
 
     return kResultFalse;
@@ -98,7 +101,7 @@ tresult PLUGIN_API TestVST3Processor::setActive (TBool state)
 {
     //--- called when the Plug-in is enable/disable (On/Off) -----
 
-    if (ARATestPlaybackRenderer* playbackRenderer = _araPlugInExtension.getPlaybackRenderer<ARATestPlaybackRenderer> ())
+    if (auto playbackRenderer = _araPlugInExtension.getPlaybackRenderer<ARATestPlaybackRenderer> ())
     {
         if (state)
             playbackRenderer->enableRendering (processSetup.sampleRate, getAudioBusChannelCount (audioOutputs[0]), processSetup.maxSamplesPerBlock);

@@ -62,12 +62,15 @@ void TestAudioUnit::Cleanup()
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 UInt32 TestAudioUnit::SupportedNumChannels(const AUChannelInfo** outInfo)
 {
-    static const AUChannelInfo channelInfo { -1, -1 };
+    // at this point, only up to stereo formats are supported because the test code
+    // doesn't handle surround channel arrangements yet.
+    //static const AUChannelInfo channelInfo[] {{ -1, -1 }};
+    static const AUChannelInfo channelInfo[] {{ 1, 1 }, { 2, 2 }};
 
     if (outInfo)
-        *outInfo = &channelInfo;
+        *outInfo = channelInfo;
 
-    return 1;
+    return sizeof(channelInfo) / sizeof(channelInfo[0]);
 }
 
 CFURLRef TestAudioUnit::CopyIconLocation()
