@@ -195,6 +195,11 @@ private:
 
 /*******************************************************************************/
 
+std::string createVST3EntryDescription (const std::string& binaryName, const std::string& optionalPlugInName, bool useIPC)
+{
+    return std::string { "VST3 " } + ((optionalPlugInName.empty ()) ? "" : optionalPlugInName + " ") + "@ " + binaryName + ((useIPC) ? " via IPC" : "");
+}
+
 class VST3PlugInEntry : public PlugInEntry
 {
 public:
@@ -357,6 +362,18 @@ private:
     IPCPort _hostCommandsPort;
 
     std::unique_ptr<ARA::ProxyPlugIn::Factory> _proxyFactory;
+};
+
+/*******************************************************************************/
+
+class IPCVST3PlugInEntry : public IPCPlugInEntry
+{
+public:
+    IPCVST3PlugInEntry (const std::string& binaryName, const std::string& optionalPlugInName, ARA::ARAAssertFunction* assertFunctionAddress)
+    : IPCPlugInEntry { std::string { "-vst3 " } + binaryName + " " + optionalPlugInName, assertFunctionAddress }
+    {
+        _description = createVST3EntryDescription (binaryName, optionalPlugInName, true);
+    }
 };
 
 /*******************************************************************************/
@@ -595,6 +612,18 @@ std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<st
                 optionalPlugInName = *it;
             return std::make_unique<VST3PlugInEntry> (binaryFileName, optionalPlugInName, assertFunctionAddress);
         }
+
+#if ARA_ENABLE_IPC
+        it = std::find (args.begin (), args.end (), "-ipc_vst3");
+        if (it < args.end () - 1)   // we need at least one follow-up argument
+        {
+            const auto& binaryFileName { *++it };
+            std::string optionalPlugInName {};
+            if ((++it != args.end ()) && ((*it)[0] != '-'))
+                optionalPlugInName = *it;
+            return std::make_unique<IPCVST3PlugInEntry> (binaryFileName, optionalPlugInName, assertFunctionAddress);
+        }
+#endif
     }
 
 #if defined (__APPLE__)
