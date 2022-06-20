@@ -1538,8 +1538,8 @@ elseif(UNIX)
     )
 endif()
 
-# \todo IPC implementation is Apple-only at this point
-if(APPLE)
+# \todo add IPC implementation for Linux
+if(APPLE OR WIN32)
     target_sources(ARATestHost PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCEncoding.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCProxyHost.h"

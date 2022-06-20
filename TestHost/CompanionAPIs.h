@@ -34,7 +34,7 @@
 
 
 /*******************************************************************************/
-#if defined (__APPLE__)
+#if defined (__APPLE__) || defined (_WIN32)
     #define ARA_ENABLE_IPC 1
 #else
     #define ARA_ENABLE_IPC 0
