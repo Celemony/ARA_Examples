@@ -299,8 +299,9 @@ public:
         // \todo we're copying twice here: msg -> vector, vector -> buffer
         //       we should change the IPCMessage API to directly decode to buffers, or to return
         //       an arrayview-like object (same problem for strings - albeit these are much much smaller)
-        const auto reply { _sender.remoteCallWithReply<std::vector<uint8_t>> (kIPCRenderSamples, _remoteRef, samplePosition,
-                                            std::vector<uint8_t> { reinterpret_cast<const uint8_t*> (buffer), reinterpret_cast<const uint8_t*> (buffer + blockSize) }) };
+        std::vector<uint8_t> reply;
+        _sender.remoteCallWithReply (reply, kIPCRenderSamples, _remoteRef, samplePosition,
+                                    std::vector<uint8_t> { reinterpret_cast<const uint8_t*> (buffer), reinterpret_cast<const uint8_t*> (buffer + blockSize) });
         std::memcpy (buffer, reply.data (), static_cast<size_t> (blockSize) * sizeof (*buffer));
     }
 
@@ -372,7 +373,8 @@ public:
         const ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
 
         const auto remoteDocumentControllerRef { _proxyFactory->getDocumentControllerRemoteRef (documentControllerRef) };
-        const auto result { ARA::ARAIPCMessageSender { _hostCommandsPort }.remoteCallWithReply<IPCMessage> (kIPCCreateARAEffect, remoteDocumentControllerRef, assignedRoles) };
+        IPCMessage result;
+        ARA::ARAIPCMessageSender { _hostCommandsPort }.remoteCallWithReply (result, kIPCCreateARAEffect, remoteDocumentControllerRef, assignedRoles);
         size_t remoteInstanceRef;
         result.readSize (0, remoteInstanceRef);
         size_t remoteExtensionRef;

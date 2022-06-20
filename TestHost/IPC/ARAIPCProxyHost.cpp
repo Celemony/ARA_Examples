@@ -61,7 +61,7 @@ ARAAudioReaderHostRef AudioAccessController::createAudioReaderForSource (ARAAudi
     auto remoteAudioReader { new RemoteAudioReader };
     remoteAudioReader->audioSource = fromHostRef (audioSourceHostRef);
     remoteAudioReader->use64BitSamples = use64BitSamples;
-    remoteAudioReader->mainHostRef = remoteCallWithReply<ARAAudioReaderHostRef> (HOST_METHOD_ID (ARAAudioAccessControllerInterface, createAudioReaderForSource), _remoteHostRef, remoteAudioReader->audioSource->mainHostRef, use64BitSamples);
+    remoteCallWithReply (remoteAudioReader->mainHostRef, HOST_METHOD_ID (ARAAudioAccessControllerInterface, createAudioReaderForSource), _remoteHostRef, remoteAudioReader->audioSource->mainHostRef, use64BitSamples);
     return toHostRef (remoteAudioReader);
 }
 
@@ -149,8 +149,12 @@ bool AudioAccessController::readAudioSamples (ARAAudioReaderHostRef audioReaderH
         }
     }
 
-    const auto reply { remoteCallWithReply<std::vector<uint8_t>> (HOST_METHOD_ID (ARAAudioAccessControllerInterface, readAudioSamples),
-                                                        _remoteHostRef, remoteAudioReader->mainHostRef, samplePosition, samplesPerChannel) };
+    // local message copy to deal with float data memory ownership
+    IPCMessage replyMsg;
+    remoteCallWithReply (replyMsg, HOST_METHOD_ID (ARAAudioAccessControllerInterface, readAudioSamples),
+                        _remoteHostRef, remoteAudioReader->mainHostRef, samplePosition, samplesPerChannel);
+    std::vector<uint8_t> reply;
+    decodeReply (reply, replyMsg);
     const auto result { (remoteAudioReader->use64BitSamples != kARAFalse) ?
                         _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers, !portEndianessMatches ()):
                         _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers, !portEndianessMatches ()) };
@@ -168,7 +172,9 @@ void AudioAccessController::destroyAudioReader (ARAAudioReaderHostRef audioReade
 
 ARASize ArchivingController::getArchiveSize (ARAArchiveReaderHostRef archiveReaderHostRef) noexcept
 {
-    return remoteCallWithReply<ARASize> (HOST_METHOD_ID (ARAArchivingControllerInterface, getArchiveSize), _remoteHostRef, archiveReaderHostRef);
+    ARASize size;
+    remoteCallWithReply (size, HOST_METHOD_ID (ARAArchivingControllerInterface, getArchiveSize), _remoteHostRef, archiveReaderHostRef);
+    return size;
 }
 
 bool ArchivingController::readBytesFromArchive (ARAArchiveReaderHostRef archiveReaderHostRef, ARASize position, ARASize length, ARAByte buffer[]) noexcept
@@ -192,8 +198,9 @@ bool ArchivingController::readBytesFromArchive (ARAArchiveReaderHostRef archiveR
         }
     }
 
-    const auto bytes { remoteCallWithReply<std::vector<ARAByte>> (HOST_METHOD_ID (ARAArchivingControllerInterface, readBytesFromArchive),
-                                                                    _remoteHostRef, archiveReaderHostRef, position, length) };
+    std::vector<ARAByte> bytes;
+    remoteCallWithReply (bytes, HOST_METHOD_ID (ARAArchivingControllerInterface, readBytesFromArchive),
+                        _remoteHostRef, archiveReaderHostRef, position, length);
 
     if (bytes.size () == length)
     {
@@ -227,7 +234,10 @@ bool ArchivingController::writeBytesToArchive (ARAArchiveWriterHostRef archiveWr
         }
     }
 
-    return (remoteCallWithReply<ARABool> (HOST_METHOD_ID (ARAArchivingControllerInterface, writeBytesToArchive), _remoteHostRef, archiveWriterHostRef, position, std::vector<ARAByte> (buffer, buffer + length)) != kARAFalse);
+    ARABool success;
+    remoteCallWithReply (success, HOST_METHOD_ID (ARAArchivingControllerInterface, writeBytesToArchive),
+                        _remoteHostRef, archiveWriterHostRef, position, std::vector<ARAByte> { buffer, buffer + length });
+    return (success != kARAFalse);
 }
 
 void ArchivingController::notifyDocumentArchivingProgress (float value) noexcept
@@ -243,8 +253,11 @@ void ArchivingController::notifyDocumentUnarchivingProgress (float value) noexce
 ARAPersistentID ArchivingController::getDocumentArchiveID (ARAArchiveReaderHostRef archiveReaderHostRef) noexcept
 {
     // local message copy to deal with string memory ownership
-    const auto reply { remoteCallWithReply<IPCMessage> (HOST_METHOD_ID (ARAArchivingControllerInterface, getDocumentArchiveID), _remoteHostRef, archiveReaderHostRef) };
-    _archiveID.assign ( decodeReply<ARAPersistentID> (reply));
+    IPCMessage replyMsg;
+    remoteCallWithReply (replyMsg, HOST_METHOD_ID (ARAArchivingControllerInterface, getDocumentArchiveID), _remoteHostRef, archiveReaderHostRef);
+    ARAPersistentID persistentID;
+    decodeReply (persistentID, replyMsg);
+    _archiveID.assign (persistentID);
     return _archiveID.c_str();
 }
 
@@ -252,36 +265,50 @@ ARAPersistentID ArchivingController::getDocumentArchiveID (ARAArchiveReaderHostR
 
 bool ContentAccessController::isMusicalContextContentAvailable (ARAMusicalContextHostRef musicalContextHostRef, ARAContentType type) noexcept
 {
-    return (remoteCallWithReply<ARASize> (HOST_METHOD_ID (ARAContentAccessControllerInterface, isMusicalContextContentAvailable), _remoteHostRef, musicalContextHostRef, type) != kARAFalse);
+    ARABool result;
+    remoteCallWithReply (result, HOST_METHOD_ID (ARAContentAccessControllerInterface, isMusicalContextContentAvailable),
+                        _remoteHostRef, musicalContextHostRef, type);
+    return (result != kARAFalse);
 }
 
 ARAContentGrade ContentAccessController::getMusicalContextContentGrade (ARAMusicalContextHostRef musicalContextHostRef, ARAContentType type) noexcept
 {
-    return remoteCallWithReply<ARAContentGrade> (HOST_METHOD_ID (ARAContentAccessControllerInterface, getMusicalContextContentGrade), _remoteHostRef, musicalContextHostRef, type);
+    ARAContentGrade grade;
+    remoteCallWithReply (grade, HOST_METHOD_ID (ARAContentAccessControllerInterface, getMusicalContextContentGrade),
+                        _remoteHostRef, musicalContextHostRef, type);
+    return grade;
 }
 
 ARAContentReaderHostRef ContentAccessController::createMusicalContextContentReader (ARAMusicalContextHostRef musicalContextHostRef, ARAContentType type, const ARAContentTimeRange* range) noexcept
 {
-    const auto contentReaderHostRef { remoteCallWithReply<ARAContentReaderHostRef> (
-                HOST_METHOD_ID (ARAContentAccessControllerInterface, createMusicalContextContentReader), _remoteHostRef, musicalContextHostRef, type, range) };
+    ARAContentReaderHostRef contentReaderHostRef;
+    remoteCallWithReply (contentReaderHostRef, HOST_METHOD_ID (ARAContentAccessControllerInterface, createMusicalContextContentReader),
+                        _remoteHostRef, musicalContextHostRef, type, range);
     auto contentReader { new RemoteHostContentReader { contentReaderHostRef, type } };
     return toHostRef (contentReader);
 }
 
 bool ContentAccessController::isAudioSourceContentAvailable (ARAAudioSourceHostRef audioSourceHostRef, ARAContentType type) noexcept
 {
-    return (remoteCallWithReply<ARASize> (HOST_METHOD_ID (ARAContentAccessControllerInterface, isAudioSourceContentAvailable), _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, type) != kARAFalse);
+    ARABool result;
+    remoteCallWithReply (result, HOST_METHOD_ID (ARAContentAccessControllerInterface, isAudioSourceContentAvailable),
+                        _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, type);
+    return (result != kARAFalse);
 }
 
 ARAContentGrade ContentAccessController::getAudioSourceContentGrade (ARAAudioSourceHostRef audioSourceHostRef, ARAContentType type) noexcept
 {
-    return remoteCallWithReply<ARAContentGrade> (HOST_METHOD_ID (ARAContentAccessControllerInterface, getAudioSourceContentGrade), _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, type);
+    ARAContentGrade grade;
+    remoteCallWithReply (grade, HOST_METHOD_ID (ARAContentAccessControllerInterface, getAudioSourceContentGrade),
+                        _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, type);
+    return grade;
 }
 
 ARAContentReaderHostRef ContentAccessController::createAudioSourceContentReader (ARAAudioSourceHostRef audioSourceHostRef, ARAContentType type, const ARAContentTimeRange* range) noexcept
 {
-    const auto contentReaderHostRef { remoteCallWithReply<ARAContentReaderHostRef> (
-                HOST_METHOD_ID (ARAContentAccessControllerInterface, createAudioSourceContentReader), _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, type, range) };
+    ARAContentReaderHostRef contentReaderHostRef;
+    remoteCallWithReply (contentReaderHostRef, HOST_METHOD_ID (ARAContentAccessControllerInterface, createAudioSourceContentReader),
+                        _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, type, range);
     auto contentReader { new RemoteHostContentReader { contentReaderHostRef, type } };
     return toHostRef (contentReader);
 }
@@ -289,15 +316,19 @@ ARAContentReaderHostRef ContentAccessController::createAudioSourceContentReader 
 ARAInt32 ContentAccessController::getContentReaderEventCount (ARAContentReaderHostRef contentReaderHostRef) noexcept
 {
     const auto contentReader { fromHostRef (contentReaderHostRef) };
-    return remoteCallWithReply<ARAInt32> (
-                HOST_METHOD_ID (ARAContentAccessControllerInterface, getContentReaderEventCount), _remoteHostRef, contentReader->remoteHostRef);
+    ARAInt32 count;
+    remoteCallWithReply (count, HOST_METHOD_ID (ARAContentAccessControllerInterface, getContentReaderEventCount),
+                        _remoteHostRef, contentReader->remoteHostRef);
+    return count;
 }
 
 const void* ContentAccessController::getContentReaderDataForEvent (ARAContentReaderHostRef contentReaderHostRef, ARAInt32 eventIndex) noexcept
 {
     const auto contentReader { fromHostRef (contentReaderHostRef) };
-    return contentReader->decoder.decode (remoteCallWithReply<IPCMessage> (
-                HOST_METHOD_ID (ARAContentAccessControllerInterface, getContentReaderDataForEvent), _remoteHostRef, contentReader->remoteHostRef, eventIndex));
+    IPCMessage reply;
+    remoteCallWithReply (reply, HOST_METHOD_ID (ARAContentAccessControllerInterface, getContentReaderDataForEvent),
+                        _remoteHostRef, contentReader->remoteHostRef, eventIndex);
+    return contentReader->decoder.decode (reply);
 }
 
 void ContentAccessController::destroyContentReader (ARAContentReaderHostRef contentReaderHostRef) noexcept
