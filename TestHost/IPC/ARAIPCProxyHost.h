@@ -145,7 +145,7 @@ private:
 };
 
 /*******************************************************************************/
-//! extension of Host::DocumentController that also stores the host instance visible to the plug-in
+//! Extension of Host::DocumentController that also stores the host instance visible to the plug-in
 class DocumentController : public Host::DocumentController
 {
 public:
@@ -187,8 +187,18 @@ ARA_MAP_REF (PlugInExtension, ARAPlugInExtensionRef, ARAPlaybackRendererRef, ARA
 
 
 /*******************************************************************************/
+//! Handler for all incoming IPC calls.
+void setupHostCommandHandler (const ARAFactory* factory, IPCPort* plugInCallbacksPort);
+IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& message);
 
-void runHost (const ARAFactory& factory, const char* hostCommandsPortID, const char* plugInCallbacksPortID);
+inline ARADocumentControllerRef getDocumentControllerRefForRemoteRef (ARADocumentControllerRef remoteRef)
+{ return fromRef (remoteRef)->getRef (); }
+
+inline ARAPlugInExtensionRef createPlugInExtension (const ARAPlugInExtensionInstance* instance)
+{ return toRef (new PlugInExtension { instance }); }
+
+inline void destroyPlugInExtension (ARAPlugInExtensionRef plugInExtensionRef)
+{ delete fromRef (plugInExtensionRef); }
 
 
 }   // namespace ProxyHost

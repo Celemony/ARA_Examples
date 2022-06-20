@@ -166,9 +166,7 @@ int main (int argc, const char* argv[])
     {
         ARA_LOG ("Remotely hosting ARA plug-in '%s' in %s", factory->plugInName, plugInEntry->getDescription ().c_str ());
 
-        ARA::ProxyHost::runHost (*plugInEntry->getARAFactory (), hostCommandsPortID.c_str (), plugInCallbacksPortID.c_str ());
-
-        return 0;
+        return RemoteHost::main (std::move (plugInEntry), hostCommandsPortID, plugInCallbacksPortID);
     }
 #endif
 
