@@ -319,7 +319,6 @@ private:
 class IPCPlugInEntry : public PlugInEntry
 {
 private:
-
     // helper class to launch remote before initializing related port members
     struct RemoteLauncher
     {
@@ -338,17 +337,25 @@ private:
         }
     };
 
+    static ARA::ProxyPlugIn::Factory& defaultGetFactory(IPCPort& hostCommandsPort)
+    {
+        const auto count { ARA::ProxyPlugIn::Factory::initializeFactories (hostCommandsPort) };
+        ARA_INTERNAL_ASSERT (count > 0);
+        return ARA::ProxyPlugIn::Factory::getFactoryAtIndex (0U);
+    }
+
 public:
-    IPCPlugInEntry (const std::string& launchArgs, ARA::ARAAssertFunction* assertFunctionAddress)
+    IPCPlugInEntry (const std::string& launchArgs, ARA::ARAAssertFunction* assertFunctionAddress,
+                    const std::function<ARA::ProxyPlugIn::Factory& (IPCPort& hostCommandsPort)>& getFactoryFunction = defaultGetFactory)
     : _hostCommandsPortID { _createPortID () },
       _plugInCallbacksPortID { _createPortID () },
       _remoteLauncher { launchArgs, _hostCommandsPortID, _plugInCallbacksPortID },
       _plugInCallbacksThread { &IPCPlugInEntry::_plugInCallbacksThreadFunction, this },
       _hostCommandsPort { IPCPort::createConnectedToID (_hostCommandsPortID.c_str ()) },
-      _proxyFactory { std::make_unique<ARA::ProxyPlugIn::Factory> (_hostCommandsPort) }
+      _proxyFactory { getFactoryFunction (_hostCommandsPort) }
     {
         setUsesIPC ();
-        initializeARA (_proxyFactory->getFactory (), assertFunctionAddress);
+        initializeARA (_proxyFactory.getFactory (), assertFunctionAddress);
     }
 
     ~IPCPlugInEntry () override
@@ -362,7 +369,7 @@ public:
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
-        return _proxyFactory->createDocumentControllerWithDocument (hostInstance, properties);
+        return _proxyFactory.createDocumentControllerWithDocument (hostInstance, properties);
     }
 
     std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
@@ -370,14 +377,14 @@ public:
         // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
         const ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
 
-        const auto remoteDocumentControllerRef { _proxyFactory->getDocumentControllerRemoteRef (documentControllerRef) };
+        const auto remoteDocumentControllerRef { _proxyFactory.getDocumentControllerRemoteRef (documentControllerRef) };
         IPCMessage result;
         ARA::ARAIPCMessageSender { _hostCommandsPort }.remoteCallWithReply (result, kIPCCreateARAEffect, remoteDocumentControllerRef, assignedRoles);
         size_t remoteInstanceRef;
         result.readSize (0, remoteInstanceRef);
         size_t remoteExtensionRef;
         result.readSize (1, remoteExtensionRef);
-        auto plugInExtension { _proxyFactory->createPlugInExtension (remoteExtensionRef, _hostCommandsPort, documentControllerRef, knownRoles, assignedRoles) };
+        auto plugInExtension { _proxyFactory.createPlugInExtension (remoteExtensionRef, _hostCommandsPort, documentControllerRef, knownRoles, assignedRoles) };
         validatePlugInExtensionInstance (plugInExtension->getInstance (), assignedRoles);
         return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _hostCommandsPort, std::move (plugInExtension));
     }
@@ -404,7 +411,7 @@ private:
     IPCPort _plugInCallbacksPort;
     IPCPort _hostCommandsPort;
 
-    std::unique_ptr<ARA::ProxyPlugIn::Factory> _proxyFactory;
+    ARA::ProxyPlugIn::Factory& _proxyFactory;
 };
 
 /*******************************************************************************/
@@ -413,7 +420,24 @@ class IPCVST3PlugInEntry : public IPCPlugInEntry
 {
 public:
     IPCVST3PlugInEntry (const std::string& binaryName, const std::string& optionalPlugInName, ARA::ARAAssertFunction* assertFunctionAddress)
-    : IPCPlugInEntry { std::string { "-vst3 " } + binaryName + " " + optionalPlugInName, assertFunctionAddress }
+    : IPCPlugInEntry { std::string { "-vst3 " } + binaryName + " " + optionalPlugInName, assertFunctionAddress,
+                        [&optionalPlugInName] (IPCPort& hostCommandsPort) -> ARA::ProxyPlugIn::Factory&
+                        {
+                            const auto count { ARA::ProxyPlugIn::Factory::initializeFactories (hostCommandsPort) };
+                            ARA_INTERNAL_ASSERT (count > 0);
+
+                            if (optionalPlugInName.empty ())
+                                return ARA::ProxyPlugIn::Factory::getFactoryAtIndex (0U);
+
+                            for (auto i { 0U }; i < count; ++i)
+                            {
+                                auto& factory { ARA::ProxyPlugIn::Factory::getFactoryAtIndex (i) };
+                                if (0 == std::strcmp (factory.getFactory ()->plugInName, optionalPlugInName.c_str ()))
+                                    return factory;
+                            }
+                            ARA_INTERNAL_ASSERT (false);
+                            return ARA::ProxyPlugIn::Factory::getFactoryAtIndex (0U);
+                        }}
     {
         _description = createVST3EntryDescription (binaryName, optionalPlugInName, true);
     }
@@ -516,7 +540,8 @@ int RemoteHost::main (std::unique_ptr<PlugInEntry> plugInEntry, const std::strin
     auto hostCommandsPort { IPCPort::createPublishingID (hostCommandsPortID.c_str (), &_hostCommandHandler) };
     auto plugInCallbacksPort { IPCPort::createConnectedToID (plugInCallbacksPortID.c_str ()) };
 
-    ARA::ProxyHost::setupHostCommandHandler (_plugInEntry->getARAFactory (), &plugInCallbacksPort);
+    ARA::ProxyHost::addFactory (_plugInEntry->getARAFactory ());
+    ARA::ProxyHost::setPlugInCallbacksPort (&plugInCallbacksPort);
 
     while (!_shutDown)
         hostCommandsPort.runReceiveLoop (100);

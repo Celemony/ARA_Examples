@@ -909,8 +909,9 @@ constexpr int32_t _encodeMessageID ()
 #define PLUGIN_METHOD_ID(StructT, member) _encodeMessageID <_getPlugInInterfaceID<StructT> (), offsetof (StructT, member)> ()
 
 // "global" messages that are not passed based on interface structs
-constexpr int32_t kGetFactoryMethodID { 1 };
-constexpr int32_t kCreateDocumentControllerMethodID { 2 };
+constexpr int32_t kGetFactoriesCountMethodID { 1 };
+constexpr int32_t kGetFactoryMethodID { 2 };
+constexpr int32_t kCreateDocumentControllerMethodID { 3 };
 
 
 // caller side: create a message with the specified arguments
