@@ -189,16 +189,18 @@ VST3Binary* VST3LoadBinary (const char* binaryName)
             ARA_INTERNAL_ASSERT (result == kResultOk);
             ARA_INTERNAL_ASSERT (araMainFactory);
 
+#if ARA_VALIDATE_API_CALLS
+            // ensure all ARAFactories are unique (address and factoryID)
             const auto araFactory { araMainFactory->getFactory () };
             ARA_VALIDATE_API_CONDITION (araFactory);
-
-            // ensure all ARAFactories are unique (address and factoryID)
             for (auto& otherMainFactory : vst3Binary->araMainFactories)
             {
-                const auto otherARAFactory = otherMainFactory->getFactory ();
-                ARA_INTERNAL_ASSERT (std::strcmp (araFactory->factoryID, otherARAFactory->factoryID) != 0);
-                ARA_INTERNAL_ASSERT (std::strcmp (araFactory->plugInName, otherARAFactory->plugInName) != 0);
+                const auto otherARAFactory { otherMainFactory->getFactory () };
+                ARA_VALIDATE_API_CONDITION (araFactory != otherARAFactory);
+                ARA_VALIDATE_API_CONDITION (std::strcmp (araFactory->factoryID, otherARAFactory->factoryID) != 0);
+                ARA_VALIDATE_API_CONDITION (std::strcmp (araFactory->plugInName, otherARAFactory->plugInName) != 0);
             }
+#endif
 
             vst3Binary->araMainFactories.emplace_back (std::move (araMainFactory));
         }
@@ -243,7 +245,7 @@ VST3Binary* VST3LoadBinary (const char* binaryName)
             ARA_VALIDATE_API_CONDITION (foundMatchingClass && "found no IAudioProcessor class for given ARA::IMainFactory class by name");
         }
     }
-#endif  // ARA_VALIDATE_API_CALLS
+#endif
 
     return vst3Binary;
 }
