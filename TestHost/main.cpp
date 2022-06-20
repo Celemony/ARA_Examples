@@ -141,7 +141,7 @@ int main (int argc, const char* argv[])
 #endif
 
     // parse the plug-in binary from the command line arguments
-    auto plugInEntry { PlugInEntry::parsePlugInEntry (args, assertFunctionReference) };
+    auto plugInEntry { PlugInEntry::parsePlugInEntry (args) };
     if (!plugInEntry)
     {
         ARA_LOG ("No plug-in binary specified via -vst3 [binaryFilePath].");
@@ -162,12 +162,21 @@ int main (int argc, const char* argv[])
         return -1;
     }
 
+    // start up ARA
+    if (!plugInEntry->usesIPC ())
+        plugInEntry->initializeARA (assertFunctionReference);
+
 #if ARA_ENABLE_IPC
     if (isRemoteHost)
     {
         ARA_LOG ("Remotely hosting ARA plug-in '%s' in %s", factory->plugInName, plugInEntry->getDescription ().c_str ());
 
-        return RemoteHost::main (std::move (plugInEntry), hostCommandsPortID, plugInCallbacksPortID);
+        const auto result { RemoteHost::main (std::move (plugInEntry), hostCommandsPortID, plugInCallbacksPortID) };
+
+        if (!plugInEntry->usesIPC ())
+            plugInEntry->uninitializeARA ();
+
+        return result;
     }
 #endif
 
@@ -225,6 +234,10 @@ int main (int argc, const char* argv[])
         testAudioFileChunkSaving (plugInEntry.get (), audioFiles);
     if (shouldTest ("AudioFileChunkLoading"))
         testAudioFileChunkLoading (plugInEntry.get (), audioFiles);
+
+    // shut down ARA
+    if (!plugInEntry->usesIPC ())
+        plugInEntry->uninitializeARA ();
 
     return 0;
 }

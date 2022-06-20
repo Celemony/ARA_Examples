@@ -75,13 +75,14 @@ private:
 class PlugInEntry
 {
 protected:
-    PlugInEntry () = default;
+    PlugInEntry (const std::string& description)
+    : _description { description } {}
 
 public:
     // Static factory function for parsing companion API plug-in binaries from command line args.
     // If the plug-in supports ARA, the API will be initialized using the provided assert function
     // and uninitialized when the resulting binary is deleted.
-    static std::unique_ptr<PlugInEntry> parsePlugInEntry (const std::vector<std::string>& args, ARA::ARAAssertFunction* assertFunctionAddress);
+    static std::unique_ptr<PlugInEntry> parsePlugInEntry (const std::vector<std::string>& args);
 
     virtual ~PlugInEntry () = default;
 
@@ -91,30 +92,33 @@ public:
     // Return pointer to factory describing the ARA plug-in (nullptr if plug-in does not support ARA)
     const ARA::SizedStructPtr<ARA::ARAFactory> getARAFactory () const { return _factory; }
 
+    // Test if IPC is used
+    virtual bool usesIPC () const { return false; }
+
+    // Initialize ARA before creating any document controllers
+    void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress);
+
     // Factory function for new ARA document controller instances
     virtual const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                             const ARA::ARADocumentProperties* properties);
 
+    // Initialize ARA before after destroying all document controllers
+    void uninitializeARA ();
+
     // Factory function for new plug-in instances
     virtual std::unique_ptr<PlugInInstance> createPlugInInstance () = 0;
 
-    // Test if IPC is used
-    bool usesIPC () const { return _usesIPC; }
-
 protected:
-    // implementation helpers for derived classes
-#if ARA_ENABLE_IPC
-    void setUsesIPC () { _usesIPC = true; }
-#endif
-    void initializeARA (const ARA::ARAFactory* factory, ARA::ARAAssertFunction* assertFunctionAddress);
-    void uninitializeARA ();
+    // Implementation helper for derived classes - to be called from the c'tor,
+    // but implemented as separate functions due to call order requirements
+    void validateAndSetFactory (const ARA::ARAFactory* factory);
 
-protected:
-    std::string _description {};
+    // Implementation helper for initializeARA () and its overrides
+    ARA::ARAAPIGeneration getDesiredAPIGeneration (const ARA::ARAFactory* const factory);
 
 private:
+    const std::string _description;
     const ARA::ARAFactory* _factory { nullptr };
-    bool _usesIPC { false };
 };
 
 #if ARA_ENABLE_IPC
