@@ -25,8 +25,7 @@
 
 #include "IPCMessage.h"
 
-#include "ARA_API/ARAInterface.h"
-#include "ARA_Library/Debug/ARADebug.h"
+#include "ARA_Library/Dispatch/ARAContentReader.h"
 
 #include <algorithm>
 #include <map>
@@ -138,7 +137,7 @@ inline IPCMessage _encodeValue (const std::vector<ElementT>& value)
 {                                           // overload for arrays
     IPCMessage result;
     result.append (0, value.size ());
-    for (auto i { 0u }; i < value.size (); ++i)
+    for (auto i { 0U }; i < value.size (); ++i)
         result.append (i + 1, _encodeValue (value[i]));
     return result;
 }
@@ -672,7 +671,7 @@ inline void _encodeArgumentsHelper (IPCMessage& message, size_t n, const ArgT& a
     _encodeArgumentsHelper (message, n + 1, moreArgs...);
 }
 template<typename... MoreArgs>
-inline void _encodeArgumentsHelper (IPCMessage& message, size_t n, const std::nullptr_t& argValue, const MoreArgs &... moreArgs)
+inline void _encodeArgumentsHelper (IPCMessage& message, size_t n, const std::nullptr_t& /*argValue*/, const MoreArgs &... moreArgs)
 {
     _encodeArgumentsHelper (message, n + 1, moreArgs...);
 }
@@ -855,5 +854,120 @@ inline const char* decodePlugInMethodID (const size_t messageID)
     }
     return _decodeMethodID (cache, interfaceName, messageID);
 }
+
+//------------------------------------------------------------------------------
+// support for content readers
+//------------------------------------------------------------------------------
+
+inline IPCMessage encodeContentEvent (const ARAContentType type, const void* eventData)
+{
+    switch (type)
+    {
+        case kARAContentTypeNotes:          return encodeReply (*static_cast<const ARAContentNote*> (eventData));
+        case kARAContentTypeTempoEntries:   return encodeReply (*static_cast<const ARAContentTempoEntry*> (eventData));
+        case kARAContentTypeBarSignatures:  return encodeReply (*static_cast<const ARAContentBarSignature*> (eventData));
+        case kARAContentTypeStaticTuning:   return encodeReply (*static_cast<const ARAContentTuning*> (eventData));
+        case kARAContentTypeKeySignatures:  return encodeReply (*static_cast<const ARAContentKeySignature*> (eventData));
+        case kARAContentTypeSheetChords:    return encodeReply (*static_cast<const ARAContentChord*> (eventData));
+        default:                            ARA_INTERNAL_ASSERT (false && "content type not implemented yet"); return {};
+    }
+}
+
+class ARAIPCContentEventDecoder
+{
+public:
+    ARAIPCContentEventDecoder (ARAContentType type)
+    : _decoderFunction { _getDecoderFunctionForContentType (type) }
+    {}
+
+    const void* decode (const IPCMessage& message)
+    {
+        (this->*_decoderFunction) (message);
+        return &_eventStorage;
+    }
+
+private:
+    using _DecoderFunction = void (ARAIPCContentEventDecoder::*) (const IPCMessage&);
+
+    template<typename ContentT>
+    void _copyEventStringIfNeeded ()
+    {}
+// \todo is there a way to use decltype(memberString) instead of additionally passing in the type?
+#define _SPECIALIZE_COPY_EVENT_STRING_IF_NEEEDED(ContentT, memberString) \
+    template<>                                                      \
+    void _copyEventStringIfNeeded<ContentT> ()                      \
+    {                                                               \
+        if (_eventStorage.memberString)                             \
+        {                                                           \
+            _stringStorage.assign (_eventStorage.memberString);     \
+            _eventStorage.memberString = _stringStorage.c_str ();   \
+        }                                                           \
+    }
+    _SPECIALIZE_COPY_EVENT_STRING_IF_NEEEDED (ARAContentTuning, _tuning.name)
+    _SPECIALIZE_COPY_EVENT_STRING_IF_NEEEDED (ARAContentKeySignature, _keySignature.name)
+    _SPECIALIZE_COPY_EVENT_STRING_IF_NEEEDED (ARAContentChord, _chord.name)
+#undef _SPECIALIZE_COPY_EVENT_STRING_IF_NEEEDED
+
+    template<typename ContentT>
+    void _decodeContentEvent (const IPCMessage& message)
+    {
+        *reinterpret_cast<ContentT*> (&this->_eventStorage) = decodeReply<ContentT> (message);
+        _copyEventStringIfNeeded<ContentT> ();
+    }
+
+    _DecoderFunction _getDecoderFunctionForContentType (ARAContentType type)
+    {
+        switch (type)
+        {
+            case kARAContentTypeNotes: return &ARAIPCContentEventDecoder::_decodeContentEvent<ContentTypeMapper<kARAContentTypeNotes>::DataType>;
+            case kARAContentTypeTempoEntries: return &ARAIPCContentEventDecoder::_decodeContentEvent<ContentTypeMapper<kARAContentTypeTempoEntries>::DataType>;
+            case kARAContentTypeBarSignatures: return &ARAIPCContentEventDecoder::_decodeContentEvent<ContentTypeMapper<kARAContentTypeBarSignatures>::DataType>;
+            case kARAContentTypeStaticTuning: return &ARAIPCContentEventDecoder::_decodeContentEvent<ContentTypeMapper<kARAContentTypeStaticTuning>::DataType>;
+            case kARAContentTypeKeySignatures: return &ARAIPCContentEventDecoder::_decodeContentEvent<ContentTypeMapper<kARAContentTypeKeySignatures>::DataType>;
+            case kARAContentTypeSheetChords: return &ARAIPCContentEventDecoder::_decodeContentEvent<ContentTypeMapper<kARAContentTypeSheetChords>::DataType>;
+            default: ARA_INTERNAL_ASSERT (false); return nullptr;
+        }
+    }
+
+private:
+    _DecoderFunction const _decoderFunction;    // instead of performing the switch (type) for each event,
+                                                // we select a templated member function in the c'tor
+    union
+    {
+        ARAContentTempoEntry _tempoEntry;
+        ARAContentBarSignature _barSignature;
+        ARAContentNote _note;
+        ARAContentTuning _tuning;
+        ARAContentKeySignature _keySignature;
+        ARAContentChord _chord;
+    } _eventStorage {};
+    std::string _stringStorage {};
+};
+
+//------------------------------------------------------------------------------
+// implementation helpers
+//------------------------------------------------------------------------------
+
+// helper base class to create and send messages, decoding reply if applicable
+// it's possible to specify IPCMessage as reply type to access an undecoded reply if needed
+class ARAIPCMessageSender
+{
+public:
+    ARAIPCMessageSender (IPCPort& port) noexcept : _port { port } {}
+
+    template<typename... Args>
+    void remoteCallWithoutReply (const int32_t methodID, const Args &... args)
+    {
+        _port.sendBlocking (methodID, encodeArguments (args...));
+    }
+    template<typename RetT, typename... Args>
+    RetT remoteCallWithReply (const int32_t methodID, const Args &... args)
+    {
+        return decodeReply<RetT> (_port.sendAndAwaitReply (methodID, encodeArguments (args...)));
+    }
+
+private:
+    IPCPort& _port;
+};
 
 }   // namespace ARA

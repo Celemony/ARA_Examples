@@ -38,13 +38,9 @@
 //------------------------------------------------------------------------------
 
 // test code includes
-#include "IPCMessage.h"
-#include "IPCPort.h"
-#include "ARAIPCEncoding.h"
+#include "ARAIPCProxyPlugIn.h"
 
 #include "ExamplesCommon/SignalProcessing/PulsedSineSignal.h"
-
-#include <thread>
 
 // ARA framework includes
 #include "ARA_Library/Debug/ARADebug.h"
@@ -66,6 +62,7 @@ using namespace ARA;
 #define kTestAudioSourceChannelCount 2
 #define kHostAudioSourceHostRef ((ARAAudioSourceHostRef) 1)
 #define kAudioAccessControllerHostRef ((ARAAudioAccessControllerHostRef) 10)
+#define kArchivingControllerHostRef ((ARAArchivingControllerHostRef) 11)
 #define kAudioReader32BitHostRef ((ARAAudioReaderHostRef) 20)
 #define kAudioReader64BitHostRef ((ARAAudioReaderHostRef) 21)
 
@@ -99,72 +96,39 @@ void ARA_CALL ARADestroyAudioReader (ARAAudioAccessControllerHostRef controllerH
     ARA_VALIDATE_API_ARGUMENT (audioReaderHostRef, (audioReaderHostRef == kAudioReader32BitHostRef) || (audioReaderHostRef == kAudioReader64BitHostRef));
     ARA_LOG ("destroyAudioReader() called for fake ref %p.", audioReaderHostRef);
 }
+static const ARAAudioAccessControllerInterface hostAudioAccessControllerInterface = { ARA_IMPLEMENTED_STRUCT_SIZE (ARAAudioAccessControllerInterface, destroyAudioReader),
+                                                                                        &ARACreateAudioReaderForSource, &ARAReadAudioSamples, &ARADestroyAudioReader };
 
-
-template<typename FloatT>
-IPCMessage _readAudioSamples (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef readerHostRef,
-                                 ARASamplePosition samplePosition, ARASampleCount samplesPerChannel)
+// ARAArchivingControllerInterface (required)
+static ARASize ARA_CALL ARAGetArchiveSize (ARAArchivingControllerHostRef controllerHostRef, ARAArchiveReaderHostRef archiveReaderHostRef)
 {
-    std::vector<ARAByte> bufferData;
-    bufferData.resize (sizeof (FloatT) * kTestAudioSourceChannelCount * static_cast<size_t> (samplesPerChannel));
-    void* sampleBuffers[kTestAudioSourceChannelCount];
-    for (auto i { 0u }; i < kTestAudioSourceChannelCount; ++i)
-        sampleBuffers[i] = bufferData.data () + sizeof (FloatT) * i * static_cast<size_t> (samplesPerChannel);
-
-    const auto success { ARAReadAudioSamples (controllerHostRef, readerHostRef, samplePosition, samplesPerChannel, sampleBuffers) };
-
-    const auto endian { CFByteOrderGetCurrent() };
-    ARA_INTERNAL_ASSERT (endian != CFByteOrderUnknown);
-    return encodeReply (ARAIPCReadSamplesReply { (success != kARAFalse) ? bufferData.size () : 0,
-                                                       (success != kARAFalse) ? bufferData.data () : nullptr,
-                                                       (endian == CFByteOrderLittleEndian) ? kARATrue : kARAFalse });
+    return 0;
 }
-
-IPCMessage audioAccessFromPlugInCallBack (const int32_t messageID, const IPCMessage& message)
+static ARABool ARA_CALL ARAReadBytesFromArchive (ARAArchivingControllerHostRef controllerHostRef, ARAArchiveReaderHostRef archiveReaderHostRef,
+                                                ARASize position, ARASize length, ARAByte buffer[])
 {
-    if (messageID == HOST_METHOD_ID (ARAAudioAccessControllerInterface, createAudioReaderForSource))
-    {
-        ARAAudioAccessControllerHostRef controllerHostRef;
-        ARAAudioSourceHostRef audioSourceHostRef;
-        ARABool use64BitSamples;
-        decodeArguments (message, controllerHostRef, audioSourceHostRef, use64BitSamples);
-        ARAAudioReaderHostRef readerRef { ARACreateAudioReaderForSource (controllerHostRef, audioSourceHostRef, use64BitSamples) };
-        return encodeReply (readerRef);
-    }
-    else if (messageID == HOST_METHOD_ID (ARAAudioAccessControllerInterface, readAudioSamples))
-    {
-        ARAAudioAccessControllerHostRef controllerHostRef;
-        ARAAudioReaderHostRef readerRef;
-        ARASamplePosition samplePosition;
-        ARASampleCount samplesPerChannel;
-        decodeArguments (message, controllerHostRef, readerRef, samplePosition, samplesPerChannel);
-        if (readerRef == kAudioReader64BitHostRef)
-            return _readAudioSamples<double> (controllerHostRef, readerRef, samplePosition, samplesPerChannel);
-        else
-            return _readAudioSamples<float> (controllerHostRef, readerRef, samplePosition, samplesPerChannel);
-    }
-    else if (messageID == HOST_METHOD_ID (ARAAudioAccessControllerInterface, destroyAudioReader))
-    {
-        ARAAudioAccessControllerHostRef controllerHostRef;
-        ARAAudioReaderHostRef readerRef;
-        decodeArguments (message, controllerHostRef, readerRef);
-        ARADestroyAudioReader (controllerHostRef, readerRef);
-        return {};
-    }
-
-    ARA_INTERNAL_ASSERT (false && "unhandled methodSelector");
-    return {};
+    memset (&buffer[position], 0, length);
+    return kARAFalse;
 }
-
-
-void audioAccessThreadHandler (bool& keepRunning)
+static ARABool ARA_CALL ARAWriteBytesToArchive (ARAArchivingControllerHostRef controllerHostRef, ARAArchiveWriterHostRef archiveWriterHostRef,
+                                                ARASize position, ARASize length, const ARAByte buffer[])
 {
-    ARA_LOG ("audio access thread started.");
-    auto audioAccessFromPlugInPort { IPCPort::createPublishingID ("com.arademocompany.IPCDemo.audioAccessFromPlugIn", &audioAccessFromPlugInCallBack) };
-    while (keepRunning)
-        CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.05, false);
-    ARA_LOG ("audio access thread stopped.");
+    return kARATrue;
 }
+static void ARA_CALL ARANotifyDocumentArchivingProgress (ARAArchivingControllerHostRef controllerHostRef, float value)
+{
+}
+static void ARA_CALL ARANotifyDocumentUnarchivingProgress (ARAArchivingControllerHostRef controllerHostRef, float value)
+{
+}
+static ARAPersistentID ARA_CALL ARAGetDocumentArchiveID (ARAArchivingControllerHostRef controllerHostRef, ARAArchiveReaderHostRef archiveReaderHostRef)
+{
+    return nullptr;
+}
+static const ARAArchivingControllerInterface hostArchivingInterface = { ARA_IMPLEMENTED_STRUCT_SIZE (ARAArchivingControllerInterface, getDocumentArchiveID),
+                                                                        &ARAGetArchiveSize, &ARAReadBytesFromArchive, &ARAWriteBytesToArchive,
+                                                                        &ARANotifyDocumentArchivingProgress, &ARANotifyDocumentUnarchivingProgress,
+                                                                        &ARAGetDocumentArchiveID };
 
 ARA_SETUP_DEBUG_MESSAGE_PREFIX ("IPC-Main");
 
@@ -175,128 +139,77 @@ int main (int argc, const char * argv[])
     // launch plug-in process
     const auto launchResult = system ("./ARAIPCDemoPlugInProcess &");
     ARA_INTERNAL_ASSERT (launchResult == 0);
-
-    // detach thread for audio access handler
-    auto keepRunning { true };
-    std::thread audioAccessThread { audioAccessThreadHandler, std::ref (keepRunning) };
     ARA_LOG ("launched plug-in process.");
 
-// for some reason, the clang analyzer produces several false positives here related to SizedStruct<>
-// and how it initializes its members, and to keepRunning being captured - we're disabling it here.
-#if !defined(__clang_analyzer__)
-
     // connect to main process for managing model
-    IPCPort modelPortToPlugIn { IPCPort::createConnectedToID ("com.arademocompany.IPCDemo.modelPortToPlugIn") };
+    ProxyPlugIn::Factory proxyFactory { "com.arademocompany.IPCDemo.hostCommands", "com.arademocompany.IPCDemo.plugInCallbacks" };
 
     // set a breakpoint to this line if you want to attach the debugger to the plug-in process
     ARA_LOG ("connected to plug-in process.");
 
+    ARADocumentControllerHostInstance documentEntry = { ARA_IMPLEMENTED_STRUCT_SIZE (ARADocumentControllerHostInstance, playbackControllerInterface),
+                                                        kAudioAccessControllerHostRef, &hostAudioAccessControllerInterface,
+                                                        kArchivingControllerHostRef, &hostArchivingInterface,
+                                                        nullptr, nullptr, /* no optional content access in this simple example host */
+                                                        nullptr, nullptr, /* no optional model updates in this simple example host */
+                                                        nullptr, nullptr  /* no optional playback control in this simple example host */ };
     SizedStruct<ARA_STRUCT_MEMBER (ARADocumentProperties, name)> documentProperties { "Test document" };
-    //documentControllerInstance = factory->createDocumentControllerWithDocument (&documentEntry, &documentProperties);
-    auto remoteDocumentRef { decodeReply<ARADocumentControllerRef> (
-        modelPortToPlugIn.sendAndAwaitReply (kCreateDocumentControllerMethodID,
-                                                encodeArguments (kAudioAccessControllerHostRef, (ARADocumentProperties*)&documentProperties))) };
+    const auto documentControllerInstance { proxyFactory.createDocumentControllerWithDocument (&documentEntry, &documentProperties) };
+    const auto documentControllerInterface { documentControllerInstance->documentControllerInterface };
+    auto documentControllerRef { documentControllerInstance->documentControllerRef };
 
-    //documentControllerInterface->beginEditing (documentControllerRef);
-    modelPortToPlugIn.sendBlocking (PLUGIN_METHOD_ID (ARADocumentControllerInterface, beginEditing),
-                                                encodeArguments (remoteDocumentRef));
+    // start editing the document
+    documentControllerInterface->beginEditing (documentControllerRef);
 
     SizedStruct<ARA_STRUCT_MEMBER (ARAAudioSourceProperties, merits64BitSamples)> audioSourceProperties { "Test audio source", "audioSourceTestPersistentID",
                                                                 kTestAudioSourceSampleRate * kTestAudioSourceDuration, static_cast<double> (kTestAudioSourceSampleRate),
                                                                 kTestAudioSourceChannelCount, kARAFalse };
-    //audioSourceRef = documentControllerInterface->createAudioSource (documentControllerRef, kHostAudioSourceHostRef, &audioSourceProperties);
-    auto audioSourceRef { decodeReply<ARAAudioSourceRef> (
-        modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioSource),
-                                                encodeArguments (remoteDocumentRef, kHostAudioSourceHostRef, (ARAAudioSourceProperties*)&audioSourceProperties))) };
+    auto audioSourceRef { documentControllerInterface->createAudioSource (documentControllerRef, kHostAudioSourceHostRef, &audioSourceProperties) };
 
-    //documentControllerInterface->endEditing (documentControllerRef);
-    modelPortToPlugIn.sendBlocking (PLUGIN_METHOD_ID (ARADocumentControllerInterface, endEditing),
-                                                encodeArguments (remoteDocumentRef));
+    documentControllerInterface->endEditing (documentControllerRef);
 
-    //documentControllerInterface->enableAudioSourceSamplesAccess (documentControllerRef, audioSourceRef, kARATrue);
-    modelPortToPlugIn.sendBlocking (PLUGIN_METHOD_ID (ARADocumentControllerInterface, enableAudioSourceSamplesAccess),
-                                                encodeArguments (remoteDocumentRef, audioSourceRef, kARATrue));
+    documentControllerInterface->enableAudioSourceSamplesAccess (documentControllerRef, audioSourceRef, kARATrue);
 
-    //documentControllerInterface->requestAudioSourceContentAnalysis (documentControllerRef, audioSourceRef, 1, { kARAContentTypeNotes });
-    modelPortToPlugIn.sendBlocking (PLUGIN_METHOD_ID (ARADocumentControllerInterface, requestAudioSourceContentAnalysis),
-                                                encodeArguments (remoteDocumentRef, audioSourceRef, std::vector<ARAContentType> { kARAContentTypeNotes }));
+    const ARAContentType contentType { kARAContentTypeNotes };
+    documentControllerInterface->requestAudioSourceContentAnalysis (documentControllerRef, audioSourceRef, 1, &contentType);
 
-    //wait for documentControllerInterface->isAudioSourceContentAnalysisIncomplete (documentControllerRef, audioSourceRef, kARAContentTypeNotes);
     while (true)
     {
         // this is a crude test implementation - real code wouldn't implement such a simple infinite loop.
-        // instead, it would periodically request notifications and evaluate incoming calls to notifyAudioSourceContentChanged().
+        // instead, it would evaluate incoming calls to notifyAudioSourceContentChanged().
         // further, it would evaluate notifyAudioSourceAnalysisProgress() to provide proper progress indication,
         // and offer the user a way to cancel the operation if desired.
 
-        // not modelled via IPC yet, currently sent on the remote side where needed.
-        //documentControllerInterface->notifyModelUpdates (documentControllerRef);
+        documentControllerInterface->notifyModelUpdates (documentControllerRef);
 
-        //done = documentControllerInterface->isAudioSourceContentAnalysisIncomplete (documentControllerRef, audioSourceRef, kARAContentTypeNotes);
-        if (decodeReply<ARABool> (
-                modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioSourceContentAnalysisIncomplete),
-                                                encodeArguments (remoteDocumentRef, audioSourceRef, kARAContentTypeNotes)))
-            == kARAFalse)
+        if (documentControllerInterface->isAudioSourceContentAnalysisIncomplete (documentControllerRef, audioSourceRef, kARAContentTypeNotes) == kARAFalse)
             break;
 
         std::this_thread::sleep_for (std::chrono::milliseconds { 50 });
     }
 
-    //hasEvents = documentControllerInterface->isAudioSourceContentAvailable (documentControllerRef, audioSourceRef, kARAContentTypeNotes);
-    if (decodeReply<ARABool> (
-            modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioSourceContentAvailable),
-                                                encodeArguments (remoteDocumentRef, audioSourceRef, kARAContentTypeNotes)))
-        != kARAFalse)
+    if  (documentControllerInterface->isAudioSourceContentAvailable (documentControllerRef, audioSourceRef, kARAContentTypeNotes) != kARAFalse)
     {
-        //contentReaderRef = documentControllerInterface->createAudioSourceContentReader (documentControllerRef, audioSourceRef, kARAContentTypeNotes, nullptr);
-        auto contentReaderRef { decodeReply<ARAContentReaderRef> (
-            modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioSourceContentReader),
-                                                encodeArguments (remoteDocumentRef, audioSourceRef, kARAContentTypeNotes, nullptr))) };
+        auto contentReaderRef { documentControllerInterface->createAudioSourceContentReader (documentControllerRef, audioSourceRef, kARAContentTypeNotes, nullptr) };
 
-        //eventCount = documentControllerInterface->getContentReaderEventCount (documentControllerRef, contentReaderRef);
-        const auto eventCount { decodeReply<ARAInt32> (
-            modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, getContentReaderEventCount),
-                                                encodeArguments (remoteDocumentRef, contentReaderRef))) };
+        const auto eventCount { documentControllerInterface->getContentReaderEventCount (documentControllerRef, contentReaderRef) };
         ARA_LOG ("%i notes available for audio source %s:", eventCount, audioSourceProperties.name);
-        for (ARAInt32 i = 0; i < eventCount; ++i)
-        {
-            //noteData = (const ARAContentNote *)documentControllerInterface->getContentReaderDataForEvent (documentControllerRef, contentReaderRef, i);
-            ContentLogger::logEvent (i, decodeReply<ARAContentNote> (
-                modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, getContentReaderDataForEvent),
-                                                encodeArguments (remoteDocumentRef, contentReaderRef, i))));
-        }
+        for (ARAInt32 i { 0 }; i < eventCount; ++i)
+            ContentLogger::logEvent (i, *(const ARAContentNote *)documentControllerInterface->getContentReaderDataForEvent (documentControllerRef, contentReaderRef, i));
 
-        //documentControllerInterface->destroyContentReader (documentControllerRef, contentReaderRef);
-        modelPortToPlugIn.sendBlocking (PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyContentReader),
-                                                encodeArguments (remoteDocumentRef, contentReaderRef));
+        documentControllerInterface->destroyContentReader (documentControllerRef, contentReaderRef);
     }
 
-    //documentControllerInterface->enableAudioSourceSamplesAccess (documentControllerRef, audioSourceRef, kARAFalse);
-    modelPortToPlugIn.sendBlocking (PLUGIN_METHOD_ID (ARADocumentControllerInterface, enableAudioSourceSamplesAccess),
-                                                encodeArguments (remoteDocumentRef, audioSourceRef, kARAFalse));
+    documentControllerInterface->enableAudioSourceSamplesAccess (documentControllerRef, audioSourceRef, kARAFalse);
 
-    //documentControllerInterface->beginEditing (documentControllerRef);
-    modelPortToPlugIn.sendBlocking (PLUGIN_METHOD_ID (ARADocumentControllerInterface, beginEditing),
-                                                encodeArguments (remoteDocumentRef));
+    documentControllerInterface->beginEditing (documentControllerRef);
 
-    //documentControllerInterface->destroyAudioSource (documentControllerRef, audioSourceRef);
-    modelPortToPlugIn.sendBlocking (PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyAudioSource),
-                                                encodeArguments (remoteDocumentRef, audioSourceRef));
-
-    //documentControllerInterface->endEditing (documentControllerRef);
-    modelPortToPlugIn.sendBlocking (PLUGIN_METHOD_ID (ARADocumentControllerInterface, endEditing),
-                                                encodeArguments (remoteDocumentRef));
-
-    //documentControllerInterface->destroyDocumentController (documentControllerRef);
-    modelPortToPlugIn.sendBlocking (PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyDocumentController),
-                                                encodeArguments (remoteDocumentRef));
+    documentControllerInterface->destroyAudioSource (documentControllerRef, audioSourceRef);
 
     // shut everything down
-    keepRunning = false;
-    audioAccessThread.join ();
+    documentControllerInterface->endEditing (documentControllerRef);
 
-#endif  // !defined(__clang_analyzer__)
+    documentControllerInterface->destroyDocumentController (documentControllerRef);
 
-    ARA_LOG ("completed.");
     return 0;
 }
