@@ -87,7 +87,7 @@ public:
     void appendFloat (const int32_t argKey, const float argValue);
     void appendDouble (const int32_t argKey, const double argValue);
     void appendString (const int32_t argKey, const char* const argValue);   // UTF8
-    void appendBytes (const int32_t argKey, const uint8_t* argValue, const size_t argSize);
+    void appendBytes (const int32_t argKey, const uint8_t* argValue, const size_t argSize, const bool copy = true); // disable copy if data is alive longer than the message
     void appendMessage (const int32_t argKey, const IPCMessage& argValue);
 
     // read keyed argument to the message

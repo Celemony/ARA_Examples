@@ -241,7 +241,7 @@ bool ArchivingController::writeBytesToArchive (ARAArchiveWriterHostRef archiveWr
 
     ARABool success;
     remoteCallWithReply (success, HOST_METHOD_ID (ARAArchivingControllerInterface, writeBytesToArchive),
-                        _remoteHostRef, archiveWriterHostRef, position, BytesEncoder { buffer, length });
+                        _remoteHostRef, archiveWriterHostRef, position, BytesEncoder { buffer, length, false });
     return (success != kARAFalse);
 }
 
