@@ -96,6 +96,84 @@ struct _IsStructPointerArg
 
 
 //------------------------------------------------------------------------------
+// private primitive wrappers for IPCMessage API that drop the type encoding
+// from the name (which is required there for potential C compatibility)
+// \todo we might choose to use overloads on IPCMessage and just add the
+//       type encoding to the function names in the C wrapper,
+//       which would allow to just drop these wrappers here.
+//------------------------------------------------------------------------------
+
+
+// primitives for appending an argument to a message
+inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const int32_t argValue)
+{
+    message.appendInt32 (argKey, argValue);
+}
+inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const int64_t argValue)
+{
+    message.appendInt64 (argKey, argValue);
+}
+inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const size_t argValue)
+{
+    message.appendSize (argKey, argValue);
+}
+inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const float argValue)
+{
+    message.appendFloat (argKey, argValue);
+}
+inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const double argValue)
+{
+    message.appendDouble (argKey, argValue);
+}
+inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const char* const argValue)
+{
+    message.appendString (argKey, argValue);
+}
+inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const std::vector<uint8_t>& argValue)
+{
+    message.appendBytes (argKey, argValue);
+}
+inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const IPCMessage& argValue)
+{
+    message.appendMessage (argKey, argValue);
+}
+
+// primitives for reading an (optional) argument from a message
+inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, int32_t& argValue)
+{
+    return message.readInt32 (argKey, argValue);
+}
+inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, int64_t& argValue)
+{
+    return message.readInt64 (argKey, argValue);
+}
+inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, size_t& argValue)
+{
+    return message.readSize (argKey, argValue);
+}
+inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, float& argValue)
+{
+    return message.readFloat (argKey, argValue);
+}
+inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, double& argValue)
+{
+    return message.readDouble (argKey, argValue);
+}
+inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, const char*& argValue)
+{
+    return message.readString (argKey, argValue);
+}
+inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, std::vector<uint8_t>& argValue)
+{
+    return message.readBytes (argKey, argValue);
+}
+inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, IPCMessage& argValue)
+{
+    return message.readMessage (argKey, argValue);
+}
+
+
+//------------------------------------------------------------------------------
 // private helper templates to encode ARA API values as IPCMessage data and decode back
 // mapping is 1:1 except for ARA (host)refs which are encoded as size_t and aggregate types
 // (i.e. ARA structs or std::vector<> of types other than ARAByte), which are encoded as sub-messages
@@ -105,15 +183,11 @@ struct _IsStructPointerArg
 //------------------------------------------------------------------------------
 
 
-// primitive for appending an argument to a message
+// templated wrapper for reading an (optional) argument from a message
 template <typename ArgT>
-void _appendToMessage (IPCMessage& message, const int32_t argKey, const ArgT& argValue);
-
-// primitives for reading an (optional) argument from a message
+ArgT _decodeValue (const IPCMessage& message, const int32_t argKey);
 template <typename ArgT>
-ArgT _readFromMessage (const IPCMessage& message, const int32_t argKey);
-template <typename ArgT>
-std::pair<ArgT, bool> _readOptionalFromMessage (const IPCMessage& message, const int32_t argKey);
+std::pair<ArgT, bool> _decodeOptionalValue (const IPCMessage& message, const int32_t argKey);
 
 
 // generic type encodings
@@ -133,9 +207,9 @@ inline IPCMessage _encodeValue (const std::vector<ElementT>& value)
     IPCMessage result;
     ARA_INTERNAL_ASSERT (value.size () < static_cast<size_t> (std::numeric_limits<int32_t>::max ()));
     const auto count { static_cast<int32_t> (value.size ()) };
-    result.append (0, count);
+    _appendToMessage (result, 0, count);
     for (auto i { 0 }; i < count; ++i)
-        result.append (i + 1, _encodeValue (value[static_cast<size_t> (i)]));
+        _appendToMessage (result, i + 1, _encodeValue (value[static_cast<size_t> (i)]));
     return result;
 }
 
@@ -171,10 +245,10 @@ struct _ValueDecoder<std::vector<ElementT>>
     static inline std::vector<ElementT> decode (const IPCMessage& message)
     {
         std::vector<ElementT> result;
-        const auto count { _readFromMessage<int32_t> (message, 0) };
+        const auto count { _decodeValue<int32_t> (message, 0) };
         result.reserve (static_cast<size_t> (count));
         for (auto i { 0 }; i < count; ++i)
-            result.emplace_back (_readFromMessage<ElementT> (message, i + 1));
+            result.emplace_back (_decodeValue<ElementT> (message, i + 1));
         return result;
     }
 };
@@ -198,14 +272,14 @@ inline IPCMessage _encodeValue (const StructT& data)                            
     using StructType = StructT;                                                                 \
     IPCMessage result;
 #define _ARA_ENCODE_MEMBER(member)                                                              \
-    _appendToMessage (result, offsetof (StructType, member), data.member);
+    _appendToMessage (result, offsetof (StructType, member), _encodeValue (data.member));
 #define _ARA_ENCODE_EMBEDDED_ARRAY(member)                                                      \
-    _appendToMessage (result, offsetof (StructType, member), std::vector<std::remove_extent<decltype (data.member)>::type> \
-                { data.member, data.member + std::extent<decltype (data.member)>::value });
+    _appendToMessage (result, offsetof (StructType, member), _encodeValue (std::vector<std::remove_extent<decltype (data.member)>::type> \
+                { data.member, data.member + std::extent<decltype (data.member)>::value }));
 #define _ARA_ENCODE_VARIABLE_ARRAY(member, count)                                               \
     if ((data.count > 0) && (data.member != nullptr)) {                                         \
         using ElementType = typename std::remove_const<std::remove_pointer<decltype (data.member)>::type>::type; \
-        _appendToMessage (result, offsetof (StructType, member), std::vector<ElementType> { data.member, data.member + data.count }); \
+        _appendToMessage (result, offsetof (StructType, member), _encodeValue (std::vector<ElementType> { data.member, data.member + data.count })); \
     }
 #define _ARA_HAS_OPTIONAL_MEMBER(member)                                                        \
         /* \todo ARA_IMPLEMENTS_FIELD decorates the type with the ARA:: namespace,     */       \
@@ -234,12 +308,12 @@ template<> struct _ValueDecoder<StructT>    /* specialization for given struct *
         _ARA_BEGIN_DECODE (StructT)                                                             \
         result.structSize = k##StructT##MinSize;
 #define _ARA_DECODE_MEMBER(member)                                                              \
-        result.member = _readFromMessage<decltype (result.member)> (message, offsetof (StructType, member));
+        result.member = _decodeValue<decltype (result.member)> (message, offsetof (StructType, member));
 #define _ARA_DECODE_EMBEDDED_ARRAY(member)                                                      \
-        const auto tmp_##member = _readFromMessage<std::vector<std::remove_extent<decltype (result.member)>::type>> (message, offsetof (StructType, member)); \
+        const auto tmp_##member = _decodeValue<std::vector<std::remove_extent<decltype (result.member)>::type>> (message, offsetof (StructType, member)); \
         std::memcpy (result.member, tmp_##member.data (), sizeof (result.member));
 #define _ARA_DECODE_VARIABLE_ARRAY(member, count, updateCount)                                  \
-        const auto tmp_##member { _readOptionalFromMessage<std::vector<typename                 \
+        const auto tmp_##member { _decodeOptionalValue<std::vector<typename                     \
                 std::remove_const<std::remove_pointer<decltype (result.member)>::type>::type>> (message, offsetof (StructType, member)) }; \
         if (tmp_##member.second) {                                                              \
             /* \todo the outer struct contains a pointer to the inner array, so we need some */ \
@@ -258,14 +332,14 @@ template<> struct _ValueDecoder<StructT>    /* specialization for given struct *
             constexpr auto size { offsetof (decltype (result), member) + sizeof (static_cast<decltype (result)*> (nullptr)->member) }; \
             result.structSize = std::max (result.structSize, size);
 #define _ARA_DECODE_OPTIONAL_MEMBER(member)                                                     \
-        const auto tmp_##member { _readOptionalFromMessage<decltype (result.member)> (message, offsetof (StructType, member)) }; \
+        const auto tmp_##member { _decodeOptionalValue<decltype (result.member)> (message, offsetof (StructType, member)) }; \
         if (tmp_##member.second) {                                                              \
             _ARA_UPDATE_STRUCT_SIZE_FOR_OPTIONAL (member);                                      \
             result.member = tmp_##member.first;                                                 \
         }
 #define _ARA_DECODE_OPTIONAL_STRUCT_PTR(member)                                                 \
         result.member = nullptr;    /* set to null because other members may follow */          \
-        const auto tmp_##member { _readOptionalFromMessage<IPCMessage> (message, offsetof (StructType, member)) }; \
+        const auto tmp_##member { _decodeOptionalValue<IPCMessage> (message, offsetof (StructType, member)) }; \
         if (tmp_##member.second) {                                                              \
             _ARA_UPDATE_STRUCT_SIZE_FOR_OPTIONAL (member);                                      \
             /* \todo the outer struct contains a pointer to the inner struct, so we need some */\
@@ -595,22 +669,19 @@ _ARA_END_DECODE
 
 // definitions of the primitive templates declare at the start of this header
 template <typename ArgT>
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const ArgT& argValue)
+inline ArgT _decodeValue (const IPCMessage& message, const int32_t argKey)
 {
-    message.append (argKey, _encodeValue (argValue));
-}
-
-template <typename ArgT>
-inline ArgT _readFromMessage (const IPCMessage& message, const int32_t argKey)
-{
-    return _ValueDecoder<ArgT>::decode (message.getArgValue<typename _ValueDecoder<ArgT>::EncodedType> (argKey));
+    typename _ValueDecoder<ArgT>::EncodedType value;
+    const auto success { _readFromMessage (message, argKey, value) };
+    ARA_INTERNAL_ASSERT (success);
+    return _ValueDecoder<ArgT>::decode (value);
 }
 template <typename ArgT>
-inline std::pair<ArgT, bool> _readOptionalFromMessage (const IPCMessage& message, const int32_t argKey)
+inline std::pair<ArgT, bool> _decodeOptionalValue (const IPCMessage& message, const int32_t argKey)
 {
-    const auto result { message.getOptionalArgValue<typename _ValueDecoder<ArgT>::EncodedType> (argKey) };
-    if (result.second)
-        return { _ValueDecoder<ArgT>::decode (result.first), true };
+    typename _ValueDecoder<ArgT>::EncodedType value;
+    if (_readFromMessage (message, argKey, value))
+        return { _ValueDecoder<ArgT>::decode (value), true };
     else
         return { {}, false };
 }
@@ -637,14 +708,14 @@ inline void _encodeArgumentsHelper (IPCMessage& /*message*/, int32_t /*argKey*/)
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<!_IsStructPointerArg<ArgT>::type::value, bool>::type = true>
 inline void _encodeArgumentsHelper (IPCMessage& message, const int32_t argKey, const ArgT& argValue, const MoreArgs &... moreArgs)
 {
-    _appendToMessage (message, argKey, argValue);
+    _appendToMessage (message, argKey, _encodeValue (argValue));
     _encodeArgumentsHelper (message, argKey + 1, moreArgs...);
 }
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<_IsStructPointerArg<ArgT>::type::value, bool>::type = true>
 inline void _encodeArgumentsHelper (IPCMessage& message, const int32_t argKey, const ArgT& argValue, const MoreArgs &... moreArgs)
 {
     if (argValue != nullptr)
-        _appendToMessage (message, argKey, *argValue);
+        _appendToMessage (message, argKey, _encodeValue (*argValue));
     _encodeArgumentsHelper (message, argKey + 1, moreArgs...);
 }
 template<typename... MoreArgs>
@@ -659,13 +730,13 @@ inline void _decodeArgumentsHelper (const IPCMessage& /*message*/, int32_t /*arg
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<!_IsOptionalArgument<ArgT>::value, bool>::type = true>
 inline void _decodeArgumentsHelper (const IPCMessage& message, const int32_t argKey, ArgT& argValue, MoreArgs &... moreArgs)
 {
-    argValue = _readFromMessage<ArgT> (message, argKey);
+    argValue = _decodeValue<ArgT> (message, argKey);
     _decodeArgumentsHelper (message, argKey + 1, moreArgs...);
 }
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<_IsOptionalArgument<ArgT>::value, bool>::type = true>
 inline void _decodeArgumentsHelper (const IPCMessage& message, const int32_t argKey, ArgT& argValue, MoreArgs &... moreArgs)
 {
-    argValue = _readOptionalFromMessage<typename ArgT::first_type> (message, argKey);
+    argValue = _decodeOptionalValue<typename ArgT::first_type> (message, argKey);
     _decodeArgumentsHelper (message, argKey + 1, moreArgs...);
 }
 
@@ -738,12 +809,12 @@ inline IPCMessage encodeArguments (const Args &... args)
 template<typename RetT, typename std::enable_if<std::is_scalar<RetT>::value, bool>::type = true>
 inline RetT decodeReply (const IPCMessage& message)
 {
-    return _readFromMessage<RetT> (message, 0);
+    return _decodeValue<RetT> (message, 0);
 }
 template<typename RetT, typename std::enable_if<std::is_same<RetT, std::vector<uint8_t>>::value, bool>::type = true>
 inline RetT decodeReply (const IPCMessage& message)
 {
-    return _readFromMessage<RetT> (message, 0);
+    return _decodeValue<RetT> (message, 0);
 }
 template<typename RetT, typename std::enable_if<std::is_class<RetT>::value && std::is_pod<RetT>::value, bool>::type = true>
 inline RetT decodeReply (const IPCMessage& message)
@@ -773,14 +844,14 @@ template<typename RetT, typename std::enable_if<std::is_scalar<RetT>::value, boo
 inline IPCMessage encodeReply (const RetT& data)
 {
     IPCMessage result;
-    _appendToMessage (result, 0, data);
+    _appendToMessage (result, 0, _encodeValue (data));
     return result;
 }
 template<typename RetT, typename std::enable_if<std::is_same<RetT, std::vector<uint8_t>>::value, bool>::type = true>
 inline IPCMessage encodeReply (const RetT& data)
 {
     IPCMessage result;
-    _appendToMessage (result, 0, data);
+    _appendToMessage (result, 0, _encodeValue (data));
     return result;
 }
 template<typename RetT, typename std::enable_if<std::is_class<RetT>::value && std::is_pod<RetT>::value, bool>::type = true>

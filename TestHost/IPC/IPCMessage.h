@@ -43,8 +43,8 @@
 
 // A simple proof-of-concept wrapper for the IPC messages sent back and forth in the ARA IPC example.
 // Error handling is limited to assertions.
-// The basic data types transmitted are int32_t, int64_t, size_t, float, double, C strings and
-// (large) opaque byte arrays. Note that received string or byte pointers are only valid as long as
+// The basic data types transmitted are int32_t, int64_t, size_t, float, double, UTF8 encoded C strings
+// and (large) opaque byte arrays. Note that received string or byte pointers are only valid as long as
 // the message that provided them is alive.
 // Messages can be nested in a hierarchy.
 // The transmission channel handles proper endianness conversion of the numbers if needed.
@@ -79,78 +79,42 @@ public:
     IPCMessage () = default;
 
     // append keyed argument to the message
-    template <typename ArgT>
-    void append (const int32_t argKey, const ArgT argValue)
-    {
-        _appendArg (argKey, argValue);
-    }
+    void appendInt32 (const int32_t argKey, const int32_t argValue);
+    void appendInt64 (const int32_t argKey, const int64_t argValue);
+    void appendSize (const int32_t argKey, const size_t argValue);          // also for ptr-sized refs
+    void appendFloat (const int32_t argKey, const float argValue);
+    void appendDouble (const int32_t argKey, const double argValue);
+    void appendString (const int32_t argKey, const char* const argValue);   // UTF8
+    void appendBytes (const int32_t argKey, const std::vector<uint8_t>& argValue);
+    void appendMessage (const int32_t argKey, const IPCMessage& argValue);
 
-    // getters for receiving code: extract arguments, specifying the desired return type as template argument
-    // the optional variant returns the default value of the argument type if key wasn't not found
-    template <typename ArgT>
-    ArgT getArgValue (const int32_t argKey) const
-    {
-        ArgT result;
-        _readArg (argKey, result);
-        return result;
-    }
-    template <typename ArgT>
-    std::pair<ArgT, bool> getOptionalArgValue (const int32_t argKey) const
-    {
-        ArgT result;
-        bool didFindKey { false };
-        _readArg (argKey, result, &didFindKey);
-        return { result, didFindKey };
-    }
+    // read keyed argument to the message
+    // if key is not found, returns false and a default value
+    bool readInt32 (const int32_t argKey, int32_t& argValue) const;
+    bool readInt64 (const int32_t argKey, int64_t& argValue) const;
+    bool readSize (const int32_t argKey, size_t& argValue) const;           // also for ptr-sized refs
+    bool readFloat (const int32_t argKey, float& argValue) const;
+    bool readDouble (const int32_t argKey, double& argValue) const;
+    bool readString (const int32_t argKey, const char*& argValue) const;    // UTF8
+    bool readBytes (const int32_t argKey, std::vector<uint8_t>& argValue) const;
+    bool readMessage (const int32_t argKey, IPCMessage& argValue) const;
 
 private:
 #if IPC_MESSAGE_USE_CFDICTIONARY
+    // wrap key value into CFString (no reference count transferred to caller)
+    static CFStringRef _getEncodedKey (const int32_t argKey);
+
     // internal primitive - dictionary will be retained or copied, depending on isWritable
     void _setup (CFDictionaryRef dictionary, bool isWritable);
 
-    // wrap key value into CFString (no reference count transferred to caller)
-    static CFStringRef _getEncodedKey (const int32_t argKey);
-#else
-    static const char* _getEncodedKey (const int32_t argKey);
-#endif
-
-    // helpers for construction for sending code
-    void _appendArg (const int32_t argKey, const int32_t argValue);
-    void _appendArg (const int32_t argKey, const int64_t argValue);
-    void _appendArg (const int32_t argKey, const size_t argValue);
-    void _appendArg (const int32_t argKey, const float argValue);
-    void _appendArg (const int32_t argKey, const double argValue);
-    void _appendArg (const int32_t argKey, const char* const argValue);
-    void _appendArg (const int32_t argKey, const std::vector<uint8_t>& argValue);
-    void _appendArg (const int32_t argKey, const IPCMessage& argValue);
-
-#if IPC_MESSAGE_USE_CFDICTIONARY
     void _appendEncodedArg (const int32_t argKey, __attribute__((cf_consumed)) CFTypeRef argObject);
 #else
+    static const char* _getEncodedKey (const int32_t argKey);
+
     void _makeWritableIfNeeded ();
+
     pugi::xml_attribute _appendAttribute (const int32_t argKey);
 #endif
-
-    // helpers for getters for receiving code
-    // since we cannot overload by return type, we are returning via reference argument
-    void _readArg (const int32_t argKey, int32_t& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const int32_t argKey, int64_t& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const int32_t argKey, size_t& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const int32_t argKey, float& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const int32_t argKey, double& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const int32_t argKey, const char*& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const int32_t argKey, std::vector<uint8_t>& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const int32_t argKey, IPCMessage& argValue, bool* didFindKey = nullptr) const;
-
-    static bool _checkKeyFound (const bool found, bool* didFindKey)
-    {
-        if (didFindKey)
-        {
-            *didFindKey = found;
-            return found;
-        }
-        return true;
-    }
 
 private:
 #if IPC_MESSAGE_USE_CFDICTIONARY
