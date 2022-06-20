@@ -107,7 +107,7 @@ struct _IsStructPointerArg
 
 // primitive for appending an argument to a message
 template <typename ArgT>
-void _appendToMessage (IPCMessage& message, const int32_t argKey, ArgT argValue);
+void _appendToMessage (IPCMessage& message, const int32_t argKey, const ArgT& argValue);
 
 // primitives for reading an (optional) argument from a message
 template <typename ArgT>
@@ -118,7 +118,7 @@ std::pair<ArgT, bool> _readOptionalFromMessage (const IPCMessage& message, const
 
 // generic type encodings
 template<typename T, typename std::enable_if<!_IsRefType<T>::value, bool>::type = true>
-inline T _encodeValue (T value)             // overload for basic types (numbers, strings) and raw bytes
+inline T _encodeValue (const T& value)      // overload for basic types (numbers, strings) and raw bytes
 {
     return value;
 }
@@ -146,19 +146,19 @@ struct _ValueDecoder
 {
 private:
     template<typename RetT, typename ArgT, typename std::enable_if<std::is_same<RetT, ArgT>::value, bool>::type = true>
-    static inline RetT _convertValue (ArgT value)
+    static inline RetT _convertValue (const ArgT& value)
     {
         return value;
     }
     template<typename RetT, typename ArgT, typename std::enable_if<_IsRefType<RetT>::value, bool>::type = true>
-    static inline RetT _convertValue (ArgT value)
+    static inline RetT _convertValue (const ArgT& value)
     {
         return reinterpret_cast<RetT> (value);
     }
 
 public:
     using EncodedType = typename std::conditional<_IsRefType<ValueT>::value, size_t, ValueT>::type;
-    static inline ValueT decode (EncodedType value)
+    static inline ValueT decode (const EncodedType& value)
     {
         return _ValueDecoder::_convertValue<ValueT, EncodedType> (value);
     }
@@ -615,7 +615,7 @@ _ARA_END_DECODE
 
 // definitions of the primitive templates declare at the start of this header
 template <typename ArgT>
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, ArgT argValue)
+inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const ArgT& argValue)
 {
     message.append (argKey, _encodeValue (argValue));
 }
