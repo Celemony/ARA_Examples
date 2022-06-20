@@ -586,9 +586,9 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
     const auto document { araDocumentController->getDocument () };
 
     // instantiate the plug-in with the PlaybackRenderer role and verify that it's a valid playback renderer instance
-    auto plugInInstance { plugInEntry->createARAPlugInInstanceWithRoles (araDocumentController->getDocumentController ()->getRef (), ARA::kARAPlaybackRendererRole) };
+    auto plugInInstance { plugInEntry->createPlugInInstance () };
+    plugInInstance->bindToDocumentControllerWithRoles (araDocumentController->getDocumentController ()->getRef (), ARA::kARAPlaybackRendererRole);
     auto playbackRenderer { plugInInstance->getPlaybackRenderer () };
-    ARA_INTERNAL_ASSERT (playbackRenderer != nullptr);
 
     // for testing purposes, we take the sample rate of the first audio source as our renderer sample rate
     const auto renderSampleRate { (!document->getAudioSources ().empty ()) ? document->getAudioSources ().front ()->getSampleRate () : 44100.0 };
@@ -601,8 +601,8 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
     {
         for (const auto& playbackRegion : regionSequence->getPlaybackRegions ())
         {
-            ARA_LOG ("Adding playback region %p (ARAPlaybackRegionRef %p) to playback renderer %p (ARAPlaybackRendererRef %p)", playbackRegion, araDocumentController->getRef (playbackRegion), playbackRenderer, playbackRenderer->getRef ());
-            playbackRenderer->addPlaybackRegion (araDocumentController->getRef (playbackRegion));
+            ARA_LOG ("Adding playback region %p (ARAPlaybackRegionRef %p) to playback renderer %p", playbackRegion, araDocumentController->getRef (playbackRegion), playbackRenderer.getRef ());
+            playbackRenderer.addPlaybackRegion (araDocumentController->getRef (playbackRegion));
 
             auto headTime { 0.0 }, tailTime { 0.0 };
             araDocumentController->getPlaybackRegionHeadAndTailTime (playbackRegion, &headTime, &tailTime);
@@ -617,7 +617,7 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
     // bail if no region samples to render
     if (startOfPlaybackRegions < endOfPlaybackRegions)
     {
-        ARA_LOG ("Rendering %lu region(s) assigned to playback renderer %p (ARAPlaybackRendererRef %p) with sample rate %lgHz", playbackRegions.size (), playbackRenderer, playbackRenderer->getRef (), renderSampleRate);
+        ARA_LOG ("Rendering %lu region(s) assigned to playback renderer %p with sample rate %lgHz", playbackRegions.size (), playbackRenderer.getRef (), renderSampleRate);
 
         auto startOfPlaybackRegionSamples { ARA::samplePositionAtTime (startOfPlaybackRegions, renderSampleRate) };
         auto endOfPlaybackRegionSamples { ARA::samplePositionAtTime (endOfPlaybackRegions, renderSampleRate) };
@@ -648,7 +648,7 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
             if ((supportedTransformationFlags & ARA::kARAPlaybackTransformationTimestretch) != 0)
             {
                 constexpr double timeStretchFactor { 0.75 };
-                ARA_LOG ("Applying time stretch factor of %lg to all playback regions assigned to playback renderer %p (ARAPlaybackRendererRef %p)", timeStretchFactor, playbackRenderer, playbackRenderer->getRef ());
+                ARA_LOG ("Applying time stretch factor of %lg to all playback regions assigned to playback renderer %p", timeStretchFactor, playbackRenderer.getRef ());
 
                 araDocumentController->beginEditing ();
                 for (auto& playbackRegion : playbackRegions)
@@ -662,7 +662,7 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
                 endOfPlaybackRegions *= timeStretchFactor;
                 endOfPlaybackRegionSamples = ARA::samplePositionAtTime (endOfPlaybackRegions, renderSampleRate);
 
-                ARA_LOG ("Rendering %lu region(s) assigned to playback renderer %p (ARAPlaybackRendererRef %p) with sample rate %lgHz", playbackRegions.size (), playbackRenderer, playbackRenderer->getRef (), renderSampleRate);
+                ARA_LOG ("Rendering %lu region(s) assigned to playback renderer %p with sample rate %lgHz", playbackRegions.size (), playbackRenderer.getRef (), renderSampleRate);
 
                 // render all playback region samples
                 plugInInstance->startRendering (renderBlockSize, renderSampleRate);
@@ -697,9 +697,9 @@ void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     const auto document { araDocumentController->getDocument () };
 
     // instantiate the plug-in with the EditorView role and verify that it's a valid editor view instance
-    auto plugInInstance { plugInEntry->createARAPlugInInstanceWithRoles (araDocumentController->getDocumentController ()->getRef (), ARA::kARAEditorViewRole) };
+    auto plugInInstance { plugInEntry->createPlugInInstance () };
+    plugInInstance->bindToDocumentControllerWithRoles (araDocumentController->getDocumentController ()->getRef (), ARA::kARAEditorViewRole);
     auto editorView { plugInInstance->getEditorView () };
-    ARA_INTERNAL_ASSERT (editorView != nullptr);
 
     // Selection demonstration
     using Selection = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAViewSelection, timeRange)>;
@@ -709,32 +709,32 @@ void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     for (const auto& regionSequence : document->getRegionSequences ())
         for (const auto& playbackRegion : regionSequence->getPlaybackRegions ())
             playbackRegionRefs.push_back (araDocumentController->getRef (playbackRegion));
-    ARA_LOG ("Notifying editor view %p (ARAEditorViewRef %p) of %lu selected playback region(s)", editorView, editorView->getRef (), playbackRegionRefs.size ());
+    ARA_LOG ("Notifying editor view %p of %lu selected playback region(s)", editorView.getRef (), playbackRegionRefs.size ());
     const Selection selection1 { playbackRegionRefs.size (), playbackRegionRefs.data (), 0U, nullptr, nullptr };
-    editorView->notifySelection (&selection1);
+    editorView.notifySelection (&selection1);
 
     // we can also select all region sequences and limit the selection to a specific time range
     std::vector<ARA::ARARegionSequenceRef> regionSequenceRefs;
     for (const auto& regionSequence : document->getRegionSequences ())
         regionSequenceRefs.push_back (araDocumentController->getRef (regionSequence.get ()));
     ARA::ARAContentTimeRange timeRange { 0.0, 5.0 };
-    ARA_LOG ("Notifying editor view %p (ARAEditorViewRef %p) of %lu selected region sequence(s)", editorView, editorView->getRef (), regionSequenceRefs.size ());
+    ARA_LOG ("Notifying editor view %p of %lu selected region sequence(s)", editorView.getRef (), regionSequenceRefs.size ());
     const Selection selection2 { 0U, nullptr, regionSequenceRefs.size (), regionSequenceRefs.data (), &timeRange };
-    editorView->notifySelection (&selection2);
+    editorView.notifySelection (&selection2);
 
     // we can also mix playback region and region sequence selection, if this is a valid pattern in the host
-    ARA_LOG ("Notifying editor view %p (ARAEditorViewRef %p) of %lu selected playback region(s) and %lu selected region sequence(s)", editorView, editorView->getRef (), playbackRegionRefs.size (), regionSequenceRefs.size ());
+    ARA_LOG ("Notifying editor view %p of %lu selected playback region(s) and %lu selected region sequence(s)", editorView.getRef (), playbackRegionRefs.size (), regionSequenceRefs.size ());
     const Selection selection3 { playbackRegionRefs.size (), playbackRegionRefs.data (), regionSequenceRefs.size (), regionSequenceRefs.data (), &timeRange };
-    editorView->notifySelection (&selection3);
+    editorView.notifySelection (&selection3);
 
     // Region sequence hiding demonstration
     // "hide" the region sequences and inform the plug-in editor view
-    ARA_LOG ("Notifying editor view %p (ARAEditorViewRef %p) of %lu hidden region sequence(s)", editorView, editorView->getRef (), regionSequenceRefs.size ());
-    editorView->notifyHideRegionSequences (regionSequenceRefs.size (), regionSequenceRefs.data ());
+    ARA_LOG ("Notifying editor view %p of %lu hidden region sequence(s)", editorView.getRef (), regionSequenceRefs.size ());
+    editorView.notifyHideRegionSequences (regionSequenceRefs.size (), regionSequenceRefs.data ());
 
     // "unhide" the region sequences
-    ARA_LOG ("Notifying editor view %p (ARAEditorViewRef %p) that all region sequences are now un-hidden", editorView, editorView->getRef ());
-    editorView->notifyHideRegionSequences (0, nullptr);
+    ARA_LOG ("Notifying editor view %p that all region sequences are now un-hidden", editorView.getRef ());
+    editorView.notifyHideRegionSequences (0, nullptr);
 }
 
 /*******************************************************************************/

@@ -76,14 +76,15 @@
 // minimal set of commands to run a companion API plug-in through IPC
 enum
 {
-    kIPCCreateARAEffect = -1,
-    kIPCStartRendering = -2,
-    kIPCRenderSamples = -3,
-    kIPCStopRendering = -4,
-    kIPCDestroyEffect = -5,
-    kIPCTerminate = -6
+    kIPCCreateEffect = -1,
+    kIPCBindEffectToARA = -2,
+    kIPCStartRendering = -3,
+    kIPCRenderSamples = -4,
+    kIPCStopRendering = -5,
+    kIPCDestroyEffect = -6,
+    kIPCTerminate = -7
 };
-static_assert (kIPCCreateARAEffect < ARA::IPC::kARAIPCMessageIDRangeStart, "conflicting message IDs");
+static_assert (kIPCCreateEffect < ARA::IPC::kARAIPCMessageIDRangeStart, "conflicting message IDs");
 
 
 IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::ReceivedData const messageData);
@@ -92,7 +93,7 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
 // check message ID is either one of our commands or in the range of the generic IPC implementation
 bool isValidMessageID (const ARA::IPC::ARAIPCMessageID messageID)
 {
-    if (messageID <= kIPCCreateARAEffect)
+    if (messageID <= kIPCCreateEffect)
         return kIPCTerminate <= messageID;
 
     if  (messageID < ARA::IPC::kARAIPCMessageIDRangeStart)
@@ -323,19 +324,53 @@ private:
 
 /*******************************************************************************/
 
+void PlugInInstance::validateAndSetPlugInExtensionInstance (const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
+{
+    ARA_VALIDATE_API_STATE (plugInExtensionInstance != nullptr);
+
+#if ARA_SUPPORT_VERSION_1
+    if (_factory->highestSupportedApiGeneration < kARAAPIGeneration_2_0_Draft)
+        return;
+#endif
+
+    if ((assignedRoles & ARA::kARAPlaybackRendererRole) != 0)
+        ARA_VALIDATE_API_INTERFACE (plugInExtensionInstance->playbackRendererInterface, ARAPlaybackRendererInterface);
+    else
+        ARA_VALIDATE_API_STATE (plugInExtensionInstance->playbackRendererInterface == nullptr);
+
+    if ((assignedRoles & ARA::kARAEditorRendererRole) != 0)
+        ARA_VALIDATE_API_INTERFACE (plugInExtensionInstance->editorRendererInterface, ARAEditorRendererInterface);
+    else
+        ARA_VALIDATE_API_STATE (plugInExtensionInstance->editorRendererInterface == nullptr);
+
+    if ((assignedRoles & ARA::kARAEditorViewRole) != 0)
+        ARA_VALIDATE_API_INTERFACE (plugInExtensionInstance->editorViewInterface, ARAEditorViewInterface);
+    else
+        ARA_VALIDATE_API_STATE (plugInExtensionInstance->editorViewInterface == nullptr);
+
+    _instance = plugInExtensionInstance;
+}
+
+/*******************************************************************************/
+
 #if defined (__APPLE__)
 
 class AUPlugInInstance : public PlugInInstance
 {
 public:
-    AUPlugInInstance (AudioUnitInstance audioUnit, const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance)
-    : PlugInInstance { plugInExtensionInstance },
-      _audioUnit { audioUnit }
+    explicit AUPlugInInstance (AudioUnitInstance audioUnit)
+    : _audioUnit { audioUnit }
     {}
 
     ~AUPlugInInstance () override
     {
         AudioUnitCloseInstance (_audioUnit);
+    }
+
+    void bindToDocumentControllerWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
+    {
+        const auto plugInExtensionInstance { AudioUnitBindToARADocumentController (_audioUnit, documentControllerRef, assignedRoles) };
+        validateAndSetPlugInExtensionInstance (plugInExtensionInstance, assignedRoles);
     }
 
     void startRendering (int maxBlockSize, double sampleRate) override
@@ -364,14 +399,19 @@ private:
 class VST3PlugInInstance : public PlugInInstance
 {
 public:
-    VST3PlugInInstance (VST3Effect vst3Effect, const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance)
-    : PlugInInstance { plugInExtensionInstance },
-      _vst3Effect { vst3Effect }
+    explicit VST3PlugInInstance (VST3Effect vst3Effect)
+    : _vst3Effect { vst3Effect }
     {}
 
     ~VST3PlugInInstance () override
     {
         VST3DestroyEffect (_vst3Effect);
+    }
+
+    void bindToDocumentControllerWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
+    {
+        const auto plugInExtensionInstance { VST3BindToARADocumentController (_vst3Effect, documentControllerRef, assignedRoles) };
+        validateAndSetPlugInExtensionInstance (plugInExtensionInstance, assignedRoles);
     }
 
     void startRendering (int maxBlockSize, double sampleRate) override
@@ -429,12 +469,10 @@ public:
         // unloading is not supported for Audio Units
     }
 
-    std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
+    std::unique_ptr<PlugInInstance> createPlugInInstance () override
     {
         auto audioUnit { AudioUnitOpenInstance (_audioUnitComponent) };
-        const auto plugInExtensionInstance { AudioUnitBindToARADocumentController (audioUnit, documentControllerRef, assignedRoles) };
-        validatePlugInExtensionInstance (plugInExtensionInstance, assignedRoles);
-        return std::make_unique<AUPlugInInstance> (audioUnit, plugInExtensionInstance);
+        return std::make_unique<AUPlugInInstance> (audioUnit);
     }
 
 private:
@@ -471,12 +509,10 @@ public:
         VST3UnloadBinary (_vst3Binary);
     }
 
-    std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
+    std::unique_ptr<PlugInInstance> createPlugInInstance () override
     {
         auto vst3Instance { VST3CreateEffect (_vst3Binary, (_optionalPlugInName.empty ()) ? nullptr : _optionalPlugInName.c_str ()) };
-        const auto plugInExtensionInstance { VST3BindToARADocumentController (vst3Instance, documentControllerRef, assignedRoles) };
-        validatePlugInExtensionInstance (plugInExtensionInstance, assignedRoles);
-        return std::make_unique<VST3PlugInInstance> (vst3Instance, plugInExtensionInstance);
+        return std::make_unique<VST3PlugInInstance> (vst3Instance);
     }
 
 private:
@@ -491,9 +527,8 @@ private:
 class IPCPlugInInstance : public PlugInInstance
 {
 public:
-    IPCPlugInInstance (size_t remoteRef, IPCPort& port, ARA::IPC::ARAIPCLockingContextRef& lockingContextRef, const ARA::ARAPlugInExtensionInstance* instance)
-    : PlugInInstance { instance },
-      _remoteRef { remoteRef },
+    IPCPlugInInstance (size_t remoteRef, IPCPort& port, ARA::IPC::ARAIPCLockingContextRef& lockingContextRef)
+    : _remoteRef { remoteRef },
       _sender { port, lockingContextRef }
     {}
 
@@ -501,6 +536,22 @@ public:
     {
         ARA::IPC::RemoteCaller { _sender }.remoteCallWithoutReply (false, kIPCDestroyEffect, _remoteRef, reinterpret_cast<size_t> (getARAPlugInExtensionInstance ()->plugInExtensionRef));
         ARA::IPC::ARAIPCProxyPlugInDestroyPlugInExtension (getARAPlugInExtensionInstance ());
+    }
+
+    void bindToDocumentControllerWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
+    {
+        // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
+        const ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
+
+        const auto remoteDocumentControllerRef { ARA::IPC::ARAIPCProxyPlugInTranslateDocumentControllerRef (documentControllerRef) };
+        size_t remoteExtensionRef {};
+        ARA::IPC::RemoteCaller::CustomDecodeFunction customDecode { [&remoteExtensionRef] (const ARA::IPC::ARAIPCMessageDecoder& decoder) -> void
+            {
+                decoder.methods->readSize (decoder.ref, 0, &remoteExtensionRef);
+            } };
+        ARA::IPC::RemoteCaller { _sender }.remoteCallWithReply (customDecode, false, kIPCBindEffectToARA, _remoteRef, remoteDocumentControllerRef, assignedRoles);
+        auto plugInExtension { ARA::IPC::ARAIPCProxyPlugInCreatePlugInExtension (remoteExtensionRef, _sender, documentControllerRef, knownRoles, assignedRoles) };
+        validateAndSetPlugInExtensionInstance (plugInExtension, assignedRoles);
     }
 
     void startRendering (int maxBlockSize, double sampleRate) override
@@ -588,23 +639,15 @@ public:
         return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_hostCommandsSender, _factory->factoryID, hostInstance, properties);
     }
 
-    std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
+    std::unique_ptr<PlugInInstance> createPlugInInstance () override
     {
-        // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
-        const ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
-
-        const auto remoteDocumentControllerRef { ARA::IPC::ARAIPCProxyPlugInTranslateDocumentControllerRef (documentControllerRef) };
         size_t remoteInstanceRef {};
-        size_t remoteExtensionRef {};
-        ARA::IPC::RemoteCaller::CustomDecodeFunction customDecode { [&remoteInstanceRef, &remoteExtensionRef] (const ARA::IPC::ARAIPCMessageDecoder& decoder) -> void
+        ARA::IPC::RemoteCaller::CustomDecodeFunction customDecode { [&remoteInstanceRef] (const ARA::IPC::ARAIPCMessageDecoder& decoder) -> void
             {
                 decoder.methods->readSize (decoder.ref, 0, &remoteInstanceRef);
-                decoder.methods->readSize (decoder.ref, 1, &remoteExtensionRef);
             } };
-        ARA::IPC::RemoteCaller { _hostCommandsSender }.remoteCallWithReply (customDecode, false, kIPCCreateARAEffect, remoteDocumentControllerRef, assignedRoles);
-        auto plugInExtension { ARA::IPC::ARAIPCProxyPlugInCreatePlugInExtension (remoteExtensionRef, _hostCommandsSender, documentControllerRef, knownRoles, assignedRoles) };
-        validatePlugInExtensionInstance (plugInExtension, assignedRoles);
-        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _hostCommandsPort, _lockingContextRef, plugInExtension);
+        ARA::IPC::RemoteCaller { _hostCommandsSender }.remoteCallWithReply (customDecode, false, kIPCCreateEffect);
+        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _hostCommandsPort, _lockingContextRef);
     }
 
 private:
@@ -737,25 +780,41 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
 
     IPCPort::DataToSend result {};
 
-    if (messageID == kIPCCreateARAEffect)
+    if (messageID == kIPCCreateEffect)
     {
-        ARA::ARADocumentControllerRef documentControllerRemoteRef;
-        ARA::ARAPlugInInstanceRoleFlags assignedRoles;
-        ARA::IPC::decodeArguments (&messageDecoder, documentControllerRemoteRef, assignedRoles);
-
-        auto plugInInstance { _plugInEntry->createARAPlugInInstanceWithRoles (ARA::IPC::ARAIPCProxyHostTranslateDocumentControllerRef (documentControllerRemoteRef), assignedRoles) };
-        auto plugInExtensionRef { ARA::IPC::ARAIPCProxyHostCreatePlugInExtension (plugInInstance->getARAPlugInExtensionInstance ()) };
-
+        auto plugInInstance { _plugInEntry->createPlugInInstance () };
+        const auto plugInInstanceRef { reinterpret_cast<size_t> (plugInInstance.get ()) };
+        plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
 #if USE_ARA_CF_ENCODING
         auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
-        ARA::IPC::encodeArguments (replyEncoder, reinterpret_cast<size_t> (plugInInstance.get ()), plugInExtensionRef);
-        plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
+        ARA::IPC::encodeArguments (replyEncoder, plugInInstanceRef);
         result = ARAIPCCFCreateMessageEncoderData (replyEncoder.ref);
 #else
         IPCXMLMessage reply;
         auto replyEncoder { createMessageEncoder (&reply) };
-        ARA::IPC::encodeArguments (replyEncoder, reinterpret_cast<size_t> (plugInInstance.get ()), plugInExtensionRef);
-        plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
+        ARA::IPC::encodeArguments (replyEncoder, plugInInstanceRef);
+        result = reply.createEncodedMessage ();
+#endif
+        replyEncoder.methods->destroyEncoder (replyEncoder.ref);
+    }
+    else if (messageID == kIPCBindEffectToARA)
+    {
+        size_t plugInInstanceRef;
+        ARA::ARADocumentControllerRef documentControllerRemoteRef;
+        ARA::ARAPlugInInstanceRoleFlags assignedRoles;
+        ARA::IPC::decodeArguments (&messageDecoder, plugInInstanceRef, documentControllerRemoteRef, assignedRoles);
+        
+        reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->bindToDocumentControllerWithRoles (ARA::IPC::ARAIPCProxyHostTranslateDocumentControllerRef (documentControllerRemoteRef), assignedRoles);
+        auto plugInExtensionRef { ARA::IPC::ARAIPCProxyHostCreatePlugInExtension (reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->getARAPlugInExtensionInstance ()) };
+        
+#if USE_ARA_CF_ENCODING
+        auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
+        ARA::IPC::encodeArguments (replyEncoder, plugInExtensionRef);
+        result = ARAIPCCFCreateMessageEncoderData (replyEncoder.ref);
+#else
+        IPCXMLMessage reply;
+        auto replyEncoder { createMessageEncoder (&reply) };
+        ARA::IPC::encodeArguments (replyEncoder, plugInExtensionRef);
         result = reply.createEncodedMessage ();
 #endif
         replyEncoder.methods->destroyEncoder (replyEncoder.ref);
@@ -953,31 +1012,6 @@ void PlugInEntry::uninitializeARA ()
 {
     if (_factory && !_usesIPC)
         _factory->uninitializeARA ();
-}
-
-void PlugInEntry::validatePlugInExtensionInstance (const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
-{
-    ARA_VALIDATE_API_STATE (plugInExtensionInstance != nullptr);
-
-#if ARA_SUPPORT_VERSION_1
-    if (_factory->highestSupportedApiGeneration < kARAAPIGeneration_2_0_Draft)
-        return;
-#endif
-
-    if ((assignedRoles & ARA::kARAPlaybackRendererRole) != 0)
-        ARA_VALIDATE_API_INTERFACE (plugInExtensionInstance->playbackRendererInterface, ARAPlaybackRendererInterface);
-    else
-        ARA_VALIDATE_API_STATE (plugInExtensionInstance->playbackRendererInterface == nullptr);
-
-    if ((assignedRoles & ARA::kARAEditorRendererRole) != 0)
-        ARA_VALIDATE_API_INTERFACE (plugInExtensionInstance->editorRendererInterface, ARAEditorRendererInterface);
-    else
-        ARA_VALIDATE_API_STATE (plugInExtensionInstance->editorRendererInterface == nullptr);
-
-    if ((assignedRoles & ARA::kARAEditorViewRole) != 0)
-        ARA_VALIDATE_API_INTERFACE (plugInExtensionInstance->editorViewInterface, ARAEditorViewInterface);
-    else
-        ARA_VALIDATE_API_STATE (plugInExtensionInstance->editorViewInterface == nullptr);
 }
 
 const ARA::ARADocumentControllerInstance* PlugInEntry::createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
