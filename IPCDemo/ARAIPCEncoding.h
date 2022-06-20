@@ -26,7 +26,10 @@
 #include "IPCMessage.h"
 
 #include "ARA_API/ARAInterface.h"
+#include "ARA_Library/Debug/ARADebug.h"
 
+#include <algorithm>
+#include <map>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -39,15 +42,6 @@ namespace ARA
 //------------------------------------------------------------------------------
 // various private helpers
 //------------------------------------------------------------------------------
-
-// private key to identify methods
-constexpr auto _methodIDKey = "methodID";
-
-// private key to identify the element count of an array
-constexpr auto _arrayCountKey = "count";
-
-// private key to mark return values for scalar results
-constexpr auto _returnValueKey = "result";
 
 
 // private helper template to detect ARA ref types
@@ -107,16 +101,6 @@ struct _IsStructPointerArg
 };
 
 
-// private helper to provide reusable static key strings when encoding arrays
-inline const char* _getKeyForArrayIndex (size_t index)
-{
-    static std::vector<std::string> cache;
-    for (auto i = cache.size (); i <= index; ++i)
-        cache.emplace_back (std::to_string (i));
-    return cache[index].c_str ();
-}
-
-
 //------------------------------------------------------------------------------
 // private helper templates to encode ARA API values as IPCMessage data and decode back
 // mapping is 1:1 except for ARA (host)refs which are encoded as size_t and aggregate types
@@ -129,13 +113,13 @@ inline const char* _getKeyForArrayIndex (size_t index)
 
 // primitive for appending an argument to a message
 template <typename ArgT>
-void _appendToMessage (IPCMessage& message, const char* argKey, ArgT argValue);
+void _appendToMessage (IPCMessage& message, size_t argKey, ArgT argValue);
 
 // primitives for reading an (optional) argument from a message
 template <typename ArgT>
-ArgT _readFromMessage (const IPCMessage& message, const char* argKey);
+ArgT _readFromMessage (const IPCMessage& message, size_t argKey);
 template <typename ArgT>
-std::pair<ArgT, bool> _readOptionalFromMessage (const IPCMessage& message, const char* argKey);
+std::pair<ArgT, bool> _readOptionalFromMessage (const IPCMessage& message, size_t argKey);
 
 
 // generic type encodings
@@ -153,9 +137,9 @@ template<typename ElementT, typename std::enable_if<!std::is_same<ElementT, uint
 inline IPCMessage _encodeValue (const std::vector<ElementT>& value)
 {                                           // overload for arrays
     IPCMessage result;
-    result.append (_arrayCountKey, value.size ());
+    result.append (0, value.size ());
     for (auto i { 0u }; i < value.size (); ++i)
-        result.append (_getKeyForArrayIndex (i), _encodeValue (value[i]));
+        result.append (i + 1, _encodeValue (value[i]));
     return result;
 }
 
@@ -191,10 +175,10 @@ struct _ValueDecoder<std::vector<ElementT>>
     static inline std::vector<ElementT> decode (const IPCMessage& message)
     {
         std::vector<ElementT> result;
-        const auto count { _readFromMessage<size_t> (message, _arrayCountKey) };
+        const auto count { _readFromMessage<size_t> (message, 0) };
         result.reserve (count);
         for (auto i { 0u }; i < count; ++i)
-            result.push_back (_readFromMessage<ElementT> (message, _getKeyForArrayIndex (i)));
+            result.push_back (_readFromMessage<ElementT> (message, i + 1));
         return result;
     }
 };
@@ -215,16 +199,17 @@ struct _ValueDecoder<std::vector<uint8_t>>
 #define _ARA_BEGIN_ENCODE(StructT)                                                              \
 inline IPCMessage _encodeValue (const StructT& data)                                            \
 {                                           /* overload for given struct */                     \
+    using StructType = StructT;                                                                 \
     IPCMessage result;
 #define _ARA_ENCODE_MEMBER(member)                                                              \
-    _appendToMessage (result, #member, data.member);
+    _appendToMessage (result, offsetof (StructType, member), data.member);
 #define _ARA_ENCODE_EMBEDDED_ARRAY(member)                                                      \
-    _appendToMessage (result, #member, std::vector<std::remove_extent<decltype (data.member)>::type> \
+    _appendToMessage (result, offsetof (StructType, member), std::vector<std::remove_extent<decltype (data.member)>::type> \
                 { data.member, data.member + std::extent<decltype (data.member)>::value });
 #define _ARA_ENCODE_VARIABLE_ARRAY(member, count)                                               \
     if ((data.count > 0) && (data.member != nullptr)) {                                         \
         using ElementType = typename std::remove_const<std::remove_pointer<decltype (data.member)>::type>::type; \
-        _appendToMessage (result, #member, std::vector<ElementType> { data.member, data.member + data.count }); \
+        _appendToMessage (result, offsetof (StructType, member), std::vector<ElementType> { data.member, data.member + data.count }); \
     }
 #define _ARA_HAS_OPTIONAL_MEMBER(member)                                                        \
         /* \todo ARA_IMPLEMENTS_FIELD decorates the type with the ARA:: namespace,     */       \
@@ -235,7 +220,7 @@ inline IPCMessage _encodeValue (const StructT& data)                            
         _ARA_ENCODE_MEMBER (member)
 #define _ARA_ENCODE_OPTIONAL_STRUCT_PTR(member)                                                 \
     if (_ARA_HAS_OPTIONAL_MEMBER (member) && (data.member != nullptr))                          \
-        _appendToMessage (result, #member, _encodeValue (*data.member));
+        _appendToMessage (result, offsetof (StructType, member), _encodeValue (*data.member));
 #define _ARA_END_ENCODE                                                                         \
     return result;                                                                              \
 }
@@ -244,6 +229,7 @@ inline IPCMessage _encodeValue (const StructT& data)                            
 #define _ARA_BEGIN_DECODE(StructT)                                                              \
 template<> struct _ValueDecoder<StructT>    /* specialization for given struct */               \
 {                                                                                               \
+    using StructType = StructT;                                                                 \
     using EncodedType = IPCMessage;                                                             \
     static inline StructT decode (const IPCMessage& message)                                    \
     {                                                                                           \
@@ -252,13 +238,13 @@ template<> struct _ValueDecoder<StructT>    /* specialization for given struct *
         _ARA_BEGIN_DECODE (StructT)                                                             \
         result.structSize = k##StructT##MinSize;
 #define _ARA_DECODE_MEMBER(member)                                                              \
-        result.member = _readFromMessage<decltype (result.member)> (message, #member);
+        result.member = _readFromMessage<decltype (result.member)> (message, offsetof (StructType, member));
 #define _ARA_DECODE_EMBEDDED_ARRAY(member)                                                      \
-        const auto tmp_##member = _readFromMessage<std::vector<std::remove_extent<decltype (result.member)>::type>> (message, #member); \
+        const auto tmp_##member = _readFromMessage<std::vector<std::remove_extent<decltype (result.member)>::type>> (message, offsetof (StructType, member)); \
         std::memcpy (result.member, tmp_##member.data (), sizeof (result.member));
 #define _ARA_DECODE_VARIABLE_ARRAY(member, count, updateCount)                                  \
         const auto tmp_##member { _readOptionalFromMessage<std::vector<typename                 \
-                std::remove_const<std::remove_pointer<decltype (result.member)>::type>::type>> (message, #member) }; \
+                std::remove_const<std::remove_pointer<decltype (result.member)>::type>::type>> (message, offsetof (StructType, member)) }; \
         if (tmp_##member.second) {                                                              \
             /* \todo the outer struct contains a pointer to the inner array, so we need some */ \
             /* place to store it - this static only works as long as this is single-threaded! */\
@@ -276,20 +262,20 @@ template<> struct _ValueDecoder<StructT>    /* specialization for given struct *
             constexpr auto size { offsetof (decltype (result), member) + sizeof (static_cast<decltype (result)*> (nullptr)->member) }; \
             result.structSize = std::max (result.structSize, size);
 #define _ARA_DECODE_OPTIONAL_MEMBER(member)                                                     \
-        const auto tmp_##member { _readOptionalFromMessage<decltype (result.member)> (message, #member) }; \
+        const auto tmp_##member { _readOptionalFromMessage<decltype (result.member)> (message, offsetof (StructType, member)) }; \
         if (tmp_##member.second) {                                                              \
             _ARA_UPDATE_STRUCT_SIZE_FOR_OPTIONAL (member);                                      \
             result.member = tmp_##member.first;                                                 \
         }
 #define _ARA_DECODE_OPTIONAL_STRUCT_PTR(member)                                                 \
         result.member = nullptr;    /* set to null because other members may follow */          \
-        const auto tmp_##member { _readOptionalFromMessage<IPCMessage> (message, #member) };     \
+        const auto tmp_##member { _readOptionalFromMessage<IPCMessage> (message, offsetof (StructType, member)) }; \
         if (tmp_##member.second) {                                                              \
             _ARA_UPDATE_STRUCT_SIZE_FOR_OPTIONAL (member);                                      \
             /* \todo the outer struct contains a pointer to the inner struct, so we need some */\
             /* place to store it - this static only works as long as this is single-threaded! */\
             static std::remove_const<std::remove_pointer<decltype (result.member)>::type>::type cache; \
-            cache = _ValueDecoder<decltype(cache)>::decode (tmp_##member.first);                \
+            cache = _ValueDecoder<decltype (cache)>::decode (tmp_##member.first);               \
             result.member = &cache;                                                             \
         }
 #define _ARA_END_DECODE                                                                         \
@@ -633,18 +619,18 @@ _ARA_END_DECODE
 
 // definitions of the primitive templates declare at the start of this header
 template <typename ArgT>
-inline void _appendToMessage (IPCMessage& message, const char* argKey, ArgT argValue)
+inline void _appendToMessage (IPCMessage& message, size_t argKey, ArgT argValue)
 {
     message.append (argKey, _encodeValue (argValue));
 }
 
 template <typename ArgT>
-inline ArgT _readFromMessage (const IPCMessage& message, const char* argKey)
+inline ArgT _readFromMessage (const IPCMessage& message, size_t argKey)
 {
     return _ValueDecoder<ArgT>::decode (message.getArgValue<typename _ValueDecoder<ArgT>::EncodedType> (argKey));
 }
 template <typename ArgT>
-inline std::pair<ArgT, bool> _readOptionalFromMessage (const IPCMessage& message, const char* argKey)
+inline std::pair<ArgT, bool> _readOptionalFromMessage (const IPCMessage& message, size_t argKey)
 {
     const auto result { message.getOptionalArgValue<typename _ValueDecoder<ArgT>::EncodedType> (argKey) };
     if (result.second)
@@ -669,20 +655,20 @@ struct _IsOptionalArgument<std::pair<ArgT, bool>>
 };
 
 // private helpers for encodeArguments() and decodeArguments() to deal with the variable arguments one at a time
-inline void _encodeArgumentsHelper (IPCMessage& message, size_t n)
+inline void _encodeArgumentsHelper (IPCMessage& /*message*/, size_t /*n*/)
 {
 }
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<!_IsStructPointerArg<ArgT>::type::value, bool>::type = true>
 inline void _encodeArgumentsHelper (IPCMessage& message, size_t n, const ArgT& argValue, const MoreArgs &... moreArgs)
 {
-    _appendToMessage (message, _getKeyForArrayIndex (n), argValue);
+    _appendToMessage (message, n, argValue);
     _encodeArgumentsHelper (message, n + 1, moreArgs...);
 }
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<_IsStructPointerArg<ArgT>::type::value, bool>::type = true>
 inline void _encodeArgumentsHelper (IPCMessage& message, size_t n, const ArgT& argValue, const MoreArgs &... moreArgs)
 {
     if (argValue != nullptr)
-        _appendToMessage (message, _getKeyForArrayIndex (n), *argValue);
+        _appendToMessage (message, n, *argValue);
     _encodeArgumentsHelper (message, n + 1, moreArgs...);
 }
 template<typename... MoreArgs>
@@ -691,20 +677,61 @@ inline void _encodeArgumentsHelper (IPCMessage& message, size_t n, const std::nu
     _encodeArgumentsHelper (message, n + 1, moreArgs...);
 }
 
-inline void _decodeArgumentsHelper (const IPCMessage& message, size_t n)
+inline void _decodeArgumentsHelper (const IPCMessage& /*message*/, size_t /*n*/)
 {
 }
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<!_IsOptionalArgument<ArgT>::value, bool>::type = true>
 inline void _decodeArgumentsHelper (const IPCMessage& message, size_t n, ArgT& argValue, MoreArgs &... moreArgs)
 {
-    argValue = _readFromMessage<ArgT> (message, _getKeyForArrayIndex (n));
+    argValue = _readFromMessage<ArgT> (message, n);
     _decodeArgumentsHelper (message, n + 1, moreArgs...);
 }
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<_IsOptionalArgument<ArgT>::value, bool>::type = true>
 inline void _decodeArgumentsHelper (const IPCMessage& message, size_t n, ArgT& argValue, MoreArgs &... moreArgs)
 {
-    argValue = _readOptionalFromMessage<typename ArgT::first_type> (message, _getKeyForArrayIndex (n));
+    argValue = _readOptionalFromMessage<typename ArgT::first_type> (message, n);
     _decodeArgumentsHelper (message, n + 1, moreArgs...);
+}
+
+// private helpers for HOST_METHOD_ID and PLUGIN_METHOD_ID
+template<typename StructT>
+constexpr size_t _getHostInterfaceID ();
+template<>
+constexpr size_t _getHostInterfaceID<ARAAudioAccessControllerInterface> () { return 0; }
+template<>
+constexpr size_t _getHostInterfaceID<ARAArchivingControllerInterface> () { return 1; }
+template<>
+constexpr size_t _getHostInterfaceID<ARAContentAccessControllerInterface> () { return 2; }
+template<>
+constexpr size_t _getHostInterfaceID<ARAModelUpdateControllerInterface> () { return 3; }
+template<>
+constexpr size_t _getHostInterfaceID<ARAPlaybackControllerInterface> () { return 4; }
+
+template<typename StructT>
+constexpr size_t _getPlugInInterfaceID ();
+template<>
+constexpr size_t _getPlugInInterfaceID<ARADocumentControllerInterface> () { return 0; }
+template<>
+constexpr size_t _getPlugInInterfaceID<ARAPlaybackRendererInterface> () { return 1; }
+template<>
+constexpr size_t _getPlugInInterfaceID<ARAEditorRendererInterface> () { return 2; }
+template<>
+constexpr size_t _getPlugInInterfaceID<ARAEditorViewInterface> () { return 3; }
+
+template<size_t interfaceID, size_t offset>
+constexpr size_t _encodeMessageID ()
+{
+    static_assert (offset > 0, "offset 0 is never a valid function pointer");
+    static_assert ((interfaceID < 8), "currently using only 3 bits for interface ID");
+#if defined (__i386__) || defined (_M_IX86)
+    static_assert ((sizeof (void*) == 4), "compiler settings imply 32 bit pointers");
+    static_assert (((offset & 0x3FFFFFF4) == offset), "offset is misaligned or too large");
+    return (offset << 1) + interfaceID; // lower 2 bits of offset are 0 due to alignment, must shift 1 bit to store interface ID
+#else
+    static_assert ((sizeof (void*) == 8), "assuming 64 bit pointers per default");
+    static_assert (((offset & 0x7FFFFFF8) == offset), "offset is misaligned or too large");
+    return offset + interfaceID;        // lower 3 bits of offset are 0 due to alignment, can be used to store interface ID
+#endif
 }
 
 
@@ -712,12 +739,20 @@ inline void _decodeArgumentsHelper (const IPCMessage& message, size_t n, ArgT& a
 // actual client API
 //------------------------------------------------------------------------------
 
+
+// caller side: create a message ID for a given ARA method
+#define HOST_METHOD_ID(StructT, member) _encodeMessageID <_getHostInterfaceID<StructT> (), offsetof (StructT, member)> ()
+#define PLUGIN_METHOD_ID(StructT, member) _encodeMessageID <_getPlugInInterfaceID<StructT> (), offsetof (StructT, member)> ()
+
+// "global" messages that are not passed based on interface structs
+constexpr size_t kCreateDocumentControllerMethodID { 1 };
+
+
 // caller side: create a message with the specified arguments
 template<typename... Args>
-inline IPCMessage encodeArguments (const char* methodName, const Args &... args)
+inline IPCMessage encodeArguments (const Args &... args)
 {
     IPCMessage result;
-    _appendToMessage (result, _methodIDKey, methodName);
     _encodeArgumentsHelper (result, 0, args...);
     return result;
 }
@@ -726,7 +761,7 @@ inline IPCMessage encodeArguments (const char* methodName, const Args &... args)
 template<typename RetT, typename std::enable_if<std::is_scalar<RetT>::value, bool>::type = true>
 inline RetT decodeReply (const IPCMessage& message)
 {
-    return _readFromMessage<RetT> (message, _returnValueKey);
+    return _readFromMessage<RetT> (message, 0);
 }
 template<typename RetT, typename std::enable_if<std::is_same<RetT, std::vector<uint8_t>>::value, bool>::type = true>
 inline RetT decodeReply (const IPCMessage& message)
@@ -745,12 +780,6 @@ inline IPCMessage decodeReply (const IPCMessage& message)
 }
 
 
-// callee side: test whether the given message is encoding the given method call
-inline bool isMethodCall (const IPCMessage& message, const char* methodID)
-{
-    return (0 == std::strcmp (methodID, _readFromMessage<const char*> (message, _methodIDKey)));
-}
-
 // callee side: decode the arguments of a received message
 template<typename... Args>
 inline void decodeArguments (const IPCMessage& message, Args &... args)
@@ -767,7 +796,7 @@ template<typename RetT, typename std::enable_if<std::is_scalar<RetT>::value, boo
 inline IPCMessage encodeReply (const RetT& data)
 {
     IPCMessage result;
-    _appendToMessage (result, _returnValueKey, data);
+    _appendToMessage (result, 0, data);
     return result;
 }
 template<typename RetT, typename std::enable_if<std::is_same<RetT, std::vector<uint8_t>>::value, bool>::type = true>
@@ -786,6 +815,45 @@ template<typename RetT, typename std::enable_if<std::is_same<RetT, IPCMessage>::
 inline IPCMessage encodeReply (const IPCMessage& data)
 {
     return data;
+}
+
+
+// for debugging only: decoding method IDs
+inline const char* _decodeMethodID (std::map<size_t, std::string>& cache, const char* interfaceName, size_t methodID)
+{
+    auto it { cache.find (methodID) };
+    if (it == cache.end ())
+        it = cache.emplace (methodID, std::string { interfaceName } + " method " + std::to_string (methodID >> 3)).first;
+    return it->second.c_str();
+}
+inline const char* decodeHostMethodID (const size_t messageID)
+{
+    static std::map<size_t, std::string> cache;
+    const char* interfaceName;
+    switch (messageID & 0x7)
+    {
+        case 0: interfaceName = "ARAAudioAccessControllerInterface"; break;
+        case 1: interfaceName = "ARAArchivingControllerInterface"; break;
+        case 2: interfaceName = "ARAContentAccessControllerInterface"; break;
+        case 3: interfaceName = "ARAModelUpdateControllerInterface"; break;
+        case 4: interfaceName = "ARAPlaybackControllerInterface"; break;
+        default: ARA_INTERNAL_ASSERT (false); interfaceName = "(unknown)"; break;
+    }
+    return _decodeMethodID (cache, interfaceName, messageID);
+}
+inline const char* decodePlugInMethodID (const size_t messageID)
+{
+    static std::map<size_t, std::string> cache;
+    const char* interfaceName;
+    switch (messageID & 0x7)
+    {
+        case 0: interfaceName = "ARADocumentControllerInterface"; break;
+        case 1: interfaceName = "ARAPlaybackRendererInterface"; break;
+        case 2: interfaceName = "ARAEditorRendererInterface"; break;
+        case 3: interfaceName = "ARAEditorViewInterface"; break;
+        default: ARA_INTERNAL_ASSERT (false); interfaceName = "(unknown)"; break;
+    }
+    return _decodeMethodID (cache, interfaceName, messageID);
 }
 
 }   // namespace ARA

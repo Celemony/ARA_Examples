@@ -61,7 +61,7 @@ public:
 
     // append keyed argument to the message
     template <typename ArgT>
-    void append (const char* argKey, ArgT argValue)
+    void append (size_t argKey, ArgT argValue)
     {
         _appendArg (argKey, argValue);
     }
@@ -69,14 +69,14 @@ public:
     // getters for receiving code: extract arguments, specifying the desired return type as template argument
     // the optional variant returns the default value of the argument type if key wasn't not found
     template <typename ArgT>
-    ArgT getArgValue (const char* argKey) const
+    ArgT getArgValue (size_t argKey) const
     {
         ArgT result;
         _readArg (argKey, result);
         return result;
     }
     template <typename ArgT>
-    std::pair<ArgT, bool> getOptionalArgValue (const char* argKey) const
+    std::pair<ArgT, bool> getOptionalArgValue (size_t argKey) const
     {
         ArgT result;
         bool didFindKey { false };
@@ -88,30 +88,30 @@ private:
     // internal primitive - dictionary will be retained or copied, depending on isWritable
     void _setup (CFDictionaryRef dictionary, bool isWritable);
 
-    // wrap C string into CFString - must release result!
-    static CFStringRef _createEncodedTag (const char* tag);
+    // wrap key value into CFString (no reference count transferred to caller)
+    static CFStringRef _getEncodedKey (size_t argKey);
 
     // helpers for construction for sending code
-    void _appendArg (const char* argKey, int32_t argValue);
-    void _appendArg (const char* argKey, int64_t argValue);
-    void _appendArg (const char* argKey, size_t argValue);
-    void _appendArg (const char* argKey, float argValue);
-    void _appendArg (const char* argKey, double argValue);
-    void _appendArg (const char* argKey, const char* argValue);
-    void _appendArg (const char* argKey, const std::vector<uint8_t>& argValue);
-    void _appendArg (const char* argKey, const IPCMessage& argValue);
-    void _appendEncodedArg (const char* argKey, CFTypeRef argObject);   // ownership of the arg is transferred
+    void _appendArg (size_t argKey, int32_t argValue);
+    void _appendArg (size_t argKey, int64_t argValue);
+    void _appendArg (size_t argKey, size_t argValue);
+    void _appendArg (size_t argKey, float argValue);
+    void _appendArg (size_t argKey, double argValue);
+    void _appendArg (size_t argKey, const char* argValue);
+    void _appendArg (size_t argKey, const std::vector<uint8_t>& argValue);
+    void _appendArg (size_t argKey, const IPCMessage& argValue);
+    void _appendEncodedArg (size_t argKey, CFTypeRef argObject);   // ownership of the arg is transferred
 
     // helpers for getters for receiving code
     // since we cannot overload by return type, we are returning via reference argument
-    void _readArg (const char* argKey, int32_t& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const char* argKey, int64_t& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const char* argKey, size_t& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const char* argKey, float& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const char* argKey, double& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const char* argKey, const char*& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const char* argKey, std::vector<uint8_t>& argValue, bool* didFindKey = nullptr) const;
-    void _readArg (const char* argKey, IPCMessage& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (size_t argKey, int32_t& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (size_t argKey, int64_t& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (size_t argKey, size_t& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (size_t argKey, float& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (size_t argKey, double& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (size_t argKey, const char*& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (size_t argKey, std::vector<uint8_t>& argValue, bool* didFindKey = nullptr) const;
+    void _readArg (size_t argKey, IPCMessage& argValue, bool* didFindKey = nullptr) const;
     static bool _checkKeyFound (bool found, bool* didFindKey);
 
 private:
