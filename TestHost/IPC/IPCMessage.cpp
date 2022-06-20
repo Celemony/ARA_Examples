@@ -168,7 +168,7 @@ void IPCMessage::_appendEncodedArg (const MessageKey argKey, CFTypeRef argObject
     CFRelease (argObject);
 }
 
-CFDataRef IPCMessage::createEncodedMessage () const
+__attribute__((cf_returns_retained)) CFDataRef IPCMessage::createEncodedMessage () const
 {
     if (!_dictionary)
         return nullptr;
@@ -452,7 +452,7 @@ void IPCMessage::_makeWritableIfNeeded ()
 }
 
 #if defined (__APPLE__)
-CFDataRef IPCMessage::createEncodedMessage () const
+__attribute__((cf_returns_retained)) CFDataRef IPCMessage::createEncodedMessage () const
 #else
 std::string IPCMessage::createEncodedMessage () const
 #endif
@@ -479,7 +479,7 @@ std::string IPCMessage::createEncodedMessage () const
     ARA_INTERNAL_ASSERT (result);
     return result;
 #else
-    return writer.str();
+    return writer.str ();
 #endif
 }
 

@@ -30,9 +30,6 @@
 #include "ARA_Library/Dispatch/ARAHostDispatch.h"
 
 #include "ARA_Library/IPC/ARAIPC.h"
-#if ARA_ENABLE_IPC
-    #include "IPC/IPCMessage.h"
-#endif
 
 #include <string>
 #include <vector>
@@ -131,15 +128,8 @@ private:
 #if ARA_ENABLE_IPC
 /*******************************************************************************/
 // Wrapper class for the remote process main().
-class RemoteHost
+namespace RemoteHost
 {
-public:
-    static int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& hostCommandsPortID, const std::string& plugInCallbacksPortID);
-
-private:
-    static IPCMessage _hostCommandHandler (const int32_t messageID, const IPCMessage& message);
-
-private:
-    static std::unique_ptr<PlugInEntry> _plugInEntry;
-};
+    int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& hostCommandsPortID, const std::string& plugInCallbacksPortID);
+}
 #endif

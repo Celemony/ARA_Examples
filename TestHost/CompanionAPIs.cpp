@@ -48,6 +48,7 @@
 #include "ARA_Library/IPC/ARAIPCProxyPlugIn.h"
 #include "ARA_Library/IPC/ARAIPCEncoding.h"
 #include "IPC/IPCPort.h"
+#include "IPC/IPCMessage.h"
 
 #if defined (__linux__)
     #error "IPC not yet implemented for Linux"
@@ -64,6 +65,10 @@ enum
     kIPCTerminate = -6
 };
 static_assert (kIPCCreateARAEffect < ARA::IPC::kARAIPCMessageIDRangeStart, "conflicting message IDs");
+
+
+IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::ReceivedData const messageData);
+
 
 // check message ID is either one of our commands or in the range of the generic IPC implementation
 bool isValidMessageID (const ARA::IPC::ARAIPCMessageID messageID)
@@ -195,7 +200,13 @@ public:
     {
         ARA_INTERNAL_ASSERT (isValidMessageID (messageID));
 
-        auto reply { _port.sendAndAwaitReply(messageID, *reinterpret_cast<const IPCMessage*> (encoder.ref)) };
+        IPCPort::ReceivedData replyData { _port.sendAndAwaitReply (messageID, reinterpret_cast<const IPCMessage*> (encoder.ref)->createEncodedMessage ()) };
+#if defined (__APPLE__)
+        IPCMessage reply { replyData };
+        CFRelease (replyData);
+#else
+        IPCMessage reply { replyData.c_str (), replyData.size () };
+#endif
         if (replyHandler)
         {
             auto replyDecoder { makeMessageDecoder (reply) };
@@ -530,14 +541,19 @@ private:
         // \todo It would be cleaner to create the port in the c'tor from the main thread,
         //       but for some reason reading audio is then much slower compared to creating it here...?
         _plugInCallbacksPort = IPCPort::createPublishingID (_plugInCallbacksPortID.c_str (),
-                                    [] (const ARA::IPC::ARAIPCMessageID messageID, const IPCMessage& message) -> IPCMessage
+                                    [] (const ARA::IPC::ARAIPCMessageID messageID, IPCPort::ReceivedData const messageData) -> IPCPort::DataToSend /*__attribute__((cf_returns_retained))*/
                                         {
                                             ARA_INTERNAL_ASSERT (isValidMessageID (messageID));
+#if defined (__APPLE__)
+                                            IPCMessage message { messageData };
+#else
+                                            IPCMessage message { messageData.c_str (), messageData.size () };
+#endif
                                             auto messageDecoder { makeMessageDecoder (message) };
                                             IPCMessage reply;
                                             auto replyEncoder { makeMessageEncoder (reply) };
                                             ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher (messageID, &messageDecoder, &replyEncoder);
-                                            return reply;
+                                            return reply.createEncodedMessage ();
                                         });
 
         while (!_terminateCallbacksThread)
@@ -606,12 +622,20 @@ public:
 
 /*******************************************************************************/
 
-std::unique_ptr<PlugInEntry> RemoteHost::_plugInEntry {};
+std::unique_ptr<PlugInEntry> _plugInEntry {};
 bool _shutDown { false };
 
-IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMessage& message)
+#if defined (__APPLE__)
+__attribute__((cf_returns_retained))
+#endif
+IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::ReceivedData const messageData)
 {
     ARA_INTERNAL_ASSERT (isValidMessageID (messageID));
+#if defined (__APPLE__)
+    IPCMessage message { messageData };
+#else
+    IPCMessage message { messageData.c_str (), messageData.size () };
+#endif
     auto messageDecoder { makeMessageDecoder (message) };
     if (messageID == kIPCCreateARAEffect)
     {
@@ -626,7 +650,7 @@ IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMe
         auto replyEncoder { makeMessageEncoder (reply) };
         ARA::IPC::encodeArguments (replyEncoder, reinterpret_cast<size_t> (plugInInstance.get ()), plugInExtensionRef);
         plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
-        return reply;
+        return reply.createEncodedMessage ();
     }
     else if (messageID == kIPCStartRendering)
     {
@@ -654,7 +678,7 @@ IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMe
         IPCMessage reply;
         auto replyEncoder { makeMessageEncoder (reply) };
         ARA::IPC::encodeReply (&replyEncoder, ARA::IPC::BytesEncoder { buffer, false });
-        return reply;
+        return reply.createEncodedMessage ();
     }
     else if (messageID == kIPCStopRendering)
     {
@@ -684,15 +708,17 @@ IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMe
         IPCMessage reply;
         auto replyEncoder { makeMessageEncoder (reply) };
         ARA::IPC::ARAIPCProxyHostCommandHandler (messageID, &messageDecoder, &replyEncoder);
-        return reply;
+        return reply.createEncodedMessage ();
     }
 }
 
-int RemoteHost::main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& hostCommandsPortID, const std::string& plugInCallbacksPortID)
+namespace RemoteHost
+{
+int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& hostCommandsPortID, const std::string& plugInCallbacksPortID)
 {
     _plugInEntry = std::move (plugInEntry);
 
-    auto hostCommandsPort { IPCPort::createPublishingID (hostCommandsPortID.c_str (), &_hostCommandHandler) };
+    auto hostCommandsPort { IPCPort::createPublishingID (hostCommandsPortID.c_str (), &remoteHostCommandHandler) };
     auto plugInCallbacksPort { IPCPort::createConnectedToID (plugInCallbacksPortID.c_str ()) };
     IPCSender plugInCallbacksSender { plugInCallbacksPort };
 
@@ -705,6 +731,7 @@ int RemoteHost::main (std::unique_ptr<PlugInEntry> plugInEntry, const std::strin
     _plugInEntry.reset ();
 
     return 0;
+}
 }
 
 #endif // ARA_ENABLE_IPC

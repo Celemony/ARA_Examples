@@ -72,7 +72,7 @@ public:
     // to be used by IPCPort only: encoding from/to port-internal datas format
 #if defined (__APPLE__)
     explicit IPCMessage (CFDataRef data);
-    CFDataRef createEncodedMessage () const;
+    __attribute__((cf_returns_retained)) CFDataRef createEncodedMessage () const;
 #else
     IPCMessage (const char* data, const size_t dataSize);
     std::string createEncodedMessage () const;
