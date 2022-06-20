@@ -25,7 +25,6 @@
     #include <utility>
 #elif defined (__APPLE__)
     #include <CoreFoundation/CoreFoundation.h>
-    #include <os/lock.h>
 #else
     #error "IPC not yet implemented for this platform"
 #endif
@@ -108,7 +107,6 @@ private:
     };
 
     const ReceiveCallback* _receiveCallback {};
-    HANDLE _hSendMutex {};
     HANDLE _hWriteMutex {};
     HANDLE _hRequest {};
     HANDLE _hResult {};
@@ -117,6 +115,5 @@ private:
 
 #elif defined (__APPLE__)
     CFMessagePortRef _port {};
-    os_unfair_lock_s _sendLock { OS_UNFAIR_LOCK_INIT };
 #endif
 };
