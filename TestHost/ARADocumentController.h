@@ -159,6 +159,8 @@ public:
 
     void setMinimalContentUpdateLogging (bool flag);
 
+    void logAudioModificationPreservesAudioSourceSignalIfSupported (AudioModification* audioModification);
+    
     /*******************************************************************************/
     // Public accessors
     Document* getDocument () const noexcept { return _document; }
