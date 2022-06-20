@@ -21,28 +21,24 @@
 #include "ARA_API/ARAInterface.h"
 #include "ARA_Library/Debug/ARADebug.h"
 
-#include <CoreServices/CoreServices.h>
-
-struct ComponentInstanceRecord;
-typedef struct ComponentInstanceRecord * AudioUnit;
-
-struct OpaqueAudioComponent;
-typedef struct OpaqueAudioComponent * AudioComponent;
-
+#include <MacTypes.h>
 
 #if defined(__cplusplus)
 extern "C"
 {
 #endif
 
-AudioComponent AudioUnitFindValidARAComponentWithIDs(OSType type, OSType subtype, OSType manufacturer);
-const struct ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioComponent audioComponent);
-AudioUnit AudioUnitOpen(AudioComponent audioComponent);
-const struct ARA_NAMESPACE ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnit audioUnit, ARA_NAMESPACE ARADocumentControllerRef controllerRef, ARA_NAMESPACE ARAPlugInInstanceRoleFlags assignedRoles);
-void AudioUnitStartRendering(AudioUnit audioUnit, UInt32 blockSize, double sampleRate);
-void AudioUnitRenderBuffer(AudioUnit audioUnit, UInt32 blockSize, SInt64 samplePosition, float * buffer);
-void AudioUnitStopRendering(AudioUnit audioUnit);
-void AudioUnitClose(AudioUnit audioUnit);
+typedef struct OpaqueAudioComponent * AudioUnitComponent;
+typedef struct _AudioUnitInstance * AudioUnitInstance;
+
+AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype, OSType manufacturer);
+const struct ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitComponent);
+AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent);
+const struct ARA_NAMESPACE ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnit, ARA_NAMESPACE ARADocumentControllerRef controllerRef, ARA_NAMESPACE ARAPlugInInstanceRoleFlags assignedRoles);
+void AudioUnitStartRendering(AudioUnitInstance audioUnit, UInt32 blockSize, double sampleRate);
+void AudioUnitRenderBuffer(AudioUnitInstance audioUnit, UInt32 blockSize, SInt64 samplePosition, float * buffer);
+void AudioUnitStopRendering(AudioUnitInstance audioUnit);
+void AudioUnitCloseInstance(AudioUnitInstance audioUnit);
 
 #if defined(__cplusplus)
 }   // extern "C"

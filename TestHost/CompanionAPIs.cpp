@@ -43,14 +43,14 @@
 class AUPlugInInstance : public PlugInInstance
 {
 public:
-    AUPlugInInstance (AudioUnit audioUnit, const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance)
+    AUPlugInInstance (AudioUnitInstance audioUnit, const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance)
     : PlugInInstance { plugInExtensionInstance },
       _audioUnit { audioUnit }
     {}
 
     ~AUPlugInInstance () override
     {
-        AudioUnitClose (_audioUnit);
+        AudioUnitCloseInstance (_audioUnit);
     }
 
     void startRendering (int maxBlockSize, double sampleRate) override
@@ -69,7 +69,7 @@ public:
     }
 
 private:
-    AudioUnit const _audioUnit;
+    AudioUnitInstance const _audioUnit;
 };
 #endif
 
@@ -124,9 +124,9 @@ class AUPlugInEntry : public PlugInEntry
 
 public:
     AUPlugInEntry (const std::string& type, const std::string& subType, const std::string& manufacturer, ARA::ARAAssertFunction* assertFunctionAddress)
-    : _audioComponent { AudioUnitFindValidARAComponentWithIDs (parseOSType (type), parseOSType (subType), parseOSType (manufacturer)) }
+    : _audioUnitComponent { AudioUnitPrepareComponentWithIDs (parseOSType (type), parseOSType (subType), parseOSType (manufacturer)) }
     {
-        initializeARA (AudioUnitGetARAFactory (_audioComponent), assertFunctionAddress);
+        initializeARA (AudioUnitGetARAFactory (_audioUnitComponent), assertFunctionAddress);
 
         _description = std::string { "Audio Unit (" } + type + " - " + subType + " - " + manufacturer + ")";
     }
@@ -139,14 +139,14 @@ public:
 
     std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::Host::DocumentController* documentController, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
     {
-        AudioUnit audioUnit = AudioUnitOpen (_audioComponent);
+        AudioUnitInstance audioUnit = AudioUnitOpenInstance (_audioUnitComponent);
         const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance = AudioUnitBindToARADocumentController (audioUnit, documentController->getRef (), assignedRoles);
         validatePlugInExtensionInstance (plugInExtensionInstance, assignedRoles);
         return std::make_unique<AUPlugInInstance> (audioUnit, plugInExtensionInstance);
     }
 
 private:
-    AudioComponent _audioComponent;
+    AudioUnitComponent const _audioUnitComponent;
 };
 #endif
 

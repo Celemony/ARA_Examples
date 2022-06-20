@@ -29,7 +29,15 @@
 #include "ARA_API/ARAAudioUnit.h"
 #include "ARA_Library/Debug/ARADebug.h"
 
-AudioComponent AudioUnitFindValidARAComponentWithIDs(OSType type, OSType subtype, OSType manufacturer)
+
+struct _AudioUnitInstance
+{
+    AudioUnit v2AudioUnit;
+    SInt64 samplePosition;
+};
+
+
+AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype, OSType manufacturer)
 {
     AudioComponentDescription compDesc = { type, subtype, manufacturer, 0, 0 };
     AudioComponent component = NULL;
@@ -68,48 +76,48 @@ AudioComponent AudioUnitFindValidARAComponentWithIDs(OSType type, OSType subtype
     return component;
 }
 
-AudioUnit AudioUnitOpen(AudioComponent audioComponent)
+AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent)
 {
-    AudioUnit audioUnit = NULL;
-    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioComponentInstanceNew(audioComponent, &audioUnit);
+    AudioUnitInstance result = malloc(sizeof(struct _AudioUnitInstance));
+    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioComponentInstanceNew(audioUnitComponent, &result->v2AudioUnit);
     ARA_INTERNAL_ASSERT(status == noErr);
-    ARA_INTERNAL_ASSERT(audioUnit != NULL);
-    return audioUnit;
+    ARA_INTERNAL_ASSERT(result->v2AudioUnit != NULL);
+    return result;
 }
 
-const struct ARAFactory * AudioUnitGetARAFactory(AudioComponent audioComponent)
+const struct ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitComponent)
 {
+    const struct ARAFactory * result = NULL;    // initially assume this plug-in doesn't support ARA
+    AudioUnitInstance audioUnitInstance = AudioUnitOpenInstance(audioUnitComponent);
+
+    // check whether the AU supports ARA by trying to get the factory
     UInt32 propertySize = sizeof(ARAAudioUnitFactory);
     ARAAudioUnitFactory audioUnitFactory = { kARAAudioUnitMagic, NULL };
     Boolean isWriteable = FALSE;
 
-    // check if it supports ARA by trying to get the factory
-    AudioUnit audioUnit = AudioUnitOpen(audioComponent);
-    OSStatus status = AudioUnitGetPropertyInfo(audioUnit, kAudioUnitProperty_ARAFactory, kAudioUnitScope_Global, 0, &propertySize, &isWriteable);
-    if ((status != noErr) ||
-        (propertySize != sizeof(ARAAudioUnitFactory)) ||
-        isWriteable)
+    OSStatus status = AudioUnitGetPropertyInfo(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAFactory, kAudioUnitScope_Global, 0, &propertySize, &isWriteable);
+    if ((status == noErr) &&
+        (propertySize == sizeof(ARAAudioUnitFactory)) &&
+        !isWriteable)
     {
-        AudioUnitClose(audioUnit);
-        return NULL;            // this plug-in doesn't support ARA.
+        status = AudioUnitGetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAFactory, kAudioUnitScope_Global, 0, &audioUnitFactory, &propertySize);
+        if ((status == noErr) &&
+            (propertySize == sizeof(ARAAudioUnitFactory)) &&
+            (audioUnitFactory.inOutMagicNumber == kARAAudioUnitMagic))
+        {
+            ARA_VALIDATE_API_CONDITION(audioUnitFactory.outFactory != NULL);
+            result = audioUnitFactory.outFactory;
+        }
+
     }
 
-    status = AudioUnitGetProperty(audioUnit, kAudioUnitProperty_ARAFactory, kAudioUnitScope_Global, 0, &audioUnitFactory, &propertySize);
-    if ((status != noErr) ||
-        (propertySize != sizeof(ARAAudioUnitFactory)) ||
-        (audioUnitFactory.inOutMagicNumber != kARAAudioUnitMagic))
-    {
-        AudioUnitClose(audioUnit);
-        return NULL;            // this plug-in doesn't support ARA.
-    }
-    ARA_VALIDATE_API_CONDITION(audioUnitFactory.outFactory != NULL);
-
+    // validate the AU is properly tagged as ARA
     if (@available(macOS 10.10, *))
     {
         @autoreleasepool
         {
             AudioComponentDescription compDesc;
-            status = AudioComponentGetDescription(audioComponent, &compDesc);
+            status = AudioComponentGetDescription(audioUnitComponent, &compDesc);
             ARA_INTERNAL_ASSERT(status == noErr);
             AVAudioUnitComponent * avComponent = [[[AVAudioUnitComponentManager sharedAudioUnitComponentManager] componentsMatchingDescription:compDesc] firstObject];
             ARA_INTERNAL_ASSERT(avComponent);
@@ -117,25 +125,24 @@ const struct ARAFactory * AudioUnitGetARAFactory(AudioComponent audioComponent)
         }
     }
 
-    AudioUnitClose(audioUnit);
-
-    return audioUnitFactory.outFactory;
+    AudioUnitCloseInstance(audioUnitInstance);
+    return result;
 }
 
-const struct ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnit audioUnit, ARADocumentControllerRef controllerRef, ARAPlugInInstanceRoleFlags assignedRoles)
+const struct ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnitInstance, ARADocumentControllerRef controllerRef, ARAPlugInInstanceRoleFlags assignedRoles)
 {
     UInt32 propertySize = sizeof(ARAAudioUnitPlugInExtensionBinding);
     UInt32 ARA_MAYBE_UNUSED_VAR(expectedPropertySize) = propertySize;
     ARAPlugInInstanceRoleFlags knownRoles = kARAPlaybackRendererRole | kARAEditorRendererRole | kARAEditorViewRole;
     ARAAudioUnitPlugInExtensionBinding audioUnitBinding = { kARAAudioUnitMagic, controllerRef, NULL, knownRoles, assignedRoles };
 
-    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitGetProperty(audioUnit, kAudioUnitProperty_ARAPlugInExtensionBindingWithRoles, kAudioUnitScope_Global, 0, &audioUnitBinding, &propertySize);
+    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitGetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAPlugInExtensionBindingWithRoles, kAudioUnitScope_Global, 0, &audioUnitBinding, &propertySize);
 #if defined(ARA_SUPPORT_VERSION_1) && (ARA_SUPPORT_VERSION_1)
     if (status != noErr)
     {
         propertySize = offsetof(ARAAudioUnitPlugInExtensionBinding, knownRoles);
         expectedPropertySize = propertySize;
-        status = AudioUnitGetProperty(audioUnit, kAudioUnitProperty_ARAPlugInExtensionBinding, kAudioUnitScope_Global, 0, &audioUnitBinding, &propertySize);
+        status = AudioUnitGetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAPlugInExtensionBinding, kAudioUnitScope_Global, 0, &audioUnitBinding, &propertySize);
     }
 #endif
 
@@ -152,20 +159,20 @@ const struct ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(A
 // in order for Melodyne to render the ARA data, it must be set to playback mode (in stop, its built-in pre-listening logic is active)
 // thus we implement some crude, minimal transport information here.
 
-static Float64 globalSampleIndex = 0.0;
-
-OSStatus GetTransportState2(void * ARA_MAYBE_UNUSED_ARG(inHostUserData), Boolean * outIsPlaying, Boolean * outIsRecording,
+OSStatus GetTransportState2(void * inHostUserData, Boolean * outIsPlaying, Boolean * outIsRecording,
                             Boolean * outTransportStateChanged, Float64 * outCurrentSampleInTimeLine,
                             Boolean * outIsCycling, Float64 * outCycleStartBeat, Float64 * outCycleEndBeat)
 {
+    AudioUnitInstance instance = inHostUserData;
+
     if (outIsPlaying)
         *outIsPlaying = true;
     if (outIsRecording)
         *outIsRecording = false;
     if (outTransportStateChanged)
-        *outTransportStateChanged = (globalSampleIndex == 0) ? true : false;
+        *outTransportStateChanged = (instance->samplePosition == 0) ? true : false;
     if (outCurrentSampleInTimeLine)
-        *outCurrentSampleInTimeLine = globalSampleIndex;
+        *outCurrentSampleInTimeLine = (double)instance->samplePosition;
 
     if (outIsCycling)
         *outIsCycling = false;
@@ -229,33 +236,35 @@ void ConfigureBusses(AudioUnit audioUnit, AudioUnitScope inScope, double sampleR
     status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ShouldAllocateBuffer, inScope, 0, &shouldAllocate, sizeof(shouldAllocate));
 }
 
-void AudioUnitStartRendering(AudioUnit audioUnit, UInt32 blockSize, double sampleRate)
+void AudioUnitStartRendering(AudioUnitInstance audioUnitInstance, UInt32 blockSize, double sampleRate)
 {
     UInt32 bufferSize = blockSize;
     OSStatus ARA_MAYBE_UNUSED_VAR(status) = noErr;
-    status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &bufferSize, sizeof(bufferSize));
+    status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &bufferSize, sizeof(bufferSize));
     ARA_INTERNAL_ASSERT(status == noErr);
 
-    status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_SampleRate, kAudioUnitScope_Global, 0, &sampleRate, sizeof(sampleRate));
+    status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_SampleRate, kAudioUnitScope_Global, 0, &sampleRate, sizeof(sampleRate));
     ARA_INTERNAL_ASSERT(status == noErr);
 
-    ConfigureBusses(audioUnit, kAudioUnitScope_Input, sampleRate);
-    ConfigureBusses(audioUnit, kAudioUnitScope_Output, sampleRate);
+    ConfigureBusses(audioUnitInstance->v2AudioUnit, kAudioUnitScope_Input, sampleRate);
+    ConfigureBusses(audioUnitInstance->v2AudioUnit, kAudioUnitScope_Output, sampleRate);
 
     AURenderCallbackStruct callback = { RenderCallback, NULL };
-    status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Output, 0, &callback, sizeof(callback));
+    status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Output, 0, &callback, sizeof(callback));
     ARA_INTERNAL_ASSERT(status == noErr);
 
-    HostCallbackInfo callbacks = { NULL, NULL, NULL, &GetTransportState1, &GetTransportState2 };
-    status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_HostCallbacks, kAudioUnitScope_Global, 0, &callbacks, sizeof(callbacks));
+    HostCallbackInfo callbacks = { audioUnitInstance, NULL, NULL, &GetTransportState1, &GetTransportState2 };
+    status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_HostCallbacks, kAudioUnitScope_Global, 0, &callbacks, sizeof(callbacks));
     ARA_INTERNAL_ASSERT(status == noErr);
 
-    status = AudioUnitInitialize(audioUnit);
+    status = AudioUnitInitialize(audioUnitInstance->v2AudioUnit);
     ARA_INTERNAL_ASSERT(status == noErr);
 }
 
-void AudioUnitRenderBuffer(AudioUnit audioUnit, UInt32 blockSize, SInt64 samplePosition, float * buffer)
+void AudioUnitRenderBuffer(AudioUnitInstance audioUnitInstance, UInt32 blockSize, SInt64 samplePosition, float * buffer)
 {
+    audioUnitInstance->samplePosition = samplePosition;
+
     AudioUnitRenderActionFlags flags = 0;
 
     AudioTimeStamp timeStamp;
@@ -267,20 +276,20 @@ void AudioUnitRenderBuffer(AudioUnit audioUnit, UInt32 blockSize, SInt64 sampleP
 
     AudioBufferList audioBufferList = { 1, { { 1, (UInt32)(sizeof(float) * bufferSize), buffer } } };
 
-    globalSampleIndex = (double)samplePosition;
-
-    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitRender(audioUnit, &flags, &timeStamp, 0, bufferSize, &audioBufferList);
+    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitRender(audioUnitInstance->v2AudioUnit, &flags, &timeStamp, 0, bufferSize, &audioBufferList);
     ARA_INTERNAL_ASSERT(status == noErr);
 }
 
-void AudioUnitStopRendering(AudioUnit audioUnit)
+void AudioUnitStopRendering(AudioUnitInstance audioUnitInstance)
 {
-    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitUninitialize(audioUnit);
+    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitUninitialize(audioUnitInstance->v2AudioUnit);
     ARA_INTERNAL_ASSERT(status == noErr);
 }
 
-void AudioUnitClose(AudioUnit audioUnit)
+void AudioUnitCloseInstance(AudioUnitInstance audioUnitInstance)
 {
-    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioComponentInstanceDispose(audioUnit);
+    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioComponentInstanceDispose(audioUnitInstance->v2AudioUnit);
     ARA_INTERNAL_ASSERT(status == noErr);
+    
+    free(audioUnitInstance);
 }
