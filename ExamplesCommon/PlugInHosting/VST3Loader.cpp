@@ -76,8 +76,7 @@ using namespace Steinberg;
 using namespace Vst;
 
 
-//-------------------------------------------------------------------------------------------------------
-struct VST3Binary
+struct _VST3Binary
 {
 #if defined (_WIN32)
     HMODULE libHandle;
@@ -94,17 +93,18 @@ struct VST3Binary
 #endif
 };
 
-struct VST3Effect
+struct _VST3Effect
 {
     IPtr<IComponent> component;
 
 #if ARA_VALIDATE_API_CALLS
-    VST3Binary* binary;
+    VST3Binary binary;
     std::string className;
 #endif
 };
 
-VST3Binary* VST3LoadBinary (const char* binaryName)
+
+VST3Binary VST3LoadBinary (const char* binaryName)
 {
 #if defined (__APPLE__) || defined (__linux__)
     // if the binary name contains no '/', dlopen () searches the system library paths for the file,
@@ -117,7 +117,7 @@ VST3Binary* VST3LoadBinary (const char* binaryName)
     }
 #endif
 
-    VST3Binary* vst3Binary { new VST3Binary };
+    VST3Binary vst3Binary { new _VST3Binary };
 #if defined (_WIN32)
     vst3Binary->libHandle = ::LoadLibraryA (binaryName);
     ARA_INTERNAL_ASSERT (vst3Binary->libHandle);
@@ -250,7 +250,7 @@ VST3Binary* VST3LoadBinary (const char* binaryName)
     return vst3Binary;
 }
 
-const ARA::ARAFactory* VST3GetARAFactory (struct VST3Binary* vst3Binary, const char* optionalPlugInName)
+const ARA::ARAFactory* VST3GetARAFactory (VST3Binary vst3Binary, const char* optionalPlugInName)
 {
     if (vst3Binary->araMainFactories.empty ())
         return nullptr;
@@ -267,7 +267,7 @@ const ARA::ARAFactory* VST3GetARAFactory (struct VST3Binary* vst3Binary, const c
     return nullptr;
 }
 
-VST3Effect* VST3CreateEffect (VST3Binary* vst3Binary, const char* optionalPlugInName)
+VST3Effect VST3CreateEffect (VST3Binary vst3Binary, const char* optionalPlugInName)
 {
     for (int32 i = 0; i < vst3Binary->pluginFactory->countClasses (); ++i)
     {
@@ -289,9 +289,9 @@ VST3Effect* VST3CreateEffect (VST3Binary* vst3Binary, const char* optionalPlugIn
             result = component->initialize (nullptr);
             ARA_INTERNAL_ASSERT (result == kResultOk);
 #if ARA_VALIDATE_API_CALLS
-            return new VST3Effect { component, vst3Binary, classInfo.name };
+            return new _VST3Effect { component, vst3Binary, classInfo.name };
 #else
-            return new VST3Effect { component };
+            return new _VST3Effect { component };
 #endif
         }
     }
@@ -300,7 +300,7 @@ VST3Effect* VST3CreateEffect (VST3Binary* vst3Binary, const char* optionalPlugIn
     return nullptr;
 }
 
-const ARA::ARAPlugInExtensionInstance* VST3BindToARADocumentController (VST3Effect* vst3Effect, ARA::ARADocumentControllerRef controllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
+const ARA::ARAPlugInExtensionInstance* VST3BindToARADocumentController (VST3Effect vst3Effect, ARA::ARADocumentControllerRef controllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
 {
     FUnknownPtr<ARA::IPlugInEntryPoint> entry { vst3Effect->component };
     ARA_INTERNAL_ASSERT (entry);
@@ -332,7 +332,7 @@ const ARA::ARAPlugInExtensionInstance* VST3BindToARADocumentController (VST3Effe
 #endif
 }
 
-void VST3StartRendering (VST3Effect* vst3Effect, int32_t blockSize, double sampleRate)
+void VST3StartRendering (VST3Effect vst3Effect, int32_t blockSize, double sampleRate)
 {
     FUnknownPtr<IAudioProcessor> processor { vst3Effect->component };
     ARA_INTERNAL_ASSERT (processor);
@@ -355,7 +355,7 @@ void VST3StartRendering (VST3Effect* vst3Effect, int32_t blockSize, double sampl
     ARA_INTERNAL_ASSERT (result == kResultOk);
 }
 
-void VST3RenderBuffer (VST3Effect* vst3Effect, int32_t blockSize, double sampleRate, int64_t samplePosition, float* buffer)
+void VST3RenderBuffer (VST3Effect vst3Effect, int32_t blockSize, double sampleRate, int64_t samplePosition, float* buffer)
 {
     FUnknownPtr<IAudioProcessor> processor { vst3Effect->component };
     ARA_INTERNAL_ASSERT (processor);
@@ -394,7 +394,7 @@ void VST3RenderBuffer (VST3Effect* vst3Effect, int32_t blockSize, double sampleR
     ARA_INTERNAL_ASSERT (result == kResultOk);
 }
 
-void VST3StopRendering (VST3Effect* vst3Effect)
+void VST3StopRendering (VST3Effect vst3Effect)
 {
     tresult ARA_MAYBE_UNUSED_VAR (result);
     result = vst3Effect->component->setActive (false);
@@ -406,7 +406,7 @@ void VST3StopRendering (VST3Effect* vst3Effect)
     ARA_INTERNAL_ASSERT (result == kResultOk);
 }
 
-void VST3DestroyEffect (VST3Effect* vst3Effect)
+void VST3DestroyEffect (VST3Effect vst3Effect)
 {
     tresult ARA_MAYBE_UNUSED_VAR (result);
     result = vst3Effect->component->terminate ();
@@ -415,7 +415,7 @@ void VST3DestroyEffect (VST3Effect* vst3Effect)
     delete vst3Effect;
 }
 
-void VST3UnloadBinary (VST3Binary* vst3Binary)
+void VST3UnloadBinary (VST3Binary vst3Binary)
 {
     vst3Binary->araMainFactories.clear ();
     vst3Binary->pluginFactory = nullptr;

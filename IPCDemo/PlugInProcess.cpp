@@ -366,8 +366,8 @@ int main (int argc, const char * argv[])
 
     factory = AudioUnitGetARAFactory (audioComponent);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
-    struct VST3Binary * vst3Binary = VST3LoadBinary ("ARATestPlugIn.vst3");
-//  struct VST3Binary * vst3Binary = VST3LoadBinary ("/Library/Audio/Plug-Ins/VST3/Melodyne.vst3");
+    VST3Binary vst3Binary = VST3LoadBinary ("ARATestPlugIn.vst3");
+//  VST3Binary vst3Binary = VST3LoadBinary ("/Library/Audio/Plug-Ins/VST3/Melodyne.vst3");
     ARA_INTERNAL_ASSERT (vst3Binary != nullptr);
 
     factory = VST3GetARAFactory (vst3Binary, nullptr);
