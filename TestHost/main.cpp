@@ -162,21 +162,12 @@ int main (int argc, const char* argv[])
         return -1;
     }
 
-    // start up ARA
-    if (!plugInEntry->usesIPC ())
-        plugInEntry->initializeARA (assertFunctionReference);
-
 #if ARA_ENABLE_IPC
     if (isRemoteHost)
     {
         ARA_LOG ("Remotely hosting ARA plug-in '%s' in %s", factory->plugInName, plugInEntry->getDescription ().c_str ());
 
-        const auto result { RemoteHost::main (std::move (plugInEntry), hostCommandsPortID, plugInCallbacksPortID) };
-
-        if (!plugInEntry->usesIPC ())
-            plugInEntry->uninitializeARA ();
-
-        return result;
+        return RemoteHost::main (std::move (plugInEntry), hostCommandsPortID, plugInCallbacksPortID);
     }
 #endif
 
@@ -210,6 +201,9 @@ int main (int argc, const char* argv[])
     auto audioFiles { parseAudioFiles (args) };
     const auto testCases { parseTestCases (args) };
 
+    // start up ARA
+    plugInEntry->initializeARA(assertFunctionReference);
+
     // conditionally execute each test case
     const auto shouldTest { [&] (const std::string& testCase) { return testCases.empty () || ARA::contains (testCases, testCase); } };
     if (shouldTest ("PropertyUpdates"))
@@ -236,8 +230,7 @@ int main (int argc, const char* argv[])
         testAudioFileChunkLoading (plugInEntry.get (), audioFiles);
 
     // shut down ARA
-    if (!plugInEntry->usesIPC ())
-        plugInEntry->uninitializeARA ();
+    plugInEntry->uninitializeARA();
 
     return 0;
 }
