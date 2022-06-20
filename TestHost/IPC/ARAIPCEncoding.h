@@ -1032,7 +1032,8 @@ class ARAIPCContentEventDecoder
 {
 public:
     ARAIPCContentEventDecoder (ARAContentType type)
-    : _decoderFunction { _getDecoderFunctionForContentType (type) }
+    : _decoderFunction { _getDecoderFunctionForContentType (type) },
+      _contentString { _findStringMember (type) }
     {}
 
     const void* decode (const IPCMessage& message)
@@ -1045,32 +1046,21 @@ private:
     using _DecoderFunction = void (ARAIPCContentEventDecoder::*) (const IPCMessage&);
 
     template<typename ContentT>
-    void _copyEventStringIfNeeded ()
-    {}
-// \todo is there a way to use decltype(memberString) instead of additionally passing in the type?
-#define _SPECIALIZE_COPY_EVENT_STRING_IF_NEEEDED(ContentT, memberString) \
-    template<>                                                      \
-    void _copyEventStringIfNeeded<ContentT> ()                      \
-    {                                                               \
-        if (_eventStorage.memberString)                             \
-        {                                                           \
-            _stringStorage.assign (_eventStorage.memberString);     \
-            _eventStorage.memberString = _stringStorage.c_str ();   \
-        }                                                           \
-    }
-    _SPECIALIZE_COPY_EVENT_STRING_IF_NEEEDED (ARAContentTuning, _tuning.name)
-    _SPECIALIZE_COPY_EVENT_STRING_IF_NEEEDED (ARAContentKeySignature, _keySignature.name)
-    _SPECIALIZE_COPY_EVENT_STRING_IF_NEEEDED (ARAContentChord, _chord.name)
-#undef _SPECIALIZE_COPY_EVENT_STRING_IF_NEEEDED
-
-    template<typename ContentT>
     void _decodeContentEvent (const IPCMessage& message)
     {
         decodeReply (*reinterpret_cast<ContentT*> (&this->_eventStorage), message);
-        _copyEventStringIfNeeded<ContentT> ();
+        if (this->_contentString != nullptr)
+        {
+            this->_stringStorage.assign (*this->_contentString);
+            *this->_contentString = this->_stringStorage.c_str ();
+        }
     }
 
-    _DecoderFunction _getDecoderFunctionForContentType (ARAContentType type)
+    static inline
+#if __cplusplus >= 201402L
+                  constexpr
+#endif
+                            _DecoderFunction _getDecoderFunctionForContentType (const ARAContentType type)
     {
         switch (type)
         {
@@ -1082,6 +1072,29 @@ private:
             case kARAContentTypeSheetChords: return &ARAIPCContentEventDecoder::_decodeContentEvent<ContentTypeMapper<kARAContentTypeSheetChords>::DataType>;
             default: ARA_INTERNAL_ASSERT (false); return nullptr;
         }
+    }
+
+    static inline
+#if __cplusplus >= 201402L
+                  constexpr
+#endif
+                            size_t _getStringMemberOffsetForContentType (const ARAContentType type)
+    {
+        switch (type)
+        {
+            case kARAContentTypeStaticTuning: return offsetof (ARAContentTuning, name);
+            case kARAContentTypeKeySignatures: return offsetof (ARAContentKeySignature, name);
+            case kARAContentTypeSheetChords: return offsetof (ARAContentChord, name);
+            default: return 0;
+        }
+    }
+
+    inline ARAUtf8String* _findStringMember (const ARAContentType type)
+    {
+        const auto offset { ARAIPCContentEventDecoder::_getStringMemberOffsetForContentType (type) };
+        if (offset == 0)
+            return nullptr;
+        return reinterpret_cast<ARAUtf8String*> (reinterpret_cast<uint8_t *> (&this->_eventStorage) + offset);
     }
 
 private:
@@ -1096,6 +1109,8 @@ private:
         ARAContentKeySignature _keySignature;
         ARAContentChord _chord;
     } _eventStorage {};
+
+    ARAUtf8String* _contentString {};
     std::string _stringStorage {};
 };
 
