@@ -296,13 +296,11 @@ public:
 
     void renderSamples (int blockSize, int64_t samplePosition, float* buffer) override
     {
-        // \todo we're copying twice here: msg -> vector, vector -> buffer
-        //       we should change the IPCMessage API to directly decode to buffers, or to return
-        //       an arrayview-like object (same problem for strings - albeit these are much much smaller)
-        std::vector<uint8_t> reply;
-        _sender.remoteCallWithReply (reply, kIPCRenderSamples, _remoteRef, samplePosition,
-                                    std::vector<uint8_t> { reinterpret_cast<const uint8_t*> (buffer), reinterpret_cast<const uint8_t*> (buffer + blockSize) });
-        std::memcpy (buffer, reply.data (), static_cast<size_t> (blockSize) * sizeof (*buffer));
+        const auto byteSize { static_cast<size_t> (blockSize) * sizeof (float) };
+        auto resultSize { byteSize };
+        ARA::BytesDecoder reply { reinterpret_cast<uint8_t*> (buffer), resultSize };
+        _sender.remoteCallWithReply (reply, kIPCRenderSamples, _remoteRef, samplePosition, ARA::BytesEncoder { reinterpret_cast<const uint8_t*> (buffer), byteSize });
+        ARA_INTERNAL_ASSERT (resultSize == byteSize);
     }
 
     void stopRendering () override
@@ -472,12 +470,14 @@ IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMe
         size_t plugInInstanceRef;
         int64_t samplePosition;
         std::vector<uint8_t> buffer;
-        ARA::decodeArguments (message, plugInInstanceRef, samplePosition, buffer);
+        ARA::BytesDecoder writer { buffer };
+        ARA::decodeArguments (message, plugInInstanceRef, samplePosition, writer);
+        ARA_INTERNAL_ASSERT (buffer.size () > 0);
 
         // \todo this ignores potential float data alignment or byte order issues...
         reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->renderSamples (static_cast<int> (buffer.size () / sizeof(float)),
                                                                         samplePosition, reinterpret_cast<float*> (buffer.data ()));
-        return ARA::encodeArguments (buffer);
+        return ARA::encodeArguments (ARA::BytesEncoder { buffer });
     }
     else if (messageID == kIPCStopRendering)
     {

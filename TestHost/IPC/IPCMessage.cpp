@@ -132,9 +132,9 @@ void IPCMessage::appendString (const int32_t argKey, const char* const argValue)
     _appendEncodedArg (argKey, CFStringCreateWithCString (kCFAllocatorDefault, argValue, kCFStringEncodingUTF8));
 }
 
-void IPCMessage::appendBytes (const int32_t argKey, const std::vector<uint8_t>& argValue)
+void IPCMessage::appendBytes (const int32_t argKey, const uint8_t* argValue, const size_t argSize)
 {
-    _appendEncodedArg (argKey, CFDataCreate (kCFAllocatorDefault, argValue.data (), (CFIndex) argValue.size ()));
+    _appendEncodedArg (argKey, CFDataCreate (kCFAllocatorDefault, argValue, (CFIndex) argSize));
 }
 
 void IPCMessage::appendMessage (const int32_t argKey, const IPCMessage& argValue)
@@ -263,19 +263,29 @@ bool IPCMessage::readString (const int32_t argKey, const char*& argValue) const
     return true;
 }
 
-bool IPCMessage::readBytes (const int32_t argKey, std::vector<uint8_t>& argValue) const
+bool IPCMessage::readBytesSize (const int32_t argKey, size_t& argSize) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto bytes { (CFDataRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
     if (!bytes)
     {
-        argValue.clear ();
+        argSize = 0;
         return false;
     }
     ARA_INTERNAL_ASSERT (bytes && (CFGetTypeID (bytes) == CFDataGetTypeID ()));
+    argSize = (size_t) CFDataGetLength (bytes);
+    return true;
+}
+
+bool IPCMessage::readBytes (const int32_t argKey, uint8_t* const argValue) const
+{
+    ARA_INTERNAL_ASSERT (_dictionary);
+    auto bytes { (CFDataRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
+    if (!bytes)
+        return false;
+    ARA_INTERNAL_ASSERT (bytes && (CFGetTypeID (bytes) == CFDataGetTypeID ()));
     const auto length { CFDataGetLength (bytes) };
-    argValue.resize (static_cast<size_t> (length));
-    CFDataGetBytes (bytes, CFRangeMake (0, length), argValue.data ());
+    CFDataGetBytes (bytes, CFRangeMake (0, length), argValue);
     return true;
 }
 
@@ -382,9 +392,9 @@ void IPCMessage::appendString (const int32_t argKey, const char* const argValue)
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCMessage::appendBytes (const int32_t argKey, const std::vector<uint8_t>& argValue)
+void IPCMessage::appendBytes (const int32_t argKey, const uint8_t* argValue, const size_t argSize)
 {
-    const auto encodedData { base64_encode (argValue.data (), argValue.size (), false) };
+    const auto encodedData { base64_encode (argValue, argSize, false) };
     _appendAttribute (argKey).set_value (encodedData.c_str ());
 }
 
@@ -532,18 +542,36 @@ bool IPCMessage::readString (const int32_t argKey, const char*& argValue) const
     return true;
 }
 
-bool IPCMessage::readBytes (const int32_t argKey, std::vector<uint8_t>& argValue) const
+bool IPCMessage::readBytesSize (const int32_t argKey, size_t& argSize) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
     if (attribute.empty ())
     {
-        argValue.clear ();
+        argSize = 0;
         return false;
     }
+    _bytesCacheKey = argKey;
+    _bytesCacheData = base64_decode (attribute.as_string (), false);
+    argSize = _bytesCacheData.size ();
+    return true;
+}
+
+bool IPCMessage::readBytes (const int32_t argKey, uint8_t* const argValue) const
+{
+    if (argKey == _bytesCacheKey)
+    {
+        std::memcpy (argValue, _bytesCacheData.data (), _bytesCacheData.size ());
+        return true;
+    }
+
+    ARA_INTERNAL_ASSERT (!_root.empty ());
+    const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
+    if (attribute.empty ())
+        return false;
 
     const auto decodedData { base64_decode (attribute.as_string (), false) };
-    argValue.assign ((const uint8_t*) decodedData.c_str (), (const uint8_t*) decodedData.c_str () + decodedData.size ());
+    std::memcpy (argValue, decodedData.c_str (), decodedData.size ());
     return true;
 }
 
