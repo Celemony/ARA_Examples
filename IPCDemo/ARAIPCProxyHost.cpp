@@ -18,8 +18,6 @@
 
 #include "ARAIPCProxyHost.h"
 
-#include <os/lock.h>
-
 namespace ARA {
 namespace ProxyHost {
 
@@ -143,16 +141,11 @@ bool AudioAccessController::readAudioSamples (ARAAudioReaderHostRef audioReaderH
         }
     }
 
-    static os_unfair_lock_s lock { OS_UNFAIR_LOCK_INIT };
-    os_unfair_lock_lock (&lock);
-
     const auto reply { remoteCallWithReply<IPCMessage> (HOST_METHOD_ID (ARAAudioAccessControllerInterface, readAudioSamples),
                                                         _remoteHostRef, remoteAudioReader->mainHostRef, samplePosition, samplesPerChannel) };
     const auto result { (remoteAudioReader->use64BitSamples != kARAFalse) ?
                         _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers):
                         _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers)};
-
-    os_unfair_lock_unlock (&lock);
     return (result != kARAFalse);
 }
 

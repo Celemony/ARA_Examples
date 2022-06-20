@@ -105,7 +105,9 @@ void IPCPort::sendNonblocking (const int32_t messageID, const IPCMessage& messag
 //  ARA_LOG ("IPCPort::sendNonblocking %i", messageID);
 
     auto outgoingData { message.createEncodedMessage () };
-    const auto portSendResult { CFMessagePortSendRequest (_port, messageID, outgoingData, messageTimeout, 0.0, nullptr, nullptr) };
+    os_unfair_lock_lock (&_sendLock);
+    const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (_port, messageID, outgoingData, messageTimeout, 0.0, nullptr, nullptr) };
+    os_unfair_lock_unlock (&_sendLock);
     if (outgoingData)
         CFRelease (outgoingData);
     ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
@@ -133,7 +135,9 @@ CFDataRef IPCPort::_sendBlocking (const int32_t messageID, const IPCMessage& mes
 {
     CFDataRef incomingData {};
     auto outgoingData { message.createEncodedMessage () };
-    const auto portSendResult { CFMessagePortSendRequest (_port, messageID, outgoingData, messageTimeout, messageTimeout, kCFRunLoopDefaultMode, &incomingData) };
+    os_unfair_lock_lock (&_sendLock);
+    const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (_port, messageID, outgoingData, messageTimeout, messageTimeout, kCFRunLoopDefaultMode, &incomingData) };
+    os_unfair_lock_unlock (&_sendLock);
     if (outgoingData)
         CFRelease (outgoingData);
     ARA_INTERNAL_ASSERT (incomingData && (portSendResult == kCFMessagePortSuccess));

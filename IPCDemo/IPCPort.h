@@ -25,6 +25,8 @@
 
 #include "IPCMessage.h"
 
+#include <os/lock.h>
+
 // A simple proof-of-concept wrapper for an IPC communication channel.
 // Error handling is limited to assertions.
 class IPCPort
@@ -58,4 +60,5 @@ private:
 
 private:
     CFMessagePortRef _port {};
+    os_unfair_lock_s _sendLock { OS_UNFAIR_LOCK_INIT };
 };
