@@ -169,31 +169,31 @@ struct _IsStructPointerArg
 
 
 // primitives for appending an argument to a message
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const int32_t argValue)
+inline void _appendToMessage (IPCMessage& message, const MessageKey argKey, const int32_t argValue)
 {
     message.appendInt32 (argKey, argValue);
 }
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const int64_t argValue)
+inline void _appendToMessage (IPCMessage& message, const MessageKey argKey, const int64_t argValue)
 {
     message.appendInt64 (argKey, argValue);
 }
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const size_t argValue)
+inline void _appendToMessage (IPCMessage& message, const MessageKey argKey, const size_t argValue)
 {
     message.appendSize (argKey, argValue);
 }
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const float argValue)
+inline void _appendToMessage (IPCMessage& message, const MessageKey argKey, const float argValue)
 {
     message.appendFloat (argKey, argValue);
 }
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const double argValue)
+inline void _appendToMessage (IPCMessage& message, const MessageKey argKey, const double argValue)
 {
     message.appendDouble (argKey, argValue);
 }
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const char* const argValue)
+inline void _appendToMessage (IPCMessage& message, const MessageKey argKey, const char* const argValue)
 {
     message.appendString (argKey, argValue);
 }
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const BytesEncoder& argValue)
+inline void _appendToMessage (IPCMessage& message, const MessageKey argKey, const BytesEncoder& argValue)
 {
     const uint8_t* bytes;
     size_t size;
@@ -201,37 +201,37 @@ inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const B
     argValue (bytes, size, copy);
     message.appendBytes (argKey, bytes, size, copy);
 }
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const IPCMessage& argValue)
+inline void _appendToMessage (IPCMessage& message, const MessageKey argKey, const IPCMessage& argValue)
 {
     message.appendMessage (argKey, argValue);
 }
 
 // primitives for reading an (optional) argument from a message
-inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, int32_t& argValue)
+inline bool _readFromMessage (const IPCMessage& message, const MessageKey argKey, int32_t& argValue)
 {
     return message.readInt32 (argKey, argValue);
 }
-inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, int64_t& argValue)
+inline bool _readFromMessage (const IPCMessage& message, const MessageKey argKey, int64_t& argValue)
 {
     return message.readInt64 (argKey, argValue);
 }
-inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, size_t& argValue)
+inline bool _readFromMessage (const IPCMessage& message, const MessageKey argKey, size_t& argValue)
 {
     return message.readSize (argKey, argValue);
 }
-inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, float& argValue)
+inline bool _readFromMessage (const IPCMessage& message, const MessageKey argKey, float& argValue)
 {
     return message.readFloat (argKey, argValue);
 }
-inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, double& argValue)
+inline bool _readFromMessage (const IPCMessage& message, const MessageKey argKey, double& argValue)
 {
     return message.readDouble (argKey, argValue);
 }
-inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, const char*& argValue)
+inline bool _readFromMessage (const IPCMessage& message, const MessageKey argKey, const char*& argValue)
 {
     return message.readString (argKey, argValue);
 }
-inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, BytesDecoder& argValue)
+inline bool _readFromMessage (const IPCMessage& message, const MessageKey argKey, BytesDecoder& argValue)
 {
     size_t receivedSize;
     const auto found { message.readBytesSize (argKey, receivedSize) };
@@ -243,7 +243,7 @@ inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, B
         return false;
     return message.readBytes (argKey, bytes);
 }
-inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, IPCMessage& argValue)
+inline bool _readFromMessage (const IPCMessage& message, const MessageKey argKey, IPCMessage& argValue)
 {
     return message.readMessage (argKey, argValue);
 }
@@ -257,12 +257,12 @@ inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, I
 // templated overloads of the IPCMessage primitives for ARA (host) ref types,
 // which are stored as size_t
 template<typename T, typename std::enable_if<_IsRefType<T>::value, bool>::type = true>
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const T argValue)
+inline void _appendToMessage (IPCMessage& message, const MessageKey argKey, const T argValue)
 {
     message.appendSize (argKey, reinterpret_cast<size_t> (argValue));
 }
 template<typename T, typename std::enable_if<_IsRefType<T>::value, bool>::type = true>
-inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, T& argValue)
+inline bool _readFromMessage (const IPCMessage& message, const MessageKey argKey, T& argValue)
 {
     // \todo is there a safe/proper way across all compilers for this cast to avoid the copy?
 //  return message.readSize (argKey, *reinterpret_cast<size_t*> (&argValue));
@@ -276,11 +276,11 @@ inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, T
     sending arrays of ARABytes via this overload (seems simpler but less efficient):
 // to read and write arrays of ARAByte (not raw bytes but e.g. ARAKeySignatureIntervalUsage),
 // we use int32_t to keep the IPCMessage API small
-inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const ARAByte argValue)
+inline void _appendToMessage (IPCMessage& message, const MessageKey argKey, const ARAByte argValue)
 {
     message.appendInt32 (argKey, static_cast<int32_t> (argValue));
 }
-inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, ARAByte& argValue)
+inline bool _readFromMessage (const IPCMessage& message, const MessageKey argKey, ARAByte& argValue)
 {
     int32_t tmp;
     const auto result { message.readInt32 (argKey, tmp) };
@@ -309,16 +309,16 @@ inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, A
 // declarations of wrapper functions to implicitly deduce _ValueEn-/Decoder<> -
 // they are defined further down below, after all specializations are defined
 template <typename ValueT>
-inline void _encodeAndAppend (IPCMessage& message, const int32_t argKey, const ValueT& argValue);
+inline void _encodeAndAppend (IPCMessage& message, const MessageKey argKey, const ValueT& argValue);
 template <typename ValueT>
-inline bool _readAndDecode (ValueT& result, const IPCMessage& message, const int32_t argKey);
+inline bool _readAndDecode (ValueT& result, const IPCMessage& message, const MessageKey argKey);
 
 
 // primary templates for basic types (numbers, strings, (host)refs and raw bytes)
 template<typename ValueT>
 struct _ValueEncoder
 {
-    static inline void encodeAndAppend (IPCMessage& message, const int32_t argKey, const ValueT& argValue)
+    static inline void encodeAndAppend (IPCMessage& message, const MessageKey argKey, const ValueT& argValue)
     {
         _appendToMessage (message, argKey, argValue);
     }
@@ -326,7 +326,7 @@ struct _ValueEncoder
 template<typename ValueT>
 struct _ValueDecoder
 {
-    static inline bool readAndDecode (ValueT& result, const IPCMessage& message, const int32_t argKey)
+    static inline bool readAndDecode (ValueT& result, const IPCMessage& message, const MessageKey argKey)
     {
         return _readFromMessage (message, argKey, result);
     }
@@ -338,7 +338,7 @@ struct _ValueDecoder
 template<typename ValueT>
 struct _CompoundValueEncoderBase
 {
-    static inline void encodeAndAppend (IPCMessage& message, const int32_t argKey, const ValueT& argValue)
+    static inline void encodeAndAppend (IPCMessage& message, const MessageKey argKey, const ValueT& argValue)
     {
         _encodeAndAppend (message, argKey, _ValueEncoder<ValueT>::encode (argValue));
     }
@@ -346,7 +346,7 @@ struct _CompoundValueEncoderBase
 template<typename ValueT>
 struct _CompoundValueDecoderBase
 {
-    static inline bool readAndDecode (ValueT& result, const IPCMessage& message, const int32_t argKey)
+    static inline bool readAndDecode (ValueT& result, const IPCMessage& message, const MessageKey argKey)
     {
         IPCMessage subMessage;
         if (!_readFromMessage (message, argKey, subMessage))
@@ -363,8 +363,8 @@ struct _ValueEncoder<ArrayArgument<ElementT>> : public _CompoundValueEncoderBase
     static inline IPCMessage encode (const ArrayArgument<ElementT>& value)
     {
         IPCMessage result;
-        ARA_INTERNAL_ASSERT (value.count <= static_cast<size_t> (std::numeric_limits<int32_t>::max ()));
-        const auto count { static_cast<int32_t> (value.count) };
+        ARA_INTERNAL_ASSERT (value.count <= static_cast<size_t> (std::numeric_limits<MessageKey>::max ()));
+        const auto count { static_cast<MessageKey> (value.count) };
         _encodeAndAppend (result, 0, count);
         for (auto i { 0 }; i < count; ++i)
             _encodeAndAppend (result, i + 1, value.elements[static_cast<size_t> (i)]);
@@ -379,11 +379,11 @@ struct _ValueDecoder<ArrayArgument<ElementT>> : public _CompoundValueDecoderBase
     static inline bool decode (ArrayArgument<ElementT>& result, const IPCMessage& message)
     {
         bool success { true };
-        int32_t count;
+        MessageKey count;
         success &= _readAndDecode (count, message, 0);
-        success &= (count == static_cast<int32_t> (result.count));
-        if (count > static_cast<int32_t> (result.count))
-            count = static_cast<int32_t> (result.count);
+        success &= (count == static_cast<MessageKey> (result.count));
+        if (count > static_cast<MessageKey> (result.count))
+            count = static_cast<MessageKey> (result.count);
 
         for (auto i { 0 }; i < count; ++i)
             success &= _readAndDecode (result.elements[static_cast<size_t> (i)], message, i + 1);
@@ -398,7 +398,7 @@ struct _ValueDecoder<std::vector<ElementT>> : public _CompoundValueDecoderBase<s
     static inline bool decode (std::vector<ElementT>& result, const IPCMessage& message)
     {
         bool success { true };
-        int32_t count;
+        MessageKey count;
         success &= _readAndDecode (count, message, 0);
         result.resize (static_cast<size_t> (count));
         for (auto i { 0 }; i < count; ++i)
@@ -826,12 +826,12 @@ ARA_IPC_END_DECODE
 // actual definitions of wrapper functions to implicitly deduce _ValueEn-/Decoder<> -
 // they are forward-declared above, before _ValueEn-/Decoder<> are defined
 template <typename ValueT>
-inline void _encodeAndAppend (IPCMessage& message, const int32_t argKey, const ValueT& argValue)
+inline void _encodeAndAppend (IPCMessage& message, const MessageKey argKey, const ValueT& argValue)
 {
     return _ValueEncoder<ValueT>::encodeAndAppend (message, argKey, argValue);
 }
 template <typename ValueT>
-inline bool _readAndDecode (ValueT& result, const IPCMessage& message, const int32_t argKey)
+inline bool _readAndDecode (ValueT& result, const IPCMessage& message, const MessageKey argKey)
 {
     return _ValueDecoder<ValueT>::readAndDecode (result, message, argKey);
 }
@@ -852,39 +852,39 @@ struct _IsOptionalArgument<std::pair<ArgT, bool>>
 };
 
 // private helpers for encodeArguments() and decodeArguments() to deal with the variable arguments one at a time
-inline void _encodeArgumentsHelper (IPCMessage& /*message*/, int32_t /*argKey*/)
+inline void _encodeArgumentsHelper (IPCMessage& /*message*/, MessageKey /*argKey*/)
 {
 }
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<!_IsStructPointerArg<ArgT>::type::value, bool>::type = true>
-inline void _encodeArgumentsHelper (IPCMessage& message, const int32_t argKey, const ArgT& argValue, const MoreArgs &... moreArgs)
+inline void _encodeArgumentsHelper (IPCMessage& message, const MessageKey argKey, const ArgT& argValue, const MoreArgs &... moreArgs)
 {
     _encodeAndAppend (message, argKey, argValue);
     _encodeArgumentsHelper (message, argKey + 1, moreArgs...);
 }
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<_IsStructPointerArg<ArgT>::type::value, bool>::type = true>
-inline void _encodeArgumentsHelper (IPCMessage& message, const int32_t argKey, const ArgT& argValue, const MoreArgs &... moreArgs)
+inline void _encodeArgumentsHelper (IPCMessage& message, const MessageKey argKey, const ArgT& argValue, const MoreArgs &... moreArgs)
 {
     if (argValue != nullptr)
         _encodeAndAppend (message, argKey, *argValue);
     _encodeArgumentsHelper (message, argKey + 1, moreArgs...);
 }
 template<typename... MoreArgs>
-inline void _encodeArgumentsHelper (IPCMessage& message, const int32_t argKey, const std::nullptr_t& /*argValue*/, const MoreArgs &... moreArgs)
+inline void _encodeArgumentsHelper (IPCMessage& message, const MessageKey argKey, const std::nullptr_t& /*argValue*/, const MoreArgs &... moreArgs)
 {
     _encodeArgumentsHelper (message, argKey + 1, moreArgs...);
 }
 
-inline void _decodeArgumentsHelper (const IPCMessage& /*message*/, int32_t /*argKey*/)
+inline void _decodeArgumentsHelper (const IPCMessage& /*message*/, MessageKey /*argKey*/)
 {
 }
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<!_IsOptionalArgument<ArgT>::value, bool>::type = true>
-inline void _decodeArgumentsHelper (const IPCMessage& message, const int32_t argKey, ArgT& argValue, MoreArgs &... moreArgs)
+inline void _decodeArgumentsHelper (const IPCMessage& message, const MessageKey argKey, ArgT& argValue, MoreArgs &... moreArgs)
 {
     _readAndDecode (argValue, message, argKey);
     _decodeArgumentsHelper (message, argKey + 1, moreArgs...);
 }
 template<typename ArgT, typename... MoreArgs, typename std::enable_if<_IsOptionalArgument<ArgT>::value, bool>::type = true>
-inline void _decodeArgumentsHelper (const IPCMessage& message, const int32_t argKey, ArgT& argValue, MoreArgs &... moreArgs)
+inline void _decodeArgumentsHelper (const IPCMessage& message, const MessageKey argKey, ArgT& argValue, MoreArgs &... moreArgs)
 {
     argValue.second = _readAndDecode (argValue.first, message, argKey);
     _decodeArgumentsHelper (message, argKey + 1, moreArgs...);
@@ -892,31 +892,31 @@ inline void _decodeArgumentsHelper (const IPCMessage& message, const int32_t arg
 
 // private helpers for ARA_IPC_HOST_METHOD_ID and ARA_IPC_PLUGIN_METHOD_ID
 template<typename StructT>
-constexpr int32_t _getHostInterfaceID ();
+constexpr MessageID _getHostInterfaceID ();
 template<>
-constexpr int32_t _getHostInterfaceID<ARAAudioAccessControllerInterface> () { return 0; }
+constexpr MessageID _getHostInterfaceID<ARAAudioAccessControllerInterface> () { return 0; }
 template<>
-constexpr int32_t _getHostInterfaceID<ARAArchivingControllerInterface> () { return 1; }
+constexpr MessageID _getHostInterfaceID<ARAArchivingControllerInterface> () { return 1; }
 template<>
-constexpr int32_t _getHostInterfaceID<ARAContentAccessControllerInterface> () { return 2; }
+constexpr MessageID _getHostInterfaceID<ARAContentAccessControllerInterface> () { return 2; }
 template<>
-constexpr int32_t _getHostInterfaceID<ARAModelUpdateControllerInterface> () { return 3; }
+constexpr MessageID _getHostInterfaceID<ARAModelUpdateControllerInterface> () { return 3; }
 template<>
-constexpr int32_t _getHostInterfaceID<ARAPlaybackControllerInterface> () { return 4; }
+constexpr MessageID _getHostInterfaceID<ARAPlaybackControllerInterface> () { return 4; }
 
 template<typename StructT>
-constexpr int32_t _getPlugInInterfaceID ();
+constexpr MessageID _getPlugInInterfaceID ();
 template<>
-constexpr int32_t _getPlugInInterfaceID<ARADocumentControllerInterface> () { return 0; }
+constexpr MessageID _getPlugInInterfaceID<ARADocumentControllerInterface> () { return 0; }
 template<>
-constexpr int32_t _getPlugInInterfaceID<ARAPlaybackRendererInterface> () { return 1; }
+constexpr MessageID _getPlugInInterfaceID<ARAPlaybackRendererInterface> () { return 1; }
 template<>
-constexpr int32_t _getPlugInInterfaceID<ARAEditorRendererInterface> () { return 2; }
+constexpr MessageID _getPlugInInterfaceID<ARAEditorRendererInterface> () { return 2; }
 template<>
-constexpr int32_t _getPlugInInterfaceID<ARAEditorViewInterface> () { return 3; }
+constexpr MessageID _getPlugInInterfaceID<ARAEditorViewInterface> () { return 3; }
 
-template<int32_t interfaceID, size_t offset>
-constexpr int32_t _encodeMessageID ()
+template<MessageID interfaceID, size_t offset>
+constexpr MessageID _encodeMessageID ()
 {
     static_assert (offset > 0, "offset 0 is never a valid function pointer");
     static_assert ((interfaceID < 8), "currently using only 3 bits for interface ID");
@@ -942,9 +942,9 @@ constexpr int32_t _encodeMessageID ()
 #define ARA_IPC_PLUGIN_METHOD_ID(StructT, member) _encodeMessageID <_getPlugInInterfaceID<StructT> (), offsetof (StructT, member)> ()
 
 // "global" messages that are not passed based on interface structs
-constexpr int32_t kGetFactoriesCountMethodID { 1 };
-constexpr int32_t kGetFactoryMethodID { 2 };
-constexpr int32_t kCreateDocumentControllerMethodID { 3 };
+constexpr MessageID kGetFactoriesCountMessageID { 1 };
+constexpr MessageID kGetFactoryMessageID { 2 };
+constexpr MessageID kCreateDocumentControllerMessageID { 3 };
 
 
 // caller side: create a message with the specified arguments
@@ -1001,16 +1001,16 @@ inline IPCMessage encodeReply (const ValueT& value)
 
 
 // for debugging only: decoding method IDs
-inline const char* _decodeMethodID (std::map<int32_t, std::string>& cache, const char* interfaceName, const int32_t methodID)
+inline const char* _decodeMessageID (std::map<MessageID, std::string>& cache, const char* interfaceName, const MessageID messageID)
 {
-    auto it { cache.find (methodID) };
+    auto it { cache.find (messageID) };
     if (it == cache.end ())
-        it = cache.emplace (methodID, std::string { interfaceName } + " method " + std::to_string (methodID >> 3)).first;
+        it = cache.emplace (messageID, std::string { interfaceName } + " method " + std::to_string (messageID >> 3)).first;
     return it->second.c_str();
 }
-inline const char* decodeHostMethodID (const int32_t messageID)
+inline const char* decodeHostMessageID (const MessageID messageID)
 {
-    static std::map<int32_t, std::string> cache;
+    static std::map<MessageID, std::string> cache;
     const char* interfaceName;
     switch (messageID & 0x7)
     {
@@ -1021,11 +1021,11 @@ inline const char* decodeHostMethodID (const int32_t messageID)
         case 4: interfaceName = "ARAPlaybackControllerInterface"; break;
         default: ARA_INTERNAL_ASSERT (false); interfaceName = "(unknown)"; break;
     }
-    return _decodeMethodID (cache, interfaceName, messageID);
+    return _decodeMessageID (cache, interfaceName, messageID);
 }
-inline const char* decodePlugInMethodID (const int32_t messageID)
+inline const char* decodePlugInMessageID (const MessageID messageID)
 {
-    static std::map<int32_t, std::string> cache;
+    static std::map<MessageID, std::string> cache;
     const char* interfaceName;
     switch (messageID & 0x7)
     {
@@ -1035,7 +1035,7 @@ inline const char* decodePlugInMethodID (const int32_t messageID)
         case 3: interfaceName = "ARAEditorViewInterface"; break;
         default: ARA_INTERNAL_ASSERT (false); interfaceName = "(unknown)"; break;
     }
-    return _decodeMethodID (cache, interfaceName, messageID);
+    return _decodeMessageID (cache, interfaceName, messageID);
 }
 
 //------------------------------------------------------------------------------
@@ -1154,14 +1154,14 @@ public:
     ARAIPCMessageSender (IPCPort& port) noexcept : _port { port } {}
 
     template<typename... Args>
-    void remoteCallWithoutReply (const int32_t methodID, const Args &... args)
+    void remoteCallWithoutReply (const MessageID messageID, const Args &... args)
     {
-        _port.sendBlocking (methodID, encodeArguments (args...));
+        _port.sendBlocking (messageID, encodeArguments (args...));
     }
     template<typename RetT, typename... Args>
-    void remoteCallWithReply (RetT& result, const int32_t methodID, const Args &... args)
+    void remoteCallWithReply (RetT& result, const MessageID messageID, const Args &... args)
     {
-        decodeReply (result, _port.sendAndAwaitReply (methodID, encodeArguments (args...)));
+        decodeReply (result, _port.sendAndAwaitReply (messageID, encodeArguments (args...)));
     }
 
     bool portEndianessMatches () { return _port.endianessMatches (); }

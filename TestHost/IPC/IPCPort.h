@@ -28,6 +28,11 @@
     #error "IPC not yet implemented for Linux"
 #endif
 
+
+// ID type for messages
+using MessageID = int32_t;
+
+
 // A simple proof-of-concept wrapper for an IPC communication channel.
 // Error handling is limited to assertions.
 class IPCPort
@@ -44,16 +49,16 @@ public:
     IPCPort () = default;
 
     // factory functions for send and receive ports
-    using Callback = IPCMessage (*) (const int32_t messageID, const IPCMessage&);
+    using Callback = IPCMessage (*) (const MessageID messageID, const IPCMessage& message);
     static IPCPort createPublishingID (const char* remotePortID, Callback callback);
     static IPCPort createConnectedToID (const char* remotePortID);
 
     // message sending
     // If no reply is desired, blocking is still necessary in many cases to ensure consistent call order,
     // e.g. if the message potentially triggers any synchronous callbacks from the other side.
-    void sendNonblocking (const int32_t messageID, const IPCMessage& message);
-    void sendBlocking (const int32_t messageID, const IPCMessage& message);
-    IPCMessage sendAndAwaitReply (const int32_t messageID, const IPCMessage& message);
+    void sendNonblocking (const MessageID messageID, const IPCMessage& message);
+    void sendBlocking (const MessageID messageID, const IPCMessage& message);
+    IPCMessage sendAndAwaitReply (const MessageID messageID, const IPCMessage& message);
 
     // message receiving
     // waits up to the specified amount of milliseconds for an incoming event and processes it
@@ -67,10 +72,10 @@ public:
 private:
 #if defined (_WIN32)
     IPCPort (const char* remotePortID);
-    void _sendMessage (bool blocking, const int32_t messageID, const IPCMessage& message, std::string* result);
+    void _sendMessage (bool blocking, const MessageID messageID, const IPCMessage& message, std::string* result);
 #elif defined (__APPLE__)
     explicit IPCPort (CFMessagePortRef __attribute__((cf_consumed)) port);
-    __attribute__((cf_returns_retained)) CFDataRef _sendBlocking (const int32_t messageID, const IPCMessage& message);
+    __attribute__((cf_returns_retained)) CFDataRef _sendBlocking (const MessageID messageID, const IPCMessage& message);
 #endif
 
 private:
@@ -80,7 +85,7 @@ private:
         static constexpr DWORD maxMessageSize { 4 * 1024 * 1024L - 64};
 
         size_t messageSize;
-        int32_t messageID;
+        MessageID messageID;
         char messageData[maxMessageSize];
     };
 

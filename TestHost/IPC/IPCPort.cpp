@@ -107,7 +107,7 @@ IPCPort IPCPort::createConnectedToID (const char* remotePortID)
     return port;
 }
 
-void IPCPort::_sendMessage (bool blocking, const int32_t messageID, const IPCMessage& message, std::string* result)
+void IPCPort::_sendMessage (bool blocking, const MessageID messageID, const IPCMessage& message, std::string* result)
 {
     ARA_INTERNAL_ASSERT (blocking || result == nullptr);
 
@@ -142,21 +142,21 @@ void IPCPort::_sendMessage (bool blocking, const int32_t messageID, const IPCMes
     ::ReleaseMutex (_hSendMutex);
 }
 
-void IPCPort::sendNonblocking (const int32_t messageID, const IPCMessage& message)
+void IPCPort::sendNonblocking (const MessageID messageID, const IPCMessage& message)
 {
 //  ARA_LOG ("IPCPort::sendNonblocking %i", messageID);
 
     _sendMessage (false, messageID, message, nullptr);
 }
 
-void IPCPort::sendBlocking (const int32_t messageID, const IPCMessage& message)
+void IPCPort::sendBlocking (const MessageID messageID, const IPCMessage& message)
 {
 //  ARA_LOG ("IPCPort::sendBlocking %i", messageID);
 
     _sendMessage (true, messageID, message, nullptr);
 }
 
-IPCMessage IPCPort::sendAndAwaitReply (const int32_t messageID, const IPCMessage& message)
+IPCMessage IPCPort::sendAndAwaitReply (const MessageID messageID, const IPCMessage& message)
 {
 //  ARA_LOG ("IPCPort::sendAndAwaitReply %i", messageID);
 
@@ -267,7 +267,7 @@ IPCPort IPCPort::createConnectedToID (const char* remotePortID)
     return IPCPort { port };
 }
 
-void IPCPort::sendNonblocking (const int32_t messageID, const IPCMessage& message)
+void IPCPort::sendNonblocking (const MessageID messageID, const IPCMessage& message)
 {
 //  ARA_LOG ("IPCPort::sendNonblocking %i", messageID);
 
@@ -280,7 +280,7 @@ void IPCPort::sendNonblocking (const int32_t messageID, const IPCMessage& messag
     ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
 }
 
-void IPCPort::sendBlocking (const int32_t messageID, const IPCMessage& message)
+void IPCPort::sendBlocking (const MessageID messageID, const IPCMessage& message)
 {
 //  ARA_LOG ("IPCPort::sendBlocking %i", messageID);
 
@@ -288,7 +288,7 @@ void IPCPort::sendBlocking (const int32_t messageID, const IPCMessage& message)
     CFRelease (incomingData);
 }
 
-IPCMessage IPCPort::sendAndAwaitReply (const int32_t messageID, const IPCMessage& message)
+IPCMessage IPCPort::sendAndAwaitReply (const MessageID messageID, const IPCMessage& message)
 {
 //  ARA_LOG ("IPCPort::sendAndAwaitReply %i", messageID);
 
@@ -298,7 +298,7 @@ IPCMessage IPCPort::sendAndAwaitReply (const int32_t messageID, const IPCMessage
     return reply;
 }
 
-CFDataRef IPCPort::_sendBlocking (const int32_t messageID, const IPCMessage& message)
+CFDataRef IPCPort::_sendBlocking (const MessageID messageID, const IPCMessage& message)
 {
     CFDataRef incomingData {};
     auto outgoingData { message.createEncodedMessage () };

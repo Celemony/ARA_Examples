@@ -412,21 +412,21 @@ void setPlugInCallbacksPort (IPCPort* plugInCallbacksPort)
 
 IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& message)
 {
-//  ARA_LOG ("_hostCommandHandler received message %s", decodePlugInMethodID (messageID));
+//  ARA_LOG ("_hostCommandHandler received message %s", decodePlugInMessageID (messageID));
 
     // ARAFactory
-    if (messageID == kGetFactoriesCountMethodID)
+    if (messageID == kGetFactoriesCountMessageID)
     {
         return encodeReply (_factories.size ());
     }
-    else if (messageID == kGetFactoryMethodID)
+    else if (messageID == kGetFactoryMessageID)
     {
         ARASize index;
         decodeArguments (message, index);
         ARA_INTERNAL_ASSERT (index < _factories.size ());
         return encodeReply (*_factories[index]);
     }
-    else if (messageID == kCreateDocumentControllerMethodID)
+    else if (messageID == kCreateDocumentControllerMessageID)
     {
         ARAPersistentID factoryID;
         ARAAudioAccessControllerHostRef audioAccessControllerHostRef;

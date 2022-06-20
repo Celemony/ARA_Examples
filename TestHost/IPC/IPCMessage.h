@@ -43,6 +43,10 @@
 #endif
 
 
+// key type for message dictionaries
+using MessageKey = int32_t;
+
+
 // A simple proof-of-concept wrapper for the IPC messages sent back and forth in the ARA IPC example.
 // Error handling is limited to assertions.
 // The basic data types transmitted are int32_t, int64_t, size_t, float, double, UTF8 encoded C strings
@@ -81,42 +85,42 @@ public:
     IPCMessage () = default;
 
     // append keyed argument to the message
-    void appendInt32 (const int32_t argKey, const int32_t argValue);
-    void appendInt64 (const int32_t argKey, const int64_t argValue);
-    void appendSize (const int32_t argKey, const size_t argValue);          // also for ptr-sized refs
-    void appendFloat (const int32_t argKey, const float argValue);
-    void appendDouble (const int32_t argKey, const double argValue);
-    void appendString (const int32_t argKey, const char* const argValue);   // UTF8
-    void appendBytes (const int32_t argKey, const uint8_t* argValue, const size_t argSize, const bool copy = true); // disable copy if data is alive longer than the message
-    void appendMessage (const int32_t argKey, const IPCMessage& argValue);
+    void appendInt32 (const MessageKey argKey, const int32_t argValue);
+    void appendInt64 (const MessageKey argKey, const int64_t argValue);
+    void appendSize (const MessageKey argKey, const size_t argValue);          // also for ptr-sized refs
+    void appendFloat (const MessageKey argKey, const float argValue);
+    void appendDouble (const MessageKey argKey, const double argValue);
+    void appendString (const MessageKey argKey, const char* const argValue);   // UTF8
+    void appendBytes (const MessageKey argKey, const uint8_t* argValue, const size_t argSize, const bool copy = true); // disable copy if data is alive longer than the message
+    void appendMessage (const MessageKey argKey, const IPCMessage& argValue);
 
     // read keyed argument to the message
     // if key is not found, returns false and a default value
-    bool readInt32 (const int32_t argKey, int32_t& argValue) const;
-    bool readInt64 (const int32_t argKey, int64_t& argValue) const;
-    bool readSize (const int32_t argKey, size_t& argValue) const;           // also for ptr-sized refs
-    bool readFloat (const int32_t argKey, float& argValue) const;
-    bool readDouble (const int32_t argKey, double& argValue) const;
-    bool readString (const int32_t argKey, const char*& argValue) const;    // UTF8
-    bool readBytesSize (const int32_t argKey, size_t& argSize) const;       // query size and allocate memory, then..
-    bool readBytes (const int32_t argKey, uint8_t* const argValue) const;   // copy bytes to that memory (if key found)
-    bool readMessage (const int32_t argKey, IPCMessage& argValue) const;
+    bool readInt32 (const MessageKey argKey, int32_t& argValue) const;
+    bool readInt64 (const MessageKey argKey, int64_t& argValue) const;
+    bool readSize (const MessageKey argKey, size_t& argValue) const;           // also for ptr-sized refs
+    bool readFloat (const MessageKey argKey, float& argValue) const;
+    bool readDouble (const MessageKey argKey, double& argValue) const;
+    bool readString (const MessageKey argKey, const char*& argValue) const;    // UTF8
+    bool readBytesSize (const MessageKey argKey, size_t& argSize) const;       // query size and allocate memory, then..
+    bool readBytes (const MessageKey argKey, uint8_t* const argValue) const;   // copy bytes to that memory (if key found)
+    bool readMessage (const MessageKey argKey, IPCMessage& argValue) const;
 
 private:
 #if IPC_MESSAGE_USE_CFDICTIONARY
     // wrap key value into CFString (no reference count transferred to caller)
-    static CFStringRef _getEncodedKey (const int32_t argKey);
+    static CFStringRef _getEncodedKey (const MessageKey argKey);
 
     // internal primitive - dictionary will be retained or copied, depending on isWritable
     void _setup (CFDictionaryRef dictionary, bool isWritable);
 
-    void _appendEncodedArg (const int32_t argKey, __attribute__((cf_consumed)) CFTypeRef argObject);
+    void _appendEncodedArg (const MessageKey argKey, __attribute__((cf_consumed)) CFTypeRef argObject);
 #else
-    static const char* _getEncodedKey (const int32_t argKey);
+    static const char* _getEncodedKey (const MessageKey argKey);
 
     void _makeWritableIfNeeded ();
 
-    pugi::xml_attribute _appendAttribute (const int32_t argKey);
+    pugi::xml_attribute _appendAttribute (const MessageKey argKey);
 #endif
 
 private:
@@ -126,7 +130,7 @@ private:
     std::shared_ptr<pugi::xml_document> _dictionary {};
     pugi::xml_node _root {};
     mutable std::string _bytesCacheData {};
-    mutable int32_t _bytesCacheKey { std::numeric_limits<int32_t>::max () };
+    mutable MessageKey _bytesCacheKey { std::numeric_limits<MessageKey>::max () };
 #endif
     bool _isWritable {};
 };
