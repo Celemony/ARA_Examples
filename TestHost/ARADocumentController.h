@@ -31,6 +31,7 @@
 
 #include "ExamplesCommon/Archives/Archives.h"
 #include "ModelObjects.h"
+#include "CompanionAPIs.h"
 
 #include <map>
 
@@ -63,11 +64,11 @@ class ARAPlaybackController;
 /*******************************************************************************/
 // Our test host document controller class.
 // This function creates a plug-in side document and controller and
-// provides handles to the othe ARA host controller interfaces.
+// provides handles to the other ARA host controller interfaces.
 class ARADocumentController
 {
 public:
-    ARADocumentController (Document* document, const ARA::ARAFactory* araFactory);
+    ARADocumentController (Document* document, PlugInEntry* plugInEntry);
     virtual ~ARADocumentController ();
 
     /*******************************************************************************/

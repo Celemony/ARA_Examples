@@ -15,15 +15,10 @@
 //!             See the License for the specific language governing permissions and
 //!             limitations under the License.
 //------------------------------------------------------------------------------
-// This is a brief proof-of-concept demo that hooks up an ARA capable plug-in
-// in a separate process using IPC.
-// This educational example is not suitable for production code -
-// see MainProcess.cpp for a list of issues.
-//------------------------------------------------------------------------------
 
 #pragma once
 
-#include "IPCMessage.h"
+#include "IPCPort.h"
 
 #include "ARA_Library/Dispatch/ARAContentReader.h"
 
@@ -176,7 +171,7 @@ struct _ValueDecoder<std::vector<ElementT>>
         std::vector<ElementT> result;
         const auto count { _readFromMessage<size_t> (message, 0) };
         result.reserve (count);
-        for (auto i { 0u }; i < count; ++i)
+        for (auto i { 0U }; i < count; ++i)
             result.push_back (_readFromMessage<ElementT> (message, i + 1));
         return result;
     }
@@ -744,7 +739,8 @@ constexpr size_t _encodeMessageID ()
 #define PLUGIN_METHOD_ID(StructT, member) _encodeMessageID <_getPlugInInterfaceID<StructT> (), offsetof (StructT, member)> ()
 
 // "global" messages that are not passed based on interface structs
-constexpr size_t kCreateDocumentControllerMethodID { 1 };
+constexpr size_t kGetFactoryMethodID { 1 };
+constexpr size_t kCreateDocumentControllerMethodID { 2 };
 
 
 // caller side: create a message with the specified arguments

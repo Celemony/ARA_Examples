@@ -15,14 +15,12 @@
 //!             See the License for the specific language governing permissions and
 //!             limitations under the License.
 //------------------------------------------------------------------------------
-// This is a brief proof-of-concept demo that hooks up an ARA capable plug-in
-// in a separate process using IPC.
-// This educational example is not suitable for production code -
-// see MainProcess.cpp for a list of issues.
-//------------------------------------------------------------------------------
 
 #include "IPCPort.h"
 #include "ARA_Library/Debug/ARADebug.h"
+
+_Pragma ("GCC diagnostic push")
+_Pragma ("GCC diagnostic ignored \"-Wold-style-cast\"")
 
 #if defined(NDEBUG)
     constexpr auto messageTimeout { 0.5 };
@@ -143,3 +141,5 @@ CFDataRef IPCPort::_sendBlocking (const int32_t messageID, const IPCMessage& mes
     ARA_INTERNAL_ASSERT (incomingData && (portSendResult == kCFMessagePortSuccess));
     return incomingData;
 }
+
+_Pragma ("GCC diagnostic pop")

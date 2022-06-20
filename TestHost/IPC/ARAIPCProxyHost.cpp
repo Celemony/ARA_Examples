@@ -359,7 +359,11 @@ IPCMessage _hostCommandHandler (const int32_t messageID, const IPCMessage& messa
 //  ARA_LOG ("_hostCommandHandler received message %s", decodePlugInMethodID (messageID));
 
     // ARAFactory
-    if (messageID == kCreateDocumentControllerMethodID)
+    if (messageID == kGetFactoryMethodID)
+    {
+        return encodeReply (*_factory);
+    }
+    else if (messageID == kCreateDocumentControllerMethodID)
     {
         ARAAudioAccessControllerHostRef audioAccessControllerHostRef;
         ARAArchivingControllerHostRef archivingControllerHostRef;
@@ -412,6 +416,8 @@ IPCMessage _hostCommandHandler (const int32_t messageID, const IPCMessage& messa
     }
     else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getFactory))
     {
+        ARA_INTERNAL_ASSERT (false && "should never be queried here but instead cached from companion API upon setup");
+
         ARADocumentControllerRef controllerRef;
         decodeArguments (message, controllerRef);
 

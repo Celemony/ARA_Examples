@@ -32,6 +32,15 @@
 #include <string>
 #include <vector>
 
+
+/*******************************************************************************/
+#if defined (__APPLE__)
+    #define ARA_ENABLE_IPC 1
+#else
+    #define ARA_ENABLE_IPC 0
+#endif
+
+
 /*******************************************************************************/
 // Wrapper class for a companion API plug-in instance
 class PlugInInstance
@@ -84,11 +93,21 @@ public:
     // Return pointer to factory describing the ARA plug-in (nullptr if plug-in does not support ARA)
     const ARA::ARAFactory* getARAFactory () const { return _factory; }
 
+    // Factory function for new ARA document controller instances
+    virtual const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
+                                                                                            const ARA::ARADocumentProperties* properties);
+
     // Factory function for new ARA plug-in instances with the desired roles
     virtual std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) = 0;
 
+    // Test if IPC is used
+    bool usesIPC () const { return _usesIPC; }
+
 protected:
     // implementation helpers for derived classes
+#if ARA_ENABLE_IPC
+    void setUsesIPC () { _usesIPC = true; }
+#endif
     void initializeARA (const ARA::ARAFactory* factory, ARA::ARAAssertFunction* assertFunctionAddress);
     void uninitializeARA ();
     void validatePlugInExtensionInstance (const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance, ARA::ARAPlugInInstanceRoleFlags assignedRoles);
@@ -97,5 +116,6 @@ protected:
     std::string _description {};
 
 private:
-    const ARA::ARAFactory* _factory {};
+    const ARA::ARAFactory* _factory { nullptr };
+    bool _usesIPC { false };
 };

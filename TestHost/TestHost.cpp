@@ -25,14 +25,13 @@
 
 #include "TestHost.h"
 
-void TestHost::addDocument (std::string documentName, const ARA::ARAFactory* factory)
+void TestHost::addDocument (std::string documentName, PlugInEntry* plugInEntry)
 {
     destroyDocument (documentName);
 
-    auto doc = std::make_unique<Document> (documentName);
-    std::unique_ptr<ARADocumentController> controller;
-    if (factory)
-        controller = std::make_unique<ARADocumentController> (doc.get (), factory);
+    auto doc { std::make_unique<Document> (documentName) };
+    auto controller { std::make_unique<ARADocumentController> (doc.get (), plugInEntry) };
+
     _documents[documentName] = { std::move (doc), std::move (controller) };
 }
 

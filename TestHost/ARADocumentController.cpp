@@ -44,7 +44,7 @@
 
 /*******************************************************************************/
 
-ARADocumentController::ARADocumentController (Document* document, const ARA::ARAFactory* araFactory)
+ARADocumentController::ARADocumentController (Document* document, PlugInEntry* plugInEntry)
 : _document { document },
   _documentControllerHostInstance { new ARAAudioAccessController (this),
                                     new ARAArchivingController (this),
@@ -53,13 +53,13 @@ ARADocumentController::ARADocumentController (Document* document, const ARA::ARA
                                     new ARAPlaybackController (this) }
 {
     const auto documentProperties { getDocumentProperties () };
-    auto documentControllerInstance { araFactory->createDocumentControllerWithDocument (&_documentControllerHostInstance, &documentProperties) };
+    auto documentControllerInstance { plugInEntry->createDocumentControllerWithDocument (&_documentControllerHostInstance, &documentProperties) };
     ARA_VALIDATE_API_STRUCT_PTR (documentControllerInstance, ARADocumentControllerInstance);
 
     _documentController = std::make_unique<ARA::Host::DocumentController> (documentControllerInstance);
     ARA_VALIDATE_API_INTERFACE (_documentController->getInterface (), ARADocumentControllerInterface);
 
-    ARA_VALIDATE_API_CONDITION (_documentController->getFactory () == araFactory);
+    ARA_VALIDATE_API_CONDITION (_documentController->getFactory () == plugInEntry->getARAFactory ());
 }
 
 ARADocumentController::~ARADocumentController ()

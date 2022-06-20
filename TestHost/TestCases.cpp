@@ -65,16 +65,13 @@ AudioFileList createDummyAudioFiles (size_t numFiles)
 // the entire audio modification is placed on the region sequence.
 // We can optionally request the plug-in to perform its audio source analysis immediately and
 // block until analysis completes, or time-stretch the region if the plug-in supports this.
-ARADocumentController* createHostAndBasicDocument (const PlugInEntry* plugInEntry, std::unique_ptr<TestHost>& testHost, std::string documentName, bool requestPlugInAnalysisAndBlock, const AudioFileList& audioFiles)
+ARADocumentController* createHostAndBasicDocument (PlugInEntry* plugInEntry, std::unique_ptr<TestHost>& testHost, std::string documentName, bool requestPlugInAnalysisAndBlock, const AudioFileList& audioFiles)
 {
-    // get the plug-in factory from the binary
-    const auto factory { plugInEntry->getARAFactory () };
-
     // create our ARA host and document
     if (testHost == nullptr)
         testHost = std::make_unique<TestHost> ();
 
-    testHost->addDocument (documentName, factory);
+    testHost->addDocument (documentName, plugInEntry);
     auto araDocumentController { testHost->getDocumentController (documentName) };
 
     if (requestPlugInAnalysisAndBlock)
@@ -111,14 +108,15 @@ ARADocumentController* createHostAndBasicDocument (const PlugInEntry* plugInEntr
     // end the document edit cycle
     araDocumentController->endEditing ();
 
-    // enable audio source samples access
+    // enable audio source samples access and
+    // request the analysis for all available content types if this plug-in has any
+    const auto araFactory { plugInEntry->getARAFactory () };
     for (auto& audioSource : testHost->getDocument (documentName)->getAudioSources ())
     {
         araDocumentController->enableAudioSourceSamplesAccess (audioSource.get (), true);
 
-        // request the analysis for all available content types if this plug-in has any
-        if (requestPlugInAnalysisAndBlock && factory->analyzeableContentTypesCount > 0)
-            araDocumentController->requestAudioSourceContentAnalysis (audioSource.get (), factory->analyzeableContentTypesCount, factory->analyzeableContentTypes, true);
+        if (requestPlugInAnalysisAndBlock && araFactory->analyzeableContentTypesCount > 0)
+            araDocumentController->requestAudioSourceContentAnalysis (audioSource.get (), araFactory->analyzeableContentTypesCount, araFactory->analyzeableContentTypes, true);
     }
 
     if (requestPlugInAnalysisAndBlock)
@@ -130,7 +128,7 @@ ARADocumentController* createHostAndBasicDocument (const PlugInEntry* plugInEntr
 /*******************************************************************************/
 // Demonstrates updating several properties of ARA model graph objects within an edit cycle
 // (note: in an actual application, these updates would likely be spread across individual cycles)
-void testPropertyUpdates (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
+void testPropertyUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("property updates");
 
@@ -170,7 +168,7 @@ void testPropertyUpdates (const PlugInEntry* plugInEntry, const AudioFileList& a
 // Demonstrates how to update content information if changed in the host
 // The plug-in will call back into the host's ARAContentAccessController implementation
 // to read the updated data - see ARAContentAccessController
-void testContentUpdates (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
+void testContentUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("content updates");
 
@@ -263,7 +261,7 @@ void testContentUpdates (const PlugInEntry* plugInEntry, const AudioFileList& au
 /*******************************************************************************/
 // Demonstrates how to read ARAContentTypes from a plug-in -
 // see ContentLogger::log () for implementation of the actual content reading
-void testContentReading (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
+void testContentReading (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("content reading");
 
@@ -286,7 +284,7 @@ void testContentReading (const PlugInEntry* plugInEntry, const AudioFileList& au
 
 /*******************************************************************************/
 // Demonstrates how to clone an audio modification to enable two separate edits of the same audio source
-void testModificationCloning (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
+void testModificationCloning (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("modification cloning");
 
@@ -346,7 +344,7 @@ void testModificationCloning (const PlugInEntry* plugInEntry, const AudioFileLis
 
 /*******************************************************************************/
 // Demonstrates how to store and restore plug-in document archives
-void testArchiving (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
+void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     // By default, this code stores the plug-in archivesin memory -
     // define ARA_TEST_ARCHIVE_FILENAME here to specify an archive file that should be stored on disk.
@@ -354,14 +352,13 @@ void testArchiving (const PlugInEntry* plugInEntry, const AudioFileList& audioFi
 
     ARA_LOG_TEST_HOST_FUNC ("archiving");
 
-    auto factory { plugInEntry->getARAFactory () };
     bool supportsARA2Persistency { false };                 // will be properly set after creating document controller
 
 #if defined (ARA_TEST_ARCHIVE_FILENAME)
     std::remove (ARA_TEST_ARCHIVE_FILENAME);
-    auto archive = new FileArchive { ARA_TEST_ARCHIVE_FILENAME, factory->documentArchiveID };
+    auto archive = new FileArchive { ARA_TEST_ARCHIVE_FILENAME, plugInEntry->getARAFactory ()->documentArchiveID };
 #else
-    auto archive = new MemoryArchive { factory->documentArchiveID };
+    auto archive = new MemoryArchive { plugInEntry->getARAFactory ()->documentArchiveID };
 #endif
 
     // create and archive the document,
@@ -405,7 +402,7 @@ void testArchiving (const PlugInEntry* plugInEntry, const AudioFileList& audioFi
         // B) perform the restore operation within a single edit cycle
         auto testHost { std::make_unique<TestHost> () };
         auto documentName { "testHostUnarchiving" };
-        testHost->addDocument (documentName, factory);
+        testHost->addDocument (documentName, plugInEntry);
         auto araDocumentController { testHost->getDocumentController (documentName) };
 
         // begin the document edit cycle to configure and restore the document
@@ -493,7 +490,7 @@ void testArchiving (const PlugInEntry* plugInEntry, const AudioFileList& audioFi
 /*******************************************************************************/
 // Simulates a "drag & drop" operation by archiving one source and its modification in a
 // two source/modification document with a StoreObjectsFilter, and restoring them in another document
-void testDragAndDrop (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
+void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("drag and drop");
 
@@ -742,7 +739,7 @@ void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 
 /*******************************************************************************/
 // Requests plug-in analysis, using every processing algorithm published by the plug-in.
-void testProcessingAlgorithms (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
+void testProcessingAlgorithms (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("processing algorithms");
 
@@ -751,13 +748,13 @@ void testProcessingAlgorithms (const PlugInEntry* plugInEntry, const AudioFileLi
     auto araDocumentController { createHostAndBasicDocument (plugInEntry, testHost, "testProcessingAlgorithm", false, audioFiles) };
     araDocumentController->setMinimalContentUpdateLogging (true);
     const auto document { araDocumentController->getDocument () };
-    const auto factory { plugInEntry->getARAFactory () };
+    const auto araFactory { plugInEntry->getARAFactory () };
 
     // run analysis, log content for each available processing algorithm
     const auto algorithmCount { araDocumentController->getProcessingAlgorithmsCount () };
     if (algorithmCount == 0)
     {
-        ARA_LOG ("No processing algorithms available for plug-in %s", factory->plugInName);
+        ARA_LOG ("No processing algorithms available for plug-in %s", araFactory->plugInName);
         return;
     }
 
@@ -775,7 +772,7 @@ void testProcessingAlgorithms (const PlugInEntry* plugInEntry, const AudioFileLi
         // now request analysis for each source and wait for completion
         for (auto& audioSource : document->getAudioSources ())
         {
-            araDocumentController->requestAudioSourceContentAnalysis (audioSource.get (), factory->analyzeableContentTypesCount, factory->analyzeableContentTypes, true);
+            araDocumentController->requestAudioSourceContentAnalysis (audioSource.get (), araFactory->analyzeableContentTypesCount, araFactory->analyzeableContentTypes, true);
             const auto actualIndex { araDocumentController->getProcessingAlgorithmForAudioSource (audioSource.get ()) };
             if (actualIndex != i)
                 ARA_LOG ("algorithm actually differs from requested algorithm, is %i \"%s\"", actualIndex, araDocumentController->getProcessingAlgorithmProperties (actualIndex)->name);
@@ -786,7 +783,7 @@ void testProcessingAlgorithms (const PlugInEntry* plugInEntry, const AudioFileLi
 
 /*******************************************************************************/
 // Loads an `iXML` ARA audio file chunk from a supplied .WAV or .AIFF file
-void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
+void testAudioFileChunkLoading (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("ARA audio file loading XML chunks");
 
@@ -871,7 +868,7 @@ void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileL
 // Requests plug-in analysis and saves audio source state into an `iXML` data chunk in each audio file
 // (if chunk authoring is supported by the plug-in) -
 // overwrites any current iXML chunk in the files (but only in-memory)
-void testAudioFileChunkSaving (const PlugInEntry* plugInEntry, AudioFileList& audioFiles)
+void testAudioFileChunkSaving (PlugInEntry* plugInEntry, AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("ARA audio file saving XML chunks");
 

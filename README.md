@@ -55,14 +55,14 @@ ARA audio file chunks for the plug-in.
 
 - Test Host
 The ARATestHost is a command line utility that can be used to load and debug ARA plug-ins.
-It implements many test scenarios that relate to real-life use cases - please see `main.cpp`
-for details on the tests and how to run them conveniently.
-It also serves as a demonstration for how to implement the various ARA hosting interfaces,
-and for how to load ARA enabled plug-ins using the VST3 or AudioUnit companion APIs.
-
-- IPC Demo
-The macOS-only IPC demo illustrates how ARA's use of abstract `ARARefs` allows to easily separate
-ARA plug-ins into different processes/address spaces.
+It implements many test scenarios that relate to real-life use cases.
+Please see `main.cpp` for a description of its command line arguments and `TestCases.h`
+for a list of tests that can be executed.
+The ARATestHost also serves as a demonstration for how to implement the various
+ARA hosting interfaces, and for how to load ARA enabled plug-ins using the VST3 or AudioUnit
+companion APIs.
+On macOS, it also implements optionally running the plug-in in a separate address space,
+controlled via IPC.
 
 
 ## Building and running the examples
