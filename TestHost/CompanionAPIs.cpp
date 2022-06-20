@@ -253,41 +253,32 @@ public:
 
 #if USE_ARA_CF_ENCODING
         const auto messageData { ARAIPCCFCreateMessageEncoderData (encoder.ref) };
-        IPCPort::ReceivedData replyData { _port.sendAndAwaitReply (messageID, messageData) };
-        if (replyHandler)
-        {
-            const auto replyDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (replyData) };
-            (*replyHandler) (replyDecoder, replyHandlerUserData);
-            replyDecoder.methods->destroyDecoder (replyDecoder.ref);
-        }
-#if ARA_ENABLE_INTERNAL_ASSERTS
-        else
-        {
-            const auto replyDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (replyData) };
-            ARA_INTERNAL_ASSERT (replyDecoder.methods->isEmpty (replyDecoder.ref));
-            replyDecoder.methods->destroyDecoder (replyDecoder.ref);
-        }
-#endif
-        CFRelease (replyData);
 #else
-        const auto replyData { _port.sendAndAwaitReply (messageID, reinterpret_cast<const IPCXMLMessage*> (encoder.ref)->createEncodedMessage ()) };
-    #if defined (__APPLE__)
-        const IPCXMLMessage reply { replyData };
-        CFRelease (replyData);
-    #else
-        const IPCXMLMessage reply { replyData.c_str (), replyData.size () };
-    #endif
+        const auto messageData { reinterpret_cast<const IPCXMLMessage*> (encoder.ref)->createEncodedMessage () };
+#endif
         if (replyHandler)
         {
-            const auto replyDecoder { createMessageDecoder (reply) };
-            (*replyHandler) (replyDecoder, replyHandlerUserData);
-            replyDecoder.methods->destroyDecoder (replyDecoder.ref);
+            IPCPort::ReplyHandler handler { [replyHandler, replyHandlerUserData] (IPCPort::ReceivedData replyData) -> void
+                {
+#if USE_ARA_CF_ENCODING
+                    const auto replyDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (replyData) };
+#else
+    #if defined (__APPLE__)
+                    IPCXMLMessage reply { replyData };
+    #else
+                    IPCXMLMessage reply { replyData.first, replyData.second };
+    #endif
+                    const auto replyDecoder { createMessageDecoder (reply) };
+#endif
+                    (*replyHandler) (replyDecoder, replyHandlerUserData);
+                    replyDecoder.methods->destroyDecoder (replyDecoder.ref);
+                } };
+            _port.sendMessage (messageID, messageData, &handler);
         }
         else
         {
-            ARA_INTERNAL_ASSERT (reply.isEmpty ());
+            _port.sendMessage (messageID, messageData, nullptr);
         }
-#endif
     }
 
     bool receiverEndianessMatches ()
@@ -610,33 +601,34 @@ public:
 private:
     void _plugInCallbacksThreadFunction ()
     {
-        // \todo It would be cleaner to create the port in the c'tor from the main thread,
-        //       but for some reason reading audio is then much slower compared to creating it here...?
-        _plugInCallbacksPort = IPCPort::createPublishingID (_plugInCallbacksPortID.c_str (),
-                                    [] (const ARA::IPC::ARAIPCMessageID messageID, IPCPort::ReceivedData const messageData) -> IPCPort::DataToSend /*__attribute__((cf_returns_retained))*/
-                                        {
-                                            ARA_INTERNAL_ASSERT (isValidMessageID (messageID));
+        IPCPort::ReceiveCallback callback { [] (const ARA::IPC::ARAIPCMessageID messageID, IPCPort::ReceivedData const messageData) -> /*__attribute__((cf_returns_retained))*/ IPCPort::DataToSend
+            {
+                ARA_INTERNAL_ASSERT (isValidMessageID (messageID));
 #if USE_ARA_CF_ENCODING
-                                            const auto messageDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
-                                            auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
-                                            ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher (messageID, &messageDecoder, &replyEncoder);
-                                            const auto result { ARAIPCCFCreateMessageEncoderData (replyEncoder.ref) };
+                const auto messageDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
+                auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
+                ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher (messageID, &messageDecoder, &replyEncoder);
+                const auto result { ARAIPCCFCreateMessageEncoderData (replyEncoder.ref) };
 #else
     #if defined (__APPLE__)
-                                            const IPCXMLMessage message { messageData };
+                const IPCXMLMessage message { messageData };
     #else
-                                            const IPCXMLMessage message { messageData.c_str (), messageData.size () };
+                const IPCXMLMessage message { messageData.first, messageData.second };
     #endif
-                                            const auto messageDecoder { createMessageDecoder (message) };
-                                            IPCXMLMessage reply;
-                                            auto replyEncoder { createMessageEncoder (&reply) };
-                                            ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher (messageID, &messageDecoder, &replyEncoder);
-                                            const auto result { reply.createEncodedMessage () };
+                const auto messageDecoder { createMessageDecoder (message) };
+                IPCXMLMessage reply;
+                auto replyEncoder { createMessageEncoder (&reply) };
+                ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher (messageID, &messageDecoder, &replyEncoder);
+                const auto result { reply.createEncodedMessage () };
 #endif
-                                            replyEncoder.methods->destroyEncoder (replyEncoder.ref);
-                                            messageDecoder.methods->destroyDecoder (messageDecoder.ref);
-                                            return result;
-                                        });
+                replyEncoder.methods->destroyEncoder (replyEncoder.ref);
+                messageDecoder.methods->destroyDecoder (messageDecoder.ref);
+                return result;
+            } };
+
+        // \todo It would be cleaner to create the port in the c'tor from the main thread,
+        //       but for some reason reading audio is then much slower compared to creating it here...?
+        _plugInCallbacksPort = IPCPort::createPublishingID (_plugInCallbacksPortID.c_str (), callback);
 
         while (!_terminateCallbacksThread)
             _plugInCallbacksPort.runReceiveLoop (100);
@@ -720,7 +712,7 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
 #if defined (__APPLE__)
     IPCXMLMessage message { messageData };
 #else
-    IPCXMLMessage message { messageData.c_str (), messageData.size () };
+    IPCXMLMessage message { messageData.first, messageData.second };
 #endif
     auto messageDecoder { createMessageDecoder (message) };
 #endif
@@ -829,7 +821,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& hostComma
 {
     _plugInEntry = std::move (plugInEntry);
 
-    auto hostCommandsPort { IPCPort::createPublishingID (hostCommandsPortID.c_str (), &remoteHostCommandHandler) };
+    auto hostCommandsPort { IPCPort::createPublishingID (hostCommandsPortID.c_str (), remoteHostCommandHandler) };
     auto plugInCallbacksPort { IPCPort::createConnectedToID (plugInCallbacksPortID.c_str ()) };
     IPCSender plugInCallbacksSender { plugInCallbacksPort };
 
