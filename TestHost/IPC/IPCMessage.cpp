@@ -46,14 +46,14 @@ private:
     CFStringRef _ref;
 };
 
-void IPCMessage::_setup (CFDictionaryRef dictionary, bool isWritable)
+void IPCMessage::_setup (CFDictionaryRef dictionary, bool isWritable, bool makeCopy)
 {
     if (_dictionary)
         CFRelease (_dictionary);
 
     if (!dictionary)
         _dictionary = nullptr;
-    else if (!isWritable)
+    else if (!makeCopy)
         _dictionary = (CFDictionaryRef) CFRetain (dictionary);   // we can reference immutable dictionaries instead of copying
     else
         _dictionary = CFDictionaryCreateMutableCopy (kCFAllocatorDefault, 0, dictionary);
@@ -62,7 +62,7 @@ void IPCMessage::_setup (CFDictionaryRef dictionary, bool isWritable)
 
 IPCMessage& IPCMessage::operator= (const IPCMessage& other)
 {
-    _setup (other._dictionary, other._isWritable);
+    _setup (other._dictionary, other._isWritable, other._isWritable);
     return *this;
 }
 
@@ -77,11 +77,12 @@ IPCMessage& IPCMessage::operator= (IPCMessage&& other) noexcept
 
 IPCMessage::~IPCMessage ()
 {
-    _setup (nullptr, false);
+    _setup (nullptr, false, false);
 }
 
 CFStringRef IPCMessage::_getEncodedKey (const MessageKey argKey)
 {
+    ARA_INTERNAL_ASSERT (argKey >= 0);
     // \todo All plist formats available for CFPropertyListCreateData () in createEncodedMessage () need CFString keys.
     //       Once we switch to the more modern (NS)XPC API we shall be able to use CFNumber keys directly...
     static std::map<MessageKey, _CFReleaser> cache;
@@ -96,7 +97,7 @@ IPCMessage::IPCMessage (CFDataRef data)
     if (auto dictionary { (CFDictionaryRef) CFPropertyListCreateWithData (kCFAllocatorDefault, data, kCFPropertyListImmutable, nullptr, nullptr) })
     {
         ARA_INTERNAL_ASSERT (dictionary && (CFGetTypeID (dictionary) == CFDictionaryGetTypeID ()));
-        _setup (dictionary, false);
+        _setup (dictionary, false, false);
         CFRelease (dictionary);
     }
 }
@@ -140,13 +141,19 @@ void IPCMessage::appendBytes (const MessageKey argKey, const uint8_t* argValue, 
         _appendEncodedArg (argKey, CFDataCreateWithBytesNoCopy (kCFAllocatorDefault, argValue, (CFIndex) argSize, kCFAllocatorNull));
 }
 
-void IPCMessage::appendMessage (const MessageKey argKey, const IPCMessage& argValue)
+ARA::IPC::MessageEncoder* IPCMessage::appendSubMessage (const MessageKey argKey)
 {
-    _appendEncodedArg (argKey, (CFDictionaryRef) CFRetain (argValue._dictionary));  // since _dictionary is immutable after creation, we can reference it instead of copy
+    auto subDictionary { CFDictionaryCreateMutable (kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks) };
+    _appendEncodedArg (argKey, subDictionary);
+
+    auto result { new IPCMessage {} };
+    result->_setup (subDictionary, true, false);
+    return result;
 }
 
 void IPCMessage::_appendEncodedArg (const MessageKey argKey, CFTypeRef argObject)
 {
+    ARA_INTERNAL_ASSERT (argKey >= 0);
     ARA_INTERNAL_ASSERT (argObject);
     if (!_isWritable && _dictionary)
     {
@@ -168,6 +175,11 @@ CFDataRef IPCMessage::createEncodedMessage () const
     auto result { CFPropertyListCreateData (kCFAllocatorDefault, _dictionary, kCFPropertyListBinaryFormat_v1_0, 0, nullptr) };
     ARA_INTERNAL_ASSERT (result);
     return result;
+}
+
+bool IPCMessage::isEmpty () const
+{
+    return (!_dictionary) || (CFDictionaryGetCount (_dictionary) == 0);
 }
 
 bool IPCMessage::readInt32 (const MessageKey argKey, int32_t& argValue) const
@@ -280,30 +292,26 @@ bool IPCMessage::readBytesSize (const MessageKey argKey, size_t& argSize) const
     return true;
 }
 
-bool IPCMessage::readBytes (const MessageKey argKey, uint8_t* const argValue) const
+void IPCMessage::readBytes (const MessageKey argKey, uint8_t* const argValue) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto bytes { (CFDataRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
-    if (!bytes)
-        return false;
     ARA_INTERNAL_ASSERT (bytes && (CFGetTypeID (bytes) == CFDataGetTypeID ()));
     const auto length { CFDataGetLength (bytes) };
     CFDataGetBytes (bytes, CFRangeMake (0, length), argValue);
-    return true;
 }
 
-bool IPCMessage::readMessage (const MessageKey argKey, IPCMessage& argValue) const
+ARA::IPC::MessageDecoder* IPCMessage::readSubMessage (const MessageKey argKey) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto dictionary { (CFDictionaryRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
     if (!dictionary)
-    {
-        argValue = {};
-        return false;
-    }
+        return nullptr;
+
     ARA_INTERNAL_ASSERT (dictionary && (CFGetTypeID (dictionary) == CFDictionaryGetTypeID ()));
-    argValue._setup (dictionary, false);
-    return true;
+    auto result { new IPCMessage {} };
+    result->_setup (dictionary, false, false);
+    return result;
 }
 
 //------------------------------------------------------------------------------
@@ -341,6 +349,7 @@ IPCMessage& IPCMessage::operator= (IPCMessage&& other) noexcept
 
 const char* IPCMessage::_getEncodedKey (const MessageKey argKey)
 {
+    ARA_INTERNAL_ASSERT (argKey >= 0);
     static std::map<MessageKey, std::string> cache;
     auto existingEntry { cache.find (argKey) };
     if (existingEntry != cache.end ())
@@ -403,14 +412,24 @@ void IPCMessage::appendBytes (const MessageKey argKey, const uint8_t* argValue, 
 
 pugi::xml_attribute IPCMessage::_appendAttribute (const MessageKey argKey)
 {
+    ARA_INTERNAL_ASSERT (argKey >= 0);
+
     _makeWritableIfNeeded ();
+
     return _root.append_attribute (_getEncodedKey (argKey));
 }
 
-void IPCMessage::appendMessage (const MessageKey argKey, const IPCMessage& argValue)
+ARA::IPC::MessageEncoder* IPCMessage::appendSubMessage (const MessageKey argKey)
 {
+    ARA_INTERNAL_ASSERT (argKey >= 0);
+
     _makeWritableIfNeeded ();
-    _root.append_copy (argValue._root).set_name (_getEncodedKey (argKey));
+
+    auto result { new IPCMessage };
+    result->_dictionary = _dictionary;
+    result->_root = _root.append_child (_getEncodedKey (argKey));
+    result->_isWritable = true;
+    return result;
 }
 
 void IPCMessage::_makeWritableIfNeeded ()
@@ -462,6 +481,11 @@ std::string IPCMessage::createEncodedMessage () const
 #else
     return writer.str();
 #endif
+}
+
+bool IPCMessage::isEmpty () const
+{
+    return _root.empty ();
 }
 
 bool IPCMessage::readInt32 (const MessageKey argKey, int32_t& argValue) const
@@ -560,52 +584,35 @@ bool IPCMessage::readBytesSize (const MessageKey argKey, size_t& argSize) const
     return true;
 }
 
-bool IPCMessage::readBytes (const MessageKey argKey, uint8_t* const argValue) const
+void IPCMessage::readBytes (const MessageKey argKey, uint8_t* const argValue) const
 {
     if (argKey == _bytesCacheKey)
-    {
         std::memcpy (argValue, _bytesCacheData.data (), _bytesCacheData.size ());
-        return true;
-    }
 
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (attribute.empty ())
-        return false;
+    ARA_INTERNAL_ASSERT (!attribute.empty ());
 
     const auto decodedData { base64_decode (attribute.as_string (), false) };
     std::memcpy (argValue, decodedData.c_str (), decodedData.size ());
-    return true;
 }
 
-bool IPCMessage::readMessage (const MessageKey argKey, IPCMessage& argValue) const
+ARA::IPC::MessageDecoder* IPCMessage::readSubMessage (const MessageKey argKey) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto child { _root.child (_getEncodedKey (argKey)) };
     if (child.empty ())
-    {
-        argValue = {};
-        return false;
-    }
+        return nullptr;
 
-    if (_isWritable)
-    {
-        argValue._dictionary.reset (new pugi::xml_document);
-        argValue._root = argValue._dictionary->append_copy (child);
-        argValue._root.set_name (kRootKey);
-        argValue._isWritable = true;
-    }
-    else
-    {
-        argValue._dictionary = _dictionary;
-        argValue._root = child;
-        argValue._isWritable = false;
-    }
-    return true;
+    auto result { new IPCMessage };
+    result->_dictionary = _dictionary;
+    result->_root = child;
+    result->_isWritable = false;
+    return result;;
 }
 
 //------------------------------------------------------------------------------
-#endif  // IPC_MESSAGE_USE_CFDICTIONARY
+#endif // IPC_MESSAGE_USE_CFDICTIONARY
 //------------------------------------------------------------------------------
 
 #if defined (__APPLE__)

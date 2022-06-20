@@ -29,6 +29,8 @@
     #endif
 #endif
 
+#include "ARA_Library/IPC/ARAIPC.h"
+
 #include <memory>
 #include <type_traits>
 #include <vector>
@@ -43,10 +45,6 @@
 #endif
 
 
-// key type for message dictionaries
-using MessageKey = int32_t;
-
-
 // A simple proof-of-concept wrapper for the IPC messages sent back and forth in the ARA IPC example.
 // Error handling is limited to assertions.
 // The basic data types transmitted are int32_t, int64_t, size_t, float, double, UTF8 encoded C strings
@@ -58,18 +56,19 @@ using MessageKey = int32_t;
 // side had smaller pointers, some additional infrastructure would be needed to allocate a unique
 // 32 bit representation for each size_t provided by the 64 bit process to the 32 bit process,
 // and then map between the two.
-class IPCMessage
+class IPCMessage : public ARA::IPC::MessageEncoder, public ARA::IPC::MessageDecoder
 {
 public:
+    // key type for message arguments
+    using MessageKey = int32_t;
+
     // C++ "rule of five" standard methods
     IPCMessage (const IPCMessage& other) { *this = other; }
     IPCMessage (IPCMessage&& other) noexcept { *this = std::move (other); }
     IPCMessage& operator= (const IPCMessage& other);
     IPCMessage& operator= (IPCMessage&& other)  noexcept;
 #if IPC_MESSAGE_USE_CFDICTIONARY
-    ~IPCMessage ();
-#else
-    ~IPCMessage () = default;
+    ~IPCMessage () override;
 #endif
 
     // to be used by IPCPort only: encoding from/to port-internal datas format
@@ -84,35 +83,37 @@ public:
     // default construction, creating empty message
     IPCMessage () = default;
 
-    // append keyed argument to the message
-    void appendInt32 (const MessageKey argKey, const int32_t argValue);
-    void appendInt64 (const MessageKey argKey, const int64_t argValue);
-    void appendSize (const MessageKey argKey, const size_t argValue);          // also for ptr-sized refs
-    void appendFloat (const MessageKey argKey, const float argValue);
-    void appendDouble (const MessageKey argKey, const double argValue);
-    void appendString (const MessageKey argKey, const char* const argValue);   // UTF8
-    void appendBytes (const MessageKey argKey, const uint8_t* argValue, const size_t argSize, const bool copy = true); // disable copy if data is alive longer than the message
-    void appendMessage (const MessageKey argKey, const IPCMessage& argValue);
+    // ARA::IPC::MessageEncoder implementation
+    void appendInt32 (const MessageKey argKey, const int32_t argValue) override;
+    void appendInt64 (const MessageKey argKey, const int64_t argValue) override;
+    void appendSize (const MessageKey argKey, const size_t argValue) override;
+    void appendFloat (const MessageKey argKey, const float argValue) override;
+    void appendDouble (const MessageKey argKey, const double argValue) override;
+    void appendString (const MessageKey argKey, const char* const argValue) override;
+    void appendBytes (const MessageKey argKey, const uint8_t* argValue, const size_t argSize, const bool copy) override;
+    ARA::IPC::MessageEncoder* appendSubMessage (const MessageKey argKey) override;
 
-    // read keyed argument to the message
-    // if key is not found, returns false and a default value
-    bool readInt32 (const MessageKey argKey, int32_t& argValue) const;
-    bool readInt64 (const MessageKey argKey, int64_t& argValue) const;
-    bool readSize (const MessageKey argKey, size_t& argValue) const;           // also for ptr-sized refs
-    bool readFloat (const MessageKey argKey, float& argValue) const;
-    bool readDouble (const MessageKey argKey, double& argValue) const;
-    bool readString (const MessageKey argKey, const char*& argValue) const;    // UTF8
-    bool readBytesSize (const MessageKey argKey, size_t& argSize) const;       // query size and allocate memory, then..
-    bool readBytes (const MessageKey argKey, uint8_t* const argValue) const;   // copy bytes to that memory (if key found)
-    bool readMessage (const MessageKey argKey, IPCMessage& argValue) const;
+    // ARA::IPC::MessageDecoder implementation
+    bool isEmpty () const override;
+    bool readInt32 (const MessageKey argKey, int32_t& argValue) const override;
+    bool readInt64 (const MessageKey argKey, int64_t& argValue) const override;
+    bool readSize (const MessageKey argKey, size_t& argValue) const override;
+    bool readFloat (const MessageKey argKey, float& argValue) const override;
+    bool readDouble (const MessageKey argKey, double& argValue) const override;
+    bool readString (const MessageKey argKey, const char*& argValue) const override;
+    bool readBytesSize (const MessageKey argKey, size_t& argSize) const override;
+    void readBytes (const MessageKey argKey, uint8_t* const argValue) const override;
+    ARA::IPC::MessageDecoder* readSubMessage (const MessageKey argKey) const override;
 
 private:
 #if IPC_MESSAGE_USE_CFDICTIONARY
     // wrap key value into CFString (no reference count transferred to caller)
     static CFStringRef _getEncodedKey (const MessageKey argKey);
 
-    // internal primitive - dictionary will be retained or copied, depending on isWritable
-    void _setup (CFDictionaryRef dictionary, bool isWritable);
+    // internal primitive
+    // typically, a copy should be made whenever the input is writable -
+    // an exception is appending writable sub-messages
+    void _setup (CFDictionaryRef dictionary, bool isWritable, bool makeCopy);
 
     void _appendEncodedArg (const MessageKey argKey, __attribute__((cf_consumed)) CFTypeRef argObject);
 #else
