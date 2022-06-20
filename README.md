@@ -77,7 +77,7 @@ execute this CMake command line (in older CMake versions, omit the whitespace af
 This assume you've installed the companion API SDKs using the optional install scripts from the
 ARA SDK installer. If you want to instead provide local copies of those SDKs, specify them like so:
 
-    cmake -D ARA_VST3_SDK_DIR=/path/to/VST3_SDK/ -D ARA_AUDIO_UNIT_SDK_DIR=/path/to/AudioUnit_SDK/ <then other arguments as shown above>
+    cmake -D ARA_VST3_SDK_DIR=/path/to/vst3sdk/ -D ARA_AUDIO_UNIT_SDK_DIR=/path/to/AudioUnit_SDK/ <then other arguments as shown above>
 
 Note that while it is possible to directly open the ARA_Examples folder in Visual Studio 2017 or
 newer utilizing its integrated CMake support, we still recommend creating an explicit solution due
