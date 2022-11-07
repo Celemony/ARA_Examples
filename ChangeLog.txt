@@ -4,6 +4,7 @@ This is a development build of the ARA Examples 2.2.
 Changes since previous releases:
 - initial draft of surround support for audio sources
 - added crude channel count conversion to test plug-in if audio source and playback renderer channel counts don't match
+- initial draft of tracking whether an audio modification actually modifies the underlying audio source
 
 
 === ARA SDK 2.1 release (aka 2.1.001) (2022/01/06) ===

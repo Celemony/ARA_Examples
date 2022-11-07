@@ -303,6 +303,7 @@ void testModificationCloning (const PlugInEntry* plugInEntry, const AudioFileLis
         for (const auto& audioModification : audioSource->getAudioModifications ())
         {
             araDocumentController->logAvailableContent (audioModification.get ());
+            araDocumentController->logAudioModificationPreservesAudioSourceSignalIfSupported (audioModification.get ());
 
             audioModificationsToClone.push_back (audioModification.get ());
         }
@@ -337,7 +338,10 @@ void testModificationCloning (const PlugInEntry* plugInEntry, const AudioFileLis
 
     // read back all the cloned audio modification content
     for (const auto& audioModificationClone : audioModificationClones)
+    {
         araDocumentController->logAvailableContent (audioModificationClone);
+        araDocumentController->logAudioModificationPreservesAudioSourceSignalIfSupported (audioModificationClone);
+    }
 }
 
 /*******************************************************************************/
