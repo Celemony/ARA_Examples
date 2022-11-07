@@ -48,7 +48,7 @@ ARA_MAP_HOST_REF (ArchiveBase, ARA::ARAArchiveReaderHostRef, ARA::ARAArchiveWrit
 using DocumentProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARADocumentProperties, name)>;
 using MusicalContextProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAMusicalContextProperties, color)>;
 using RegionSequenceProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARARegionSequenceProperties, color)>;
-using AudioSourceProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAAudioSourceProperties, merits64BitSamples)>;
+using AudioSourceProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAAudioSourceProperties, channelArrangement)>;
 using AudioModificationProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAAudioModificationProperties, persistentID)>;
 using PlaybackRegionProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAPlaybackRegionProperties, color)>;
 

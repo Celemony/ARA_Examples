@@ -185,7 +185,9 @@ const AudioSourceProperties ARADocumentController::getAudioSourceProperties (con
         audioSource->getSampleCount (),
         audioSource->getSampleRate (),
         audioSource->getChannelCount (),
-        audioSource->merits64BitSamples ()
+        audioSource->merits64BitSamples (),
+        ARA::kARAChannelArrangementUndefined,
+        nullptr
     };
 }
 

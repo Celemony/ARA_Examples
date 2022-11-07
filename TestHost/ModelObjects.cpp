@@ -24,6 +24,7 @@
 //------------------------------------------------------------------------------
 
 #include "ModelObjects.h"
+#include "ARA_Library/Debug/ARADebug.h"
 
 /*******************************************************************************/
 
@@ -81,7 +82,11 @@ AudioSource::AudioSource (Document* document, AudioFileBase* audioFile, std::str
 : _document { document },
   _audioFile { audioFile },
   _persistentID { persistentID }
-{}
+{
+    // at this point, only up to stereo formats are supported because the test code
+    // doesn't handle surround channel arrangements yet.
+    ARA_INTERNAL_ASSERT (_audioFile->getChannelCount () <= 2);
+}
 
 /*******************************************************************************/
 
