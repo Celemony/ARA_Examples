@@ -101,7 +101,7 @@ void ARATestPlaybackRenderer::renderPlaybackRegions (float* const* ppOutput, ARA
                     for (auto c { 0 }; c < sourceChannelCount; ++c)
                         monoSum += audioSource->getRenderSampleCacheForChannel (c)[posInSource];
                     if (sourceChannelCount > 1)
-                        monoSum /= sourceChannelCount;
+                        monoSum /= static_cast<float> (sourceChannelCount);
                     for (auto c { 0 }; c < _channelCount; ++c)
                         ppOutput[c][posInBuffer] = monoSum;
                 }

@@ -316,7 +316,8 @@ int main (int argc, const char * argv[])
 
     ARAAudioSourceProperties audioSourceProperties = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAAudioSourceProperties, merits64BitSamples),
                                                         "Test audio source", "audioSourceTestPersistentID",
-                                                        kTestAudioSourceSampleCount, kTestAudioSourceSampleRate, 1, kARAFalse };
+                                                        kTestAudioSourceSampleCount, kTestAudioSourceSampleRate, 1,
+                                                        kARAFalse, kARAChannelArrangementUndefined, NULL };
     ARAAudioSourceRef audioSourceRef;
 
     ARAAudioModificationProperties audioModificationProperties = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAAudioModificationProperties, persistentID),
