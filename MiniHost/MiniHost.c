@@ -120,7 +120,7 @@ static const ARAAudioAccessControllerInterface hostAudioAccessControllerInterfac
                                                                                         &ARACreateAudioReaderForSource, &ARAReadAudioSamples, &ARADestroyAudioReader };
 
 
-// ARAArchivingControllerInterface
+// ARAArchivingControllerInterface (required, but this is only an invalid stub implementation)
 static ARASize ARA_CALL ARAGetArchiveSize(ARAArchivingControllerHostRef controllerHostRef, ARAArchiveReaderHostRef archiveReaderHostRef)
 {
     return 0;
