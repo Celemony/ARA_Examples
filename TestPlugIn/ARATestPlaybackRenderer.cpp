@@ -49,8 +49,8 @@ void ARATestPlaybackRenderer::renderPlaybackRegions (float* const* ppOutput, ARA
             if (!audioSource->isSampleAccessEnabled ())
                 continue;
 
-            // this simplified test code "rendering" only produces audio if sample rate and channel count match
-            if ((audioSource->getChannelCount () != _channelCount) || (audioSource->getSampleRate () != _sampleRate))
+            // this simplified test code "rendering" only produces audio if the sample rate matches
+            if (audioSource->getSampleRate () != _sampleRate)
                 continue;
 
             // evaluate region borders in song time, calculate sample range to copy in song time
@@ -79,12 +79,32 @@ void ARATestPlaybackRenderer::renderPlaybackRegions (float* const* ppOutput, ARA
                 continue;
 
             // add samples from audio source
+            const auto sourceChannelCount { audioSource->getChannelCount () };
             for (auto posInSong { startSongSample }; posInSong < endSongSample; ++posInSong)
             {
                 const auto posInBuffer { posInSong - samplePosition };
                 const auto posInSource { posInSong + offsetToPlaybackRegion };
-                for (auto c { 0 }; c < audioSource->getChannelCount (); ++c)
-                    ppOutput[c][posInBuffer] += audioSource->getRenderSampleCacheForChannel (c)[posInSource];
+                if (sourceChannelCount == _channelCount)
+                {
+                    for (auto c { 0 }; c < sourceChannelCount; ++c)
+                        ppOutput[c][posInBuffer] += audioSource->getRenderSampleCacheForChannel (c)[posInSource];
+                }
+                else
+                {
+                    // crude channel format conversion:
+                    // mix down to mono, then distribute the mono signal evenly to all channels.
+                    // note that when down-mixing to mono, the result is scaled by channel count,
+                    // whereas upon up-mixing it is just copied to all channels.
+                    // \todo ambisonic formats should just stick with the mono sum on channel 0,
+                    //       but in this simple test code we currently do not distinguish ambisonics
+                    float monoSum { 0.0f };
+                    for (auto c { 0 }; c < sourceChannelCount; ++c)
+                        monoSum += audioSource->getRenderSampleCacheForChannel (c)[posInSource];
+                    if (sourceChannelCount > 1)
+                        monoSum /= sourceChannelCount;
+                    for (auto c { 0 }; c < _channelCount; ++c)
+                        ppOutput[c][posInBuffer] = monoSum;
+                }
             }
         }
 
