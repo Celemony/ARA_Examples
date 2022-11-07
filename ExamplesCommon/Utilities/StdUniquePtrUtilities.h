@@ -47,7 +47,7 @@ struct unique_ptr_compare
 // Find an a raw pointer inside a vector of std::unique_ptrs in the vector and,
 // if found, erase it from the vector. Returns true if found & erased, otherwise false
 template <typename T, typename U, typename std::enable_if<std::is_convertible<T*, U>::value || std::is_convertible<U, T*>::value, bool>::type = true>
-inline bool find_erase (std::vector<std::unique_ptr<T>>& container, const U ptr)
+inline bool find_erase (std::vector<std::unique_ptr<T>>& container, const U& ptr)
 {
     auto it = std::find_if (container.begin (), container.end (), unique_ptr_compare<T>{ ptr });
     if (it == container.end ())
@@ -61,7 +61,7 @@ inline bool find_erase (std::vector<std::unique_ptr<T>>& container, const U ptr)
 // Determine if a raw pointer exists in a vector as a std::unique_ptr
 
 template <typename T, typename U, typename std::enable_if<std::is_convertible<T*, U>::value || std::is_convertible<U, T*>::value, bool>::type = true>
-inline bool contains (std::vector<std::unique_ptr<T>> const& container, const U ptr)
+inline bool contains (std::vector<std::unique_ptr<T>> const& container, const U& ptr)
 {
     return std::any_of (container.begin (), container.end (), unique_ptr_compare<T>{ ptr });
 }
@@ -69,7 +69,7 @@ inline bool contains (std::vector<std::unique_ptr<T>> const& container, const U 
 /*******************************************************************************/
 // Find position of a raw pointer inside a vector of std::unique_ptrs.
 template <typename T, typename U, typename std::enable_if<std::is_convertible<T*, U>::value || std::is_convertible<U, T*>::value, bool>::type = true>
-inline intptr_t index_of (std::vector<std::unique_ptr<T>> const& container, const U ptr)
+inline intptr_t index_of (std::vector<std::unique_ptr<T>> const& container, const U& ptr)
 {
     auto it = std::find_if (container.begin (), container.end (), unique_ptr_compare<T>{ ptr });
     if (it == container.end ())
