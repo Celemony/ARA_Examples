@@ -1621,6 +1621,7 @@ endif()
 if(APPLE)
 
     add_executable(ARAIPCDemoPlugInProcess
+        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCEncoding.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCPort.h"
@@ -1662,6 +1663,7 @@ endif(APPLE)
 if(APPLE)
 
     add_executable(ARAIPCDemoMainProcess
+        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCEncoding.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCPort.h"
