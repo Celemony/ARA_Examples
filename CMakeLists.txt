@@ -1004,6 +1004,8 @@ function(ara_postbuild_install_for_debugging target install_target_dir create_sy
 
     add_custom_command(TARGET ${target} POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E
+            make_directory "${install_target_dir}"
+        COMMAND "${CMAKE_COMMAND}" -E
             rm -Rf "${install_target_dir}${package_name}"
         COMMAND "${CMAKE_COMMAND}" -E
             ${install_command} "${source_package}" "${install_target_dir}${package_name}"
