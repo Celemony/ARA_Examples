@@ -126,9 +126,9 @@ VST3Binary VST3LoadBinary (const char* binaryName)
     const auto factoryFunc { (GetFactoryProc) ::GetProcAddress (vst3Binary->libHandle, "GetPluginFactory") };
 
 #elif defined (__APPLE__)
-    CFURLRef url { CFURLCreateFromFileSystemRepresentation (nullptr, (const UInt8*) binaryName, (CFIndex) std::strlen (binaryName), true) };
+    CFURLRef url { CFURLCreateFromFileSystemRepresentation (kCFAllocatorDefault, (const UInt8*) binaryName, (CFIndex) std::strlen (binaryName), true) };
     ARA_INTERNAL_ASSERT (url);
-    vst3Binary->libHandle = CFBundleCreate (nullptr, url);
+    vst3Binary->libHandle = CFBundleCreate (kCFAllocatorDefault, url);
     CFRelease (url);
     ARA_INTERNAL_ASSERT (vst3Binary->libHandle);
 
