@@ -24,10 +24,19 @@
 #include "IPCMessage.h"
 #include "ARA_Library/Debug/ARADebug.h"
 
+void IPCMessage::_setup (CFDictionaryRef dictionary, bool isWritable)
+{
+    if (_dictionary)
+        CFRelease (_dictionary);
 
-IPCMessage::IPCMessage (CFDictionaryRef dictionary)
-    : _dictionary { dictionary }
-{}
+    if (!dictionary)
+        _dictionary = nullptr;
+    else if (!isWritable)
+        _dictionary = (CFDictionaryRef) CFRetain (dictionary);   // we can reference immutable dictionaries instead of copying
+    else
+        _dictionary = CFDictionaryCreateMutableCopy (kCFAllocatorDefault, 0, dictionary);
+    _isWritable = isWritable;
+}
 
 IPCMessage::IPCMessage (const IPCMessage& other)
 {
@@ -41,21 +50,22 @@ IPCMessage::IPCMessage (IPCMessage&& other) noexcept
 
 IPCMessage& IPCMessage::operator= (const IPCMessage& other)
 {
-    this->~IPCMessage ();    // cleanup current data by calling our d'tor
-    _dictionary = (other._dictionary) ? (CFDictionaryRef) CFRetain (other._dictionary) : nullptr;   // since _dictionary is immutable after creation, we can reference it instead of copy
+    _setup (other._dictionary, other._isWritable);
     return *this;
 }
 
 IPCMessage& IPCMessage::operator= (IPCMessage&& other) noexcept
 {
     std::swap (_dictionary, other._dictionary);
+// other will be cleaned up properly regardless of _isWritable, so we only need copy not swap
+//  std::swap (_isWritable, other._isWritable);
+    _isWritable = other._isWritable;
     return *this;
 }
 
 IPCMessage::~IPCMessage ()
 {
-    if (_dictionary)
-        CFRelease (_dictionary);
+    _setup (nullptr, false);
 }
 
 CFStringRef IPCMessage::_createEncodedTag (const char* tag)
@@ -65,14 +75,12 @@ CFStringRef IPCMessage::_createEncodedTag (const char* tag)
     return result;
 }
 
-IPCMessage::IPCMessage ()
-    : IPCMessage { CFDictionaryCreateMutable (kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks) }
-{}
-
 IPCMessage::IPCMessage (CFDataRef data)
-    : IPCMessage { (CFDictionaryRef) CFPropertyListCreateWithData (kCFAllocatorDefault, data, kCFPropertyListImmutable, nullptr, nullptr) }
 {
-    ARA_INTERNAL_ASSERT (_dictionary && (CFGetTypeID (_dictionary) == CFDictionaryGetTypeID ()));
+    auto dictionary { (CFDictionaryRef) CFPropertyListCreateWithData (kCFAllocatorDefault, data, kCFPropertyListImmutable, nullptr, nullptr) };
+    ARA_INTERNAL_ASSERT (dictionary && (CFGetTypeID (dictionary) == CFDictionaryGetTypeID ()));
+    _setup (dictionary, false);
+    CFRelease (dictionary);
 }
 
 void IPCMessage::_appendArg (const char* argKey, int32_t argValue)
@@ -120,6 +128,15 @@ void IPCMessage::_appendEncodedArg (const char* argKey, CFTypeRef argObject)
 {
     ARA_INTERNAL_ASSERT (argObject);
     auto keyObject { _createEncodedTag (argKey) };
+    if (!_isWritable && _dictionary)
+    {
+        auto old = _dictionary;
+        _dictionary = CFDictionaryCreateMutableCopy (kCFAllocatorDefault, 0, _dictionary);
+        CFRelease (old);
+    }
+    _isWritable = true;
+    if (!_dictionary)
+        _dictionary = CFDictionaryCreateMutable (kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFDictionarySetValue ((CFMutableDictionaryRef) _dictionary, keyObject, argObject);
     CFRelease (keyObject);
     CFRelease (argObject);
@@ -227,6 +244,6 @@ void IPCMessage::_readArg (const char* argKey, IPCMessage& argValue) const
     auto key { _createEncodedTag (argKey) };
     auto dictionary { (CFDictionaryRef) CFDictionaryGetValue (_dictionary, key) };
     ARA_INTERNAL_ASSERT (_dictionary && (CFGetTypeID (_dictionary) == CFDictionaryGetTypeID ()));
-    argValue = IPCMessage { (CFDictionaryRef) CFRetain (dictionary) };   // since _dictionary is immutable after creation, we can reference it instead of copy
+    argValue._setup (dictionary, false);
     CFRelease (key);
 }

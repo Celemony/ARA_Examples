@@ -29,7 +29,7 @@
 #if defined (__APPLE__)
     #include <CoreFoundation/CoreFoundation.h>
 #else
-    #error "only implemented for Mac at this point"
+    #error "only implemented for macOS at this point"
 #endif
 
 
@@ -37,13 +37,13 @@
 // The default mapping is mere forwarding, but pointers must be converted to size_t except for C strings.
 template<typename ArgType>
 struct _ArgWrapper
-    { static ArgType wrap (ArgType arg) { return arg; } };
+    { using WrappedType = ArgType; };
 template<>
 struct _ArgWrapper<const char*>
-    { static const char* wrap (const char* arg) { return arg; } };
+    { using WrappedType = const char*; };
 template<typename StructT>
 struct _ArgWrapper<StructT *>
-    { static size_t wrap (const StructT* arg) { return (size_t) arg; } };
+    { using WrappedType = size_t; };
 
 
 // A simple proof-of-concept wrapper for the IPC messages sent back and forth in the ARA IPC example.
@@ -71,33 +71,37 @@ public:
     CFDataRef createEncodedMessage () const;
 
     // construction with arguments for sending code with 0..n key/value pairs of the message arguments
-    IPCMessage ();
+    IPCMessage () = default;
     template <typename ArgT, typename... MoreArgs>
     IPCMessage (const char* argKey, ArgT argValue, MoreArgs... moreArgs)
         : IPCMessage (moreArgs...)
     {
-        _appendArg (argKey, _ArgWrapper<ArgT>::wrap (argValue));
+        _appendArg (argKey, (typename _ArgWrapper<ArgT>::WrappedType) argValue);
     }
 
     // appending arguments to an existing message
     template <typename ArgT, typename... MoreArgs>
     void append (const char* argKey, ArgT argValue, MoreArgs... moreArgs)
     {
-        _appendArg (argKey, _ArgWrapper<ArgT>::wrap (argValue));
+        _appendArg (argKey, (typename _ArgWrapper<ArgT>::WrappedType) argValue);
+        append (moreArgs...);
+    }
+    void append ()
+    {
     }
 
     // getters for receiving code: extract arguments, specifying the desired return type as template argument
     template <typename ArgT>
     ArgT getArgValue (const char* argKey) const
     {
-        decltype (_ArgWrapper<ArgT>::wrap (ArgT {})) result;
+        typename _ArgWrapper<ArgT>::WrappedType result;
         _readArg (argKey, result);
         return (ArgT) result;
     }
 
 private:
-    // internal primitev c'tor - ownership of the dictionary is transferred to the message.
-    explicit IPCMessage (CFDictionaryRef dictionary);
+    // internal primitive - dictionary will be retained or copied, depending on isWritable
+    void _setup (CFDictionaryRef dictionary, bool isWritable);
 
     // wrap C string into CFString - must release result!
     static CFStringRef _createEncodedTag (const char* tag);
@@ -139,4 +143,5 @@ private:
 
 private:
     CFDictionaryRef _dictionary {};   // if constructed for sending, actually a CFMutableDictionaryRef
+    bool _isWritable {};
 };
