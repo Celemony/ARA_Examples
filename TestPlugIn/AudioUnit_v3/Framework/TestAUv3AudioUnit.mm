@@ -21,18 +21,21 @@
 #import "TestAUv3DSPKernel.hpp"
 #import "BufferedAudioBus.hpp"
 
-#import <AVFoundation/AVFoundation.h>
+#import "ARATestDocumentController.h"
 
 @interface TestAUv3AudioUnit ()
 @property AUAudioUnitBusArray *inputBusArray;
 @property AUAudioUnitBusArray *outputBusArray;
 @property (nonatomic, readonly) AUAudioUnitBus *outputBus;
+@property (nonatomic, readonly, nonnull) const ARA::ARAFactory * araFactory;
 @end
+
 
 @implementation TestAUv3AudioUnit {
     // C++ members need to be ivars; they would be copied on access if they were properties.
     BufferedInputBus _inputBus;
     TestAUv3DSPKernel  _kernel;
+    ARA::PlugIn::PlugInExtension _araPlugInExtension;
 }
 
 // MARK: -  AUAudioUnit Overrides
@@ -60,6 +63,10 @@
     _outputBusArray = [[AUAudioUnitBusArray alloc] initWithAudioUnit:self
                                                              busType:AUAudioUnitBusTypeOutput
                                                               busses: @[self.outputBus]];
+
+    // Initialize ARA factory property
+    _araFactory = ARATestDocumentController::getARAFactory();
+
     return self;
 }
 
@@ -95,6 +102,7 @@
     _inputBus.allocateRenderResources(self.maximumFramesToRender);
     _kernel.init(self.outputBus.format.channelCount, self.outputBus.format.sampleRate);
     _kernel.setMaximumFramesToRender(self.maximumFramesToRender);
+    _kernel.setTransportStateBlock(self.transportStateBlock);
 
     return YES;
 }
@@ -105,6 +113,14 @@
     _inputBus.deallocateRenderResources();
 
     [super deallocateRenderResources];
+}
+
+// MARK: -  ARAAudioUnit protocol conformance
+
+- (nonnull const ARA::ARAPlugInExtensionInstance *)bindToDocumentController:(nonnull ARA::ARADocumentControllerRef)documentControllerRef
+                        withRoles:(ARA::ARAPlugInInstanceRoleFlags)assignedRoles knownRoles:(ARA::ARAPlugInInstanceRoleFlags)knownRoles {
+    _kernel.setARAPlugInExtension(&_araPlugInExtension);
+    return _araPlugInExtension.bindToARA(documentControllerRef, knownRoles, assignedRoles);
 }
 
 // MARK: -  AUAudioUnit (AUAudioUnitImplementation)

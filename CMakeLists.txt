@@ -1596,6 +1596,8 @@ if(ARA_SETUP_DEBUGGING)
         string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
         # alternatively for testing with Audio Unit example plug-in:
         #string(APPEND ARATestHost_Dbg_Arguments "-au aufx AraT ADeC")
+        # alternatively for testing with Audio Unit v3 example plug-in:
+        #string(APPEND ARATestHost_Dbg_Arguments "-au aufx Ara3 ADeC")
         # alternatively for testing with Melodyne VST3 or Audio Unit:
         #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"/Library/Audio/Plug-Ins/VST3/Melodyne.vst3\"")
         #string(APPEND ARATestHost_Dbg_Arguments "-au aumf MPLG CLMY")

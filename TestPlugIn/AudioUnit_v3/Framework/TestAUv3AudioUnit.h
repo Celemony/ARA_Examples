@@ -19,6 +19,8 @@
 
 #import <AudioToolbox/AudioToolbox.h>
 
-@interface TestAUv3AudioUnit : AUAudioUnit
+#import "ARA_API/ARAAudioUnit_v3.h"
+
+@interface TestAUv3AudioUnit : AUAudioUnit<ARAAudioUnit>
 
 @end

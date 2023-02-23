@@ -20,7 +20,8 @@
 #ifndef TestAUv3DSPKernel_hpp
 #define TestAUv3DSPKernel_hpp
 
-#include <algorithm>
+#include "ARA_Library/PlugIn/ARAPlug.h"
+#include "ARATestPlaybackRenderer.h"
 
 /*
  TestAUv3DSPKernel
@@ -45,6 +46,14 @@ public:
 
     void setMaximumFramesToRender(const AUAudioFrameCount &maxFrames) {
         maxFramesToRender = maxFrames;
+    }
+
+    void setTransportStateBlock(AUHostTransportStateBlock transportState) {
+        transportStateBlock = transportState;
+    }
+
+    void setARAPlugInExtension(ARA::PlugIn::PlugInExtension* extension) {
+        araPlugInExtension = extension;
     }
 
     void setBuffers(AudioBufferList* inBufferList, AudioBufferList* outBufferList) {
@@ -94,12 +103,24 @@ private:
         for (int i = 0; i < chanCount; ++i)
             channels[i] = (float*)outBufferListPtr->mBuffers[i].mData + bufferOffset;
 
-        // if we're no ARA playback renderer, we're just copying the inputs to the outputs, which is
-        // appropriate both when being only an ARA editor renderer, or when being used in non-ARA mode.
-        for (int i = 0; i < chanCount; ++i) {
-            const float* in = (const float*)inBufferListPtr->mBuffers[i].mData + bufferOffset;
-            if (in != channels[i])      // check in-place processing
-                std::memcpy(channels[i] + bufferOffset, in, sizeof(float) * frameCount);
+        AUHostTransportStateFlags transportStateFlags = 0;
+        double currentSamplePosition = 0.0;
+        if (transportStateBlock)
+            transportStateBlock(&transportStateFlags, &currentSamplePosition, nullptr, nullptr);
+        bool isPlaying = (transportStateFlags & AUHostTransportStateMoving) != 0;
+
+        if (auto playbackRenderer = (araPlugInExtension) ? araPlugInExtension->getPlaybackRenderer<ARATestPlaybackRenderer>() : nullptr) {
+            // if we're an ARA playback renderer, calculate ARA playback output
+            playbackRenderer->renderPlaybackRegions(channels, ARA::roundSamplePosition(currentSamplePosition), frameCount, isPlaying);
+        }
+        else {
+            // if we're no ARA playback renderer, we're just copying the inputs to the outputs, which is
+            // appropriate both when being only an ARA editor renderer, or when being used in non-ARA mode.
+            for (int i = 0; i < chanCount; ++i) {
+                const float* in = (const float*)inBufferListPtr->mBuffers[i].mData + bufferOffset;
+                if (in != channels[i])      // check in-place processing
+                    std::memcpy(channels[i] + bufferOffset, in, sizeof(float) * frameCount);
+            }
         }
     }
 
@@ -111,6 +132,8 @@ private:
     AUAudioFrameCount maxFramesToRender = 512;
     AudioBufferList* inBufferListPtr = nullptr;
     AudioBufferList* outBufferListPtr = nullptr;
+    AUHostTransportStateBlock transportStateBlock = nullptr;
+    ARA::PlugIn::PlugInExtension* araPlugInExtension = nullptr;
 };
 
 #endif /* TestAUv3DSPKernel_hpp */

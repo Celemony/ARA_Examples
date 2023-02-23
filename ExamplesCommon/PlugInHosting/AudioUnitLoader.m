@@ -27,6 +27,7 @@
 #import <AVFoundation/AVFoundation.h>
 
 #include "ARA_API/ARAAudioUnit.h"
+#include "ARA_API/ARAAudioUnit_v3.h"
 #include "ARA_Library/Debug/ARADebug.h"
 
 
@@ -139,24 +140,35 @@ const struct ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitCom
     AudioUnitInstance audioUnitInstance = AudioUnitOpenInstance(audioUnitComponent);
 
     // check whether the AU supports ARA by trying to get the factory
-    UInt32 propertySize = sizeof(ARAAudioUnitFactory);
-    ARAAudioUnitFactory audioUnitFactory = { kARAAudioUnitMagic, NULL };
-    Boolean isWriteable = FALSE;
-
-    OSStatus status = AudioUnitGetPropertyInfo(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAFactory, kAudioUnitScope_Global, 0, &propertySize, &isWriteable);
-    if ((status == noErr) &&
-        (propertySize == sizeof(ARAAudioUnitFactory)) &&
-        !isWriteable)
+    if (audioUnitInstance->isAUv2)
     {
-        status = AudioUnitGetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAFactory, kAudioUnitScope_Global, 0, &audioUnitFactory, &propertySize);
+        UInt32 propertySize = sizeof(ARAAudioUnitFactory);
+        ARAAudioUnitFactory audioUnitFactory = { kARAAudioUnitMagic, NULL };
+        Boolean isWriteable = FALSE;
+
+        OSStatus status = AudioUnitGetPropertyInfo(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAFactory, kAudioUnitScope_Global, 0, &propertySize, &isWriteable);
         if ((status == noErr) &&
             (propertySize == sizeof(ARAAudioUnitFactory)) &&
-            (audioUnitFactory.inOutMagicNumber == kARAAudioUnitMagic))
+            !isWriteable)
         {
-            ARA_VALIDATE_API_CONDITION(audioUnitFactory.outFactory != NULL);
-            result = audioUnitFactory.outFactory;
-        }
+            status = AudioUnitGetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAFactory, kAudioUnitScope_Global, 0, &audioUnitFactory, &propertySize);
+            if ((status == noErr) &&
+                (propertySize == sizeof(ARAAudioUnitFactory)) &&
+                (audioUnitFactory.inOutMagicNumber == kARAAudioUnitMagic))
+            {
+                ARA_VALIDATE_API_CONDITION(audioUnitFactory.outFactory != NULL);
+                result = audioUnitFactory.outFactory;
+            }
 
+        }
+    }
+    else
+    {
+        if ([audioUnitInstance->v3AudioUnit conformsToProtocol:@protocol(ARAAudioUnit)])
+        {
+            result = [(AUAudioUnit<ARAAudioUnit> *)audioUnitInstance->v3AudioUnit araFactory];
+            ARA_VALIDATE_API_CONDITION(result != NULL);
+        }
     }
 
     // validate the AU is properly tagged as ARA
@@ -165,7 +177,7 @@ const struct ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitCom
         @autoreleasepool
         {
             AudioComponentDescription compDesc;
-            status = AudioComponentGetDescription(audioUnitComponent, &compDesc);
+            OSStatus status = AudioComponentGetDescription(audioUnitComponent, &compDesc);
             ARA_INTERNAL_ASSERT(status == noErr);
             AVAudioUnitComponent * avComponent = [[[AVAudioUnitComponentManager sharedAudioUnitComponentManager] componentsMatchingDescription:compDesc] firstObject];
             ARA_INTERNAL_ASSERT(avComponent);
@@ -179,28 +191,39 @@ const struct ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitCom
 
 const struct ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnitInstance, ARADocumentControllerRef controllerRef, ARAPlugInInstanceRoleFlags assignedRoles)
 {
-    UInt32 propertySize = sizeof(ARAAudioUnitPlugInExtensionBinding);
-    UInt32 ARA_MAYBE_UNUSED_VAR(expectedPropertySize) = propertySize;
-    ARAPlugInInstanceRoleFlags knownRoles = kARAPlaybackRendererRole | kARAEditorRendererRole | kARAEditorViewRole;
-    ARAAudioUnitPlugInExtensionBinding audioUnitBinding = { kARAAudioUnitMagic, controllerRef, NULL, knownRoles, assignedRoles };
-
-    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitGetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAPlugInExtensionBindingWithRoles, kAudioUnitScope_Global, 0, &audioUnitBinding, &propertySize);
-#if defined(ARA_SUPPORT_VERSION_1) && (ARA_SUPPORT_VERSION_1)
-    if (status != noErr)
+    const ARAPlugInInstanceRoleFlags knownRoles = kARAPlaybackRendererRole | kARAEditorRendererRole | kARAEditorViewRole;
+    if (audioUnitInstance->isAUv2)
     {
-        propertySize = offsetof(ARAAudioUnitPlugInExtensionBinding, knownRoles);
-        expectedPropertySize = propertySize;
-        status = AudioUnitGetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAPlugInExtensionBinding, kAudioUnitScope_Global, 0, &audioUnitBinding, &propertySize);
-    }
+        UInt32 propertySize = sizeof(ARAAudioUnitPlugInExtensionBinding);
+        UInt32 ARA_MAYBE_UNUSED_VAR(expectedPropertySize) = propertySize;
+        ARAAudioUnitPlugInExtensionBinding audioUnitBinding = { kARAAudioUnitMagic, controllerRef, NULL, knownRoles, assignedRoles };
+
+        OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitGetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAPlugInExtensionBindingWithRoles, kAudioUnitScope_Global, 0, &audioUnitBinding, &propertySize);
+#if defined(ARA_SUPPORT_VERSION_1) && (ARA_SUPPORT_VERSION_1)
+        if (status != noErr)
+        {
+            propertySize = offsetof(ARAAudioUnitPlugInExtensionBinding, knownRoles);
+            expectedPropertySize = propertySize;
+            status = AudioUnitGetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAPlugInExtensionBinding, kAudioUnitScope_Global, 0, &audioUnitBinding, &propertySize);
+        }
 #endif
 
-    ARA_VALIDATE_API_CONDITION(status == noErr);
-    ARA_VALIDATE_API_CONDITION(propertySize == expectedPropertySize);
-    ARA_VALIDATE_API_CONDITION(audioUnitBinding.inOutMagicNumber == kARAAudioUnitMagic);
-    ARA_VALIDATE_API_CONDITION(audioUnitBinding.inDocumentControllerRef == controllerRef);
-    ARA_VALIDATE_API_CONDITION(audioUnitBinding.outPlugInExtension != NULL);
+        ARA_VALIDATE_API_CONDITION(status == noErr);
+        ARA_VALIDATE_API_CONDITION(propertySize == expectedPropertySize);
+        ARA_VALIDATE_API_CONDITION(audioUnitBinding.inOutMagicNumber == kARAAudioUnitMagic);
+        ARA_VALIDATE_API_CONDITION(audioUnitBinding.inDocumentControllerRef == controllerRef);
+        ARA_VALIDATE_API_CONDITION(audioUnitBinding.outPlugInExtension != NULL);
 
-    return audioUnitBinding.outPlugInExtension;
+        return audioUnitBinding.outPlugInExtension;
+    }
+    else
+    {
+        ARA_INTERNAL_ASSERT ([audioUnitInstance->v3AudioUnit conformsToProtocol:@protocol(ARAAudioUnit)]);
+        const ARAPlugInExtensionInstance * instance = [(AUAudioUnit<ARAAudioUnit> *)audioUnitInstance->v3AudioUnit
+                                                        bindToDocumentController:controllerRef withRoles:assignedRoles knownRoles:knownRoles];
+        ARA_VALIDATE_API_CONDITION(instance != NULL);
+        return instance;
+    }
 }
 
 
@@ -341,7 +364,7 @@ void AudioUnitStartRendering(AudioUnitInstance audioUnitInstance, UInt32 blockSi
         ConfigureBussesArray(audioUnitInstance->v3AudioUnit.inputBusses, sampleRate);
         ConfigureBussesArray(audioUnitInstance->v3AudioUnit.outputBusses, sampleRate);
 
-        audioUnitInstance->v3RenderBlock = [audioUnitInstance->v3AudioUnit renderBlock];
+        audioUnitInstance->v3RenderBlock = [[audioUnitInstance->v3AudioUnit renderBlock] retain];
 
         audioUnitInstance->v3AudioUnit.transportStateBlock =
             ^BOOL(AUHostTransportStateFlags * __nullable transportStateFlags, double * __nullable currentSamplePosition,
@@ -405,6 +428,7 @@ void AudioUnitStopRendering(AudioUnitInstance audioUnitInstance)
     else
     {
         [audioUnitInstance->v3AudioUnit deallocateRenderResources];
+        [audioUnitInstance->v3RenderBlock release];
     }
 }
 
