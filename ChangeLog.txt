@@ -3,7 +3,7 @@ This is a development build of the ARA Examples 2.3.
 
 
 Changes since previous releases:
-- no changes yet
+- various minor cleanups in macOS info.plist files
 
 
 === ARA SDK 2.2 release (aka 2.2.001) (2022/11/07) ===
