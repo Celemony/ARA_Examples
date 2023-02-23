@@ -358,17 +358,17 @@ int main (int argc, const char * argv[])
     if (factory == NULL)
     {
         ARA_WARN("this plug-in doesn't support ARA.");
-        return -1;                // this plug-in doesn't support ARA.
+        return -1;
     }
     if (factory->lowestSupportedApiGeneration > kARAAPIGeneration_2_0_Final)
     {
         ARA_WARN("this plug-in only supports newer generations of ARA.");
-        return -1;                // this plug-in doesn't support our generation of ARA.
+        return -1;
     }
     if (factory->highestSupportedApiGeneration < kARAAPIGeneration_2_0_Final)
     {
         ARA_WARN("this plug-in only supports older generations of ARA.");
-        return -1;                // this plug-in doesn't support our generation of ARA.
+        return -1;
     }
 
 #if ARA_VALIDATE_API_CALLS
