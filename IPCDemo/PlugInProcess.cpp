@@ -85,6 +85,32 @@ struct ARARemoteContentReader
     ARAContentType contentType;
 };
 
+// \todo convert code to properly support the host/plug-in dispatcher toRef() and fromRef()!
+ARADocumentControllerRef toRef (ARARemoteDocument* ptr)
+{
+    return reinterpret_cast<ARADocumentControllerRef> (ptr);
+}
+ARAAudioSourceRef toRef (ARARemoteAudioSource* ptr)
+{
+    return reinterpret_cast<ARAAudioSourceRef> (ptr);
+}
+ARAContentReaderRef toRef (ARARemoteContentReader* ptr)
+{
+    return reinterpret_cast<ARAContentReaderRef> (ptr);
+}
+ARARemoteDocument* fromRef (ARADocumentControllerRef ref)
+{
+    return reinterpret_cast<ARARemoteDocument*> (ref);
+}
+ARARemoteAudioSource* fromRef (ARAAudioSourceRef ref)
+{
+    return reinterpret_cast<ARARemoteAudioSource*> (ref);
+}
+ARARemoteContentReader* fromRef (ARAContentReaderRef ref)
+{
+    return reinterpret_cast<ARARemoteContentReader*> (ref);
+}
+
 
 // ARAAudioAccessControllerInterface
 ARAAudioReaderHostRef ARA_CALL ARACreateAudioReaderForSource (ARAAudioAccessControllerHostRef controllerHostRef,
@@ -95,11 +121,8 @@ ARAAudioReaderHostRef ARA_CALL ARACreateAudioReaderForSource (ARAAudioAccessCont
     remoteAudioReader->audioSource = remoteAudioSource;
     remoteAudioReader->use64BitSamples = use64BitSamples;
 
-    const auto reply { audioAccessFromPlugInPort.sendAndAwaitReply (encodeMethodCall ("createAudioReaderForSource",
-                                                                        "controllerHostRef", controllerHostRef,
-                                                                        "audioSourceHostRef", remoteAudioSource->mainHostRef,
-                                                                        "use64BitSamples", use64BitSamples)) };
-    remoteAudioReader->mainHostRef = reply.getArgValue<ARAAudioReaderHostRef> ("readerRef");
+    remoteAudioReader->mainHostRef = decodeReply<ARAAudioReaderHostRef> (audioAccessFromPlugInPort.sendAndAwaitReply (
+                                        encodeArguments ("createAudioReaderForSource", controllerHostRef, remoteAudioSource->mainHostRef, use64BitSamples)));
     return reinterpret_cast<ARAAudioReaderHostRef> (remoteAudioReader);
 }
 
@@ -115,19 +138,18 @@ void _swap (double* ptr)
 template<typename FloatT>
 ARABool _readAudioSamples (const IPCMessage& reply, ARASampleCount samplesPerChannel, ARAChannelCount channelCount, void* const buffers[])
 {
-    const auto success { reply.getArgValue<ARABool> ("result") };
-    auto bufferData { reply.getArgValue<std::vector<ARAByte>> ("bufferData") };
+    const auto decoded { decodeReply<ARAIPCReadSamplesReply> (reply) };
+    const bool success { decoded.dataCount > 0 };
     if (success != kARAFalse)
-        ARA_INTERNAL_ASSERT (bufferData.size () == sizeof (FloatT) * static_cast<size_t> (samplesPerChannel * channelCount));
+        ARA_INTERNAL_ASSERT (decoded.dataCount == sizeof (FloatT) * static_cast<size_t> (samplesPerChannel * channelCount));
     else
-        ARA_INTERNAL_ASSERT (bufferData.size () == 0);
+        ARA_INTERNAL_ASSERT (decoded.dataCount == 0);
 
-    const auto isLittleEndian { reply.getArgValue<ARABool> ("isLittleEndian") };
     const auto endian { CFByteOrderGetCurrent() };
     ARA_INTERNAL_ASSERT (endian != CFByteOrderUnknown);
-    bool needSwap { endian != ((isLittleEndian != kARAFalse) ? CFByteOrderLittleEndian : CFByteOrderBigEndian) };
+    bool needSwap { endian != ((decoded.isLittleEndian != kARAFalse) ? CFByteOrderLittleEndian : CFByteOrderBigEndian) };
 
-    auto sourcePtr = bufferData.data ();
+    auto sourcePtr = decoded.data;
     const auto channelSize { sizeof (FloatT) * static_cast<size_t> (samplesPerChannel) };
     for (auto i { 0 }; i < channelCount; ++i)
     {
@@ -181,11 +203,8 @@ ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controller
     static os_unfair_lock_s lock { OS_UNFAIR_LOCK_INIT };
     os_unfair_lock_lock (&lock);
 
-    const auto reply { audioAccessFromPlugInPort.sendAndAwaitReply (encodeMethodCall ("readAudioSamples",
-                                                                        "controllerHostRef", controllerHostRef,
-                                                                        "readerRef", remoteAudioReader->mainHostRef,
-                                                                        "samplePosition", samplePosition,
-                                                                        "samplesPerChannel", samplesPerChannel)) };
+    const auto reply { audioAccessFromPlugInPort.sendAndAwaitReply (
+                            encodeArguments ("readAudioSamples", controllerHostRef, remoteAudioReader->mainHostRef, samplePosition, samplesPerChannel)) };
     const auto result { (remoteAudioReader->use64BitSamples != kARAFalse) ?
                         _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers):
                         _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers)};
@@ -197,9 +216,7 @@ ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controller
 void ARA_CALL ARADestroyAudioReader (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef)
 {
     auto remoteAudioReader { reinterpret_cast<ARARemoteAudioReader *> (audioReaderHostRef) };
-    audioAccessFromPlugInPort.sendWithoutReply (encodeMethodCall ("destroyAudioReader",
-                                                                        "controllerHostRef", controllerHostRef,
-                                                                        "readerRef", remoteAudioReader->mainHostRef));
+    audioAccessFromPlugInPort.sendWithoutReply (encodeArguments ("destroyAudioReader", controllerHostRef, remoteAudioReader->mainHostRef));
     delete remoteAudioReader;
 }
 static const SizedStruct<ARA_STRUCT_MEMBER (ARAAudioAccessControllerInterface, destroyAudioReader)> hostAudioAccessControllerInterface {
@@ -241,23 +258,23 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
     if (isMethodCall (message, "createDocumentControllerWithDocument"))
     {
         auto remoteDocument { new ARARemoteDocument };
-
-        remoteDocument->hostInstance.audioAccessControllerHostRef = message.getArgValue<ARAAudioAccessControllerHostRef> ("hostInstance.audioAccessControllerHostRef");
         remoteDocument->hostInstance.audioAccessControllerInterface = &hostAudioAccessControllerInterface;
         remoteDocument->hostInstance.archivingControllerInterface = &hostArchivingControllerInterface;
 
-        const auto documentName { message.getArgValue<const char*> ("properties.name") };
-        const SizedStruct<ARA_STRUCT_MEMBER (ARADocumentProperties, name)> documentProperties { documentName };
+        ARADocumentProperties properties;
+        decodeArguments(message, remoteDocument->hostInstance.audioAccessControllerHostRef, properties);
 
-        const ARADocumentControllerInstance * documentControllerInstance = factory->createDocumentControllerWithDocument (&remoteDocument->hostInstance, &documentProperties);
+        const ARADocumentControllerInstance * documentControllerInstance = factory->createDocumentControllerWithDocument (&remoteDocument->hostInstance, &properties);
         ARA_VALIDATE_API_CONDITION (documentControllerInstance != nullptr);
         ARA_VALIDATE_API_INTERFACE (documentControllerInstance->documentControllerInterface, ARADocumentControllerInterface);
         remoteDocument->documentController = *documentControllerInstance;
-        return { "controllerRef", remoteDocument };
+        return encodeReply (toRef (remoteDocument));
     }
     else if (isMethodCall (message, "destroyDocumentController"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
+        ARADocumentControllerRef controllerRef;
+        decodeArguments (message, controllerRef);
+        auto remoteDocument { fromRef (controllerRef) };
         remoteDocument->documentController.documentControllerInterface->destroyDocumentController (remoteDocument->documentController.documentControllerRef);
 
         delete remoteDocument;
@@ -267,133 +284,154 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
     }
     else if (isMethodCall (message, "beginEditing"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
+        ARADocumentControllerRef controllerRef;
+        decodeArguments (message, controllerRef);
+        auto remoteDocument { fromRef (controllerRef) };
         remoteDocument->documentController.documentControllerInterface->beginEditing (remoteDocument->documentController.documentControllerRef);
         return {};
     }
     else if (isMethodCall (message, "endEditing"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
+        ARADocumentControllerRef controllerRef;
+        decodeArguments (message, controllerRef);
+        auto remoteDocument { fromRef (controllerRef) };
         remoteDocument->documentController.documentControllerInterface->endEditing (remoteDocument->documentController.documentControllerRef);
         return {};
     }
     else if (isMethodCall (message, "createAudioSource"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
-
         auto remoteAudioSource { new ARARemoteAudioSource };
-        remoteAudioSource->mainHostRef = message.getArgValue<ARAAudioSourceHostRef> ("hostRef");
 
-        const auto props { message.getArgValue<IPCMessage> ("properties") };
-        const SizedStruct<ARA_STRUCT_MEMBER (ARAAudioSourceProperties, merits64BitSamples)> properties {
-                            props.getArgValue<const char*> ("name"),
-                            props.getArgValue<const char*> ("persistentID"),
-                            props.getArgValue<ARASampleCount> ("sampleCount"),
-                            props.getArgValue<ARASampleRate> ("sampleRate"),
-                            props.getArgValue<ARAChannelCount> ("channelCount"),
-                            props.getArgValue<ARABool> ("merits64BitSamples") };
+        ARADocumentControllerRef controllerRef;
+        ARAAudioSourceProperties properties;
+        decodeArguments (message, controllerRef, remoteAudioSource->mainHostRef, properties);
+        auto remoteDocument { fromRef (controllerRef) };
+
         remoteAudioSource->channelCount = properties.channelCount;
         remoteAudioSource->plugInRef = remoteDocument->documentController.documentControllerInterface->createAudioSource (
-                                        remoteDocument->documentController.documentControllerRef, reinterpret_cast<ARAAudioSourceHostRef> (remoteAudioSource), &properties);
-        return { "audioSourceRef", remoteAudioSource };
+                                            remoteDocument->documentController.documentControllerRef, reinterpret_cast<ARAAudioSourceHostRef> (remoteAudioSource), &properties);
+        return encodeReply (toRef (remoteAudioSource));
     }
     else if (isMethodCall (message, "enableAudioSourceSamplesAccess"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
-        auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
-        auto enable { message.getArgValue<ARABool> ("enable") };
-        remoteDocument->documentController.documentControllerInterface->enableAudioSourceSamplesAccess (remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, enable);
+        ARADocumentControllerRef controllerRef;
+        ARAAudioSourceRef audioSourceRef;
+        ARABool enable;
+        decodeArguments (message, controllerRef, audioSourceRef, enable);
+        auto remoteDocument { fromRef (controllerRef) };
+        auto remoteAudioSource { fromRef (audioSourceRef) };
+        remoteDocument->documentController.documentControllerInterface->enableAudioSourceSamplesAccess (
+                remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, enable);
         return {};
     }
     else if (isMethodCall (message, "destroyAudioSource"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
-        auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
-        remoteDocument->documentController.documentControllerInterface->destroyAudioSource (remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef);
+        ARADocumentControllerRef controllerRef;
+        ARAAudioSourceRef audioSourceRef;
+        decodeArguments (message, controllerRef, audioSourceRef);
+        auto remoteDocument { fromRef (controllerRef) };
+        auto remoteAudioSource { fromRef (audioSourceRef) };
+        remoteDocument->documentController.documentControllerInterface->destroyAudioSource (
+                remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef);
 
         delete remoteAudioSource;
         return {};
     }
     else if (isMethodCall (message, "isAudioSourceContentAvailable"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
-        auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
-        auto contentType { message.getArgValue<ARAContentType> ("contentType") };
+        ARADocumentControllerRef controllerRef;
+        ARAAudioSourceRef audioSourceRef;
+        ARAContentType contentType;
+        decodeArguments (message, controllerRef, audioSourceRef, contentType);
+        auto remoteDocument { fromRef (controllerRef) };
+        auto remoteAudioSource { fromRef (audioSourceRef) };
 
         // since we've not modelled this in our IPC yet, we are sending it here so the plug-in can update before querying the state
         remoteDocument->documentController.documentControllerInterface->notifyModelUpdates (remoteDocument->documentController.documentControllerRef);
 
-        auto available = remoteDocument->documentController.documentControllerInterface->isAudioSourceContentAvailable (remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, contentType);
-        return { "result", available };
+        return encodeReply (remoteDocument->documentController.documentControllerInterface->isAudioSourceContentAvailable (
+                                        remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, contentType));
     }
     else if (isMethodCall (message, "isAudioSourceContentAnalysisIncomplete"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
-        auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
-        auto contentType { message.getArgValue<ARAContentType> ("contentType") };
+        ARADocumentControllerRef controllerRef;
+        ARAAudioSourceRef audioSourceRef;
+        ARAContentType contentType;
+        decodeArguments (message, controllerRef, audioSourceRef, contentType);
+        auto remoteDocument { fromRef (controllerRef) };
+        auto remoteAudioSource { fromRef (audioSourceRef) };
 
         // since we've not modelled this in our IPC yet, we are sending it here so the plug-in can update before querying the state
         remoteDocument->documentController.documentControllerInterface->notifyModelUpdates (remoteDocument->documentController.documentControllerRef);
 
-        auto incomplete = remoteDocument->documentController.documentControllerInterface->isAudioSourceContentAnalysisIncomplete (remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, contentType);
-        return { "result", incomplete };
+        return encodeReply (remoteDocument->documentController.documentControllerInterface->isAudioSourceContentAnalysisIncomplete (
+                                        remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, contentType));
     }
     else if (isMethodCall (message, "requestAudioSourceContentAnalysis"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
-        auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
-        auto contentTypes { message.getArgValue<std::vector<ARAContentType>> ("contentTypes") };
-        remoteDocument->documentController.documentControllerInterface->requestAudioSourceContentAnalysis (remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, contentTypes.size (), contentTypes.data ());
+        ARADocumentControllerRef controllerRef;
+        ARAAudioSourceRef audioSourceRef;
+        std::vector<ARAContentType> contentTypes;
+        decodeArguments (message, controllerRef, audioSourceRef, contentTypes);
+        auto remoteDocument { fromRef (controllerRef) };
+        auto remoteAudioSource { fromRef (audioSourceRef) };
+        remoteDocument->documentController.documentControllerInterface->requestAudioSourceContentAnalysis (
+                remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, contentTypes.size (), contentTypes.data ());
         return {};
     }
     else if (isMethodCall (message, "createAudioSourceContentReader"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
-        auto remoteAudioSource { message.getArgValue<ARARemoteAudioSource*> ("audioSourceRef") };
-        auto contentType { message.getArgValue<ARAContentType> ("contentType") };
-        /* optional contentTimeRange argument not implemented here to keep the example simple */
-
         auto remoteContentReader { new ARARemoteContentReader };
-        remoteContentReader->plugInRef = remoteDocument->documentController.documentControllerInterface->createAudioSourceContentReader (remoteDocument->documentController.documentControllerRef,
-                                            remoteAudioSource->plugInRef, contentType, nullptr);
+
+        ARADocumentControllerRef controllerRef;
+        ARAAudioSourceRef audioSourceRef;
+        ARAContentType contentType;
+        OptionalArgument<ARAContentTimeRange*> timeRange;
+        decodeArguments (message, controllerRef, audioSourceRef, contentType, timeRange);
+        auto remoteDocument { fromRef (controllerRef) };
+        auto remoteAudioSource { fromRef (audioSourceRef) };
+
+        remoteContentReader->plugInRef = remoteDocument->documentController.documentControllerInterface->createAudioSourceContentReader (
+                        remoteDocument->documentController.documentControllerRef, remoteAudioSource->plugInRef, contentType, (timeRange.second) ? &timeRange.first : nullptr);
         remoteContentReader->contentType = contentType;
-        return { "contentReaderRef", remoteContentReader };
+        return encodeReply (toRef (remoteContentReader));
     }
     else if (isMethodCall (message, "getContentReaderEventCount"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
-        auto remoteContentReader { message.getArgValue<ARARemoteContentReader*> ("contentReaderRef") };
-        ARAInt32 eventCount { remoteDocument->documentController.documentControllerInterface->getContentReaderEventCount (remoteDocument->documentController.documentControllerRef, remoteContentReader->plugInRef) };
-        return { "result", eventCount };
+        ARADocumentControllerRef controllerRef;
+        ARAContentReaderRef contentReaderRef;
+        decodeArguments (message, controllerRef, contentReaderRef);
+        auto remoteDocument { fromRef (controllerRef) };
+        auto remoteContentReader { fromRef (contentReaderRef) };
+        return encodeReply (remoteDocument->documentController.documentControllerInterface->getContentReaderEventCount (
+                                    remoteDocument->documentController.documentControllerRef, remoteContentReader->plugInRef));
     }
     else if (isMethodCall (message, "getContentReaderDataForEvent"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
-        auto remoteContentReader { message.getArgValue<ARARemoteContentReader*> ("contentReaderRef") };
-        auto eventIndex { message.getArgValue<ARAInt32> ("eventIndex") };
+        ARADocumentControllerRef controllerRef;
+        ARAContentReaderRef contentReaderRef;
+        ARAInt32 eventIndex;
+        decodeArguments (message, controllerRef, contentReaderRef, eventIndex);
+        auto remoteDocument { fromRef (controllerRef) };
+        auto remoteContentReader { fromRef (contentReaderRef) };
 
-        const void* eventData = remoteDocument->documentController.documentControllerInterface->getContentReaderDataForEvent (remoteDocument->documentController.documentControllerRef, remoteContentReader->plugInRef, eventIndex);
+        const void* eventData = remoteDocument->documentController.documentControllerInterface->getContentReaderDataForEvent (
+                                    remoteDocument->documentController.documentControllerRef, remoteContentReader->plugInRef, eventIndex);
         if (remoteContentReader->contentType == kARAContentTypeNotes)
-        {
-            const auto note { static_cast<const ARAContentNote*> (eventData) };
-            return { "frequency", note->frequency,
-                     "pitchNumber", note->pitchNumber,
-                     "volume", note->volume,
-                     "startPosition", note->startPosition,
-                     "attackDuration", note->attackDuration,
-                     "noteDuration", note->noteDuration,
-                     "signalDuration", note->signalDuration };
-        }
+            return encodeReply (*static_cast<const ARAContentNote*> (eventData));
 
         ARA_INTERNAL_ASSERT (false && "other content types are not implemented yet");
         return {};
     }
     else if (isMethodCall (message, "destroyContentReader"))
     {
-        auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
-        auto remoteContentReader { message.getArgValue<ARARemoteContentReader*> ("contentReaderRef") };
-        remoteDocument->documentController.documentControllerInterface->destroyContentReader (remoteDocument->documentController.documentControllerRef, remoteContentReader->plugInRef);
-
+        ARADocumentControllerRef controllerRef;
+        ARAContentReaderRef contentReaderRef;
+        decodeArguments (message, controllerRef, contentReaderRef);
+        auto remoteDocument { fromRef (controllerRef) };
+        auto remoteContentReader { fromRef (contentReaderRef) };
+        remoteDocument->documentController.documentControllerInterface->destroyContentReader (
+                remoteDocument->documentController.documentControllerRef, remoteContentReader->plugInRef);
         delete remoteContentReader;
         return {};
     }

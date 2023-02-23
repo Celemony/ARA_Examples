@@ -78,14 +78,6 @@ CFStringRef IPCMessage::_createEncodedTag (const char* tag)
     return result;
 }
 
-const char* IPCMessage::_getKeyForArrayIndex (size_t index)
-{
-    static std::vector<std::string> cache;
-    for (auto i = cache.size (); i <= index; ++i)
-        cache.emplace_back (std::to_string (i));
-    return cache[index].c_str ();
-}
-
 IPCMessage::IPCMessage (CFDataRef data)
 {
     auto dictionary { (CFDictionaryRef) CFPropertyListCreateWithData (kCFAllocatorDefault, data, kCFPropertyListImmutable, nullptr, nullptr) };
