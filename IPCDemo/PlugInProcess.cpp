@@ -69,9 +69,7 @@ struct ARARemoteAudioSource
 {
     ARAAudioSourceHostRef mainHostRef {};
     ARAAudioSourceRef plugInRef {};
-    std::string name;
-    std::string persistentID;
-    SizedStruct<ARA_STRUCT_MEMBER (ARAAudioSourceProperties, merits64BitSamples)> properties {};
+    ARAChannelCount channelCount { 1 };
 };
 
 struct ARARemoteAudioReader
@@ -164,8 +162,8 @@ ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controller
 
         const auto sampleSize { (remoteAudioReader->use64BitSamples != kARAFalse) ? sizeof(double) : sizeof(float) };
         const auto samplesPerChannel2 { samplesPerChannel - samplesPerChannel1 };
-        void* buffers2[remoteAudioReader->audioSource->properties.channelCount];
-        for (auto i { 0 }; i < remoteAudioReader->audioSource->properties.channelCount; ++i)
+        void* buffers2[remoteAudioReader->audioSource->channelCount];
+        for (auto i { 0 }; i < remoteAudioReader->audioSource->channelCount; ++i)
             buffers2[i] = static_cast<uint8_t*> (buffers[i]) + static_cast<size_t> (samplesPerChannel1) * sampleSize;
 
         if (result1 != kARAFalse)
@@ -174,7 +172,7 @@ ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controller
         }
         else
         {
-            for (auto i { 0 }; i < remoteAudioReader->audioSource->properties.channelCount; ++i)
+            for (auto i { 0 }; i < remoteAudioReader->audioSource->channelCount; ++i)
                 std::memset (buffers2[i], 0, static_cast<size_t> (samplesPerChannel2) * sampleSize);
             return kARAFalse;
         }
@@ -184,13 +182,13 @@ ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controller
     os_unfair_lock_lock (&lock);
 
     const auto reply { audioAccessFromPlugInPort.sendAndAwaitReply (encodeMethodCall ("readAudioSamples",
-                                                                                      "controllerHostRef", controllerHostRef,
-                                                                                      "readerRef", remoteAudioReader->mainHostRef,
-                                                                                      "samplePosition", samplePosition,
-                                                                                      "samplesPerChannel", samplesPerChannel)) };
+                                                                        "controllerHostRef", controllerHostRef,
+                                                                        "readerRef", remoteAudioReader->mainHostRef,
+                                                                        "samplePosition", samplePosition,
+                                                                        "samplesPerChannel", samplesPerChannel)) };
     const auto result { (remoteAudioReader->use64BitSamples != kARAFalse) ?
-                        _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->properties.channelCount, buffers):
-                        _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->properties.channelCount, buffers)};
+                        _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers):
+                        _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers)};
 
     os_unfair_lock_unlock (&lock);
     return result;
@@ -248,8 +246,8 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
         remoteDocument->hostInstance.audioAccessControllerInterface = &hostAudioAccessControllerInterface;
         remoteDocument->hostInstance.archivingControllerInterface = &hostArchivingControllerInterface;
 
-        const auto documentName { message.getArgValue<std::string> ("properties.name") };
-        const SizedStruct<ARA_STRUCT_MEMBER (ARADocumentProperties, name)> documentProperties { documentName.c_str () };
+        const auto documentName { message.getArgValue<const char*> ("properties.name") };
+        const SizedStruct<ARA_STRUCT_MEMBER (ARADocumentProperties, name)> documentProperties { documentName };
 
         const ARADocumentControllerInstance * documentControllerInstance = factory->createDocumentControllerWithDocument (&remoteDocument->hostInstance, &documentProperties);
         ARA_VALIDATE_API_CONDITION (documentControllerInstance != nullptr);
@@ -286,18 +284,17 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
         auto remoteAudioSource { new ARARemoteAudioSource };
         remoteAudioSource->mainHostRef = message.getArgValue<ARAAudioSourceHostRef> ("hostRef");
 
-        auto properties { message.getArgValue<IPCMessage> ("properties") };
-        remoteAudioSource->name = properties.getArgValue<std::string> ("name");
-        remoteAudioSource->properties.name = remoteAudioSource->name.c_str ();
-        remoteAudioSource->persistentID = properties.getArgValue<std::string> ("persistentID");
-        remoteAudioSource->properties.persistentID = remoteAudioSource->persistentID.c_str ();
-        remoteAudioSource->properties.sampleCount = properties.getArgValue<ARASampleCount> ("sampleCount");
-        remoteAudioSource->properties.sampleRate = properties.getArgValue<ARASampleRate> ("sampleRate");
-        remoteAudioSource->properties.channelCount = properties.getArgValue<ARAChannelCount> ("channelCount");
-        remoteAudioSource->properties.merits64BitSamples = properties.getArgValue<ARABool> ("merits64BitSamples");
-
+        const auto props { message.getArgValue<IPCMessage> ("properties") };
+        const SizedStruct<ARA_STRUCT_MEMBER (ARAAudioSourceProperties, merits64BitSamples)> properties {
+                            props.getArgValue<const char*> ("name"),
+                            props.getArgValue<const char*> ("persistentID"),
+                            props.getArgValue<ARASampleCount> ("sampleCount"),
+                            props.getArgValue<ARASampleRate> ("sampleRate"),
+                            props.getArgValue<ARAChannelCount> ("channelCount"),
+                            props.getArgValue<ARABool> ("merits64BitSamples") };
+        remoteAudioSource->channelCount = properties.channelCount;
         remoteAudioSource->plugInRef = remoteDocument->documentController.documentControllerInterface->createAudioSource (
-                                        remoteDocument->documentController.documentControllerRef, reinterpret_cast<ARAAudioSourceHostRef> (remoteAudioSource), &remoteAudioSource->properties);
+                                        remoteDocument->documentController.documentControllerRef, reinterpret_cast<ARAAudioSourceHostRef> (remoteAudioSource), &properties);
         return { "audioSourceRef", remoteAudioSource };
     }
     else if (isMethodCall (message, "enableAudioSourceSamplesAccess"))

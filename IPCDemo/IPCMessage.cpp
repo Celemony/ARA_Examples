@@ -24,6 +24,9 @@
 #include "IPCMessage.h"
 #include "ARA_Library/Debug/ARADebug.h"
 
+#include <string>
+#include <set>
+
 void IPCMessage::_setup (CFDictionaryRef dictionary, bool isWritable)
 {
     if (_dictionary)
@@ -210,16 +213,24 @@ void IPCMessage::_readArg (const char* argKey, double& argValue) const
     CFRelease (key);
 }
 
-void IPCMessage::_readArg (const char* argKey, std::string& argValue) const
+void IPCMessage::_readArg (const char* argKey, const char*& argValue) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
-    argValue.clear ();
     auto key { _createEncodedTag (argKey) };
     auto string { (CFStringRef) CFDictionaryGetValue (_dictionary, key) };
     ARA_INTERNAL_ASSERT (string && (CFGetTypeID (string) == CFStringGetTypeID ()));
-    const auto length { CFStringGetLength (string) };
-    argValue.resize (static_cast<size_t> (length), 0);
-    CFStringGetCString (string, (char *) argValue.c_str (), length + 1, kCFStringEncodingUTF8);
+    argValue = CFStringGetCStringPtr (string, kCFStringEncodingUTF8);
+    if (!argValue)      // CFStringGetCStringPtr() may fail e.g. with chord names like "G/D"
+    {
+        const auto length { CFStringGetLength (string) };
+        std::string temp;   // \todo does not work: { static_cast<size_t> (length), char { 0 } };
+        temp.assign ( static_cast<size_t> (length) , char { 0 } );
+        CFIndex ARA_MAYBE_UNUSED_VAR (count) { CFStringGetBytes (string, CFRangeMake (0, length), kCFStringEncodingUTF8, 0, false, (UInt8*)(&temp[0]), length, nullptr) };
+        ARA_INTERNAL_ASSERT (count == length);
+        static std::set<std::string> strings;   // \todo static cache of "undecodeable" strings requires single-threaded use - maybe make iVar instead?
+        strings.insert (temp);
+        argValue = strings.find (temp)->c_str ();
+    }
     CFRelease (key);
 }
 
