@@ -37,13 +37,13 @@ public:
     IPCPort& operator= (IPCPort&& other)  noexcept;
     ~IPCPort ();
 
-    typedef IPCMessage (*Callback) (const IPCMessage&);
+    typedef IPCMessage (*Callback) (const int32_t messageID, const IPCMessage&);
     static IPCPort createPublishingID (const char* remotePortID, Callback callback);
     static IPCPort createConnectedToID (const char* remotePortID);
     explicit IPCPort (CFMessagePortRef __attribute__((cf_consumed)) port = nullptr);
 
-    void sendWithoutReply (const IPCMessage& message);
-    IPCMessage sendAndAwaitReply (const IPCMessage& message);
+    void sendWithoutReply (const int32_t messageID, const IPCMessage& message);
+    IPCMessage sendAndAwaitReply (const int32_t messageID, const IPCMessage& message);
 
 private:
     CFMessagePortRef _port {};

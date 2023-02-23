@@ -51,10 +51,10 @@ IPCPort::~IPCPort ()
     }
 }
 
-CFDataRef IPCPortCallBack (CFMessagePortRef /*port*/, SInt32 /*msgid*/, CFDataRef cfData, void* info)
+CFDataRef IPCPortCallBack (CFMessagePortRef /*port*/, SInt32 msgid, CFDataRef cfData, void* info)
 {
     const IPCMessage message { cfData };
-    return ((IPCPort::Callback) info) (message).createEncodedMessage ();
+    return ((IPCPort::Callback) info) (msgid, message).createEncodedMessage ();
 }
 
 IPCPort IPCPort::createPublishingID (const char* remotePortID, Callback callback)
@@ -94,20 +94,20 @@ IPCPort IPCPort::createConnectedToID (const char* remotePortID)
     return IPCPort { port };
 }
 
-void IPCPort::sendWithoutReply (const IPCMessage& message)
+void IPCPort::sendWithoutReply (const int32_t messageID, const IPCMessage& message)
 {
     auto outgoingData { message.createEncodedMessage () };
-    const auto portSendResult { CFMessagePortSendRequest (_port, 0, outgoingData, messageTimeout, 0.0, nullptr, nullptr) };
+    const auto portSendResult { CFMessagePortSendRequest (_port, messageID, outgoingData, messageTimeout, 0.0, nullptr, nullptr) };
     CFRelease (outgoingData);
     ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
 
 }
 
-IPCMessage IPCPort::sendAndAwaitReply (const IPCMessage& message)
+IPCMessage IPCPort::sendAndAwaitReply (const int32_t messageID, const IPCMessage& message)
 {
     auto outgoingData { message.createEncodedMessage () };
     auto incomingData { CFDataRef {} };
-    const auto portSendResult { CFMessagePortSendRequest (_port, 0, outgoingData, messageTimeout, messageTimeout, kCFRunLoopDefaultMode, &incomingData) };
+    const auto portSendResult { CFMessagePortSendRequest (_port, messageID, outgoingData, messageTimeout, messageTimeout, kCFRunLoopDefaultMode, &incomingData) };
     CFRelease (outgoingData);
     ARA_INTERNAL_ASSERT (incomingData && (portSendResult == kCFMessagePortSuccess));
     IPCMessage reply { incomingData };

@@ -120,9 +120,9 @@ IPCMessage _readAudioSamples (ARAAudioAccessControllerHostRef controllerHostRef,
                                                        (endian == CFByteOrderLittleEndian) ? kARATrue : kARAFalse });
 }
 
-IPCMessage audioAccessFromPlugInCallBack (const IPCMessage& message)
+IPCMessage audioAccessFromPlugInCallBack (const int32_t messageID, const IPCMessage& message)
 {
-    if (isMethodCall (message, "createAudioReaderForSource"))
+    if (messageID == HOST_METHOD_ID (ARAAudioAccessControllerInterface, createAudioReaderForSource))
     {
         ARAAudioAccessControllerHostRef controllerHostRef;
         ARAAudioSourceHostRef audioSourceHostRef;
@@ -131,7 +131,7 @@ IPCMessage audioAccessFromPlugInCallBack (const IPCMessage& message)
         ARAAudioReaderHostRef readerRef { ARACreateAudioReaderForSource (controllerHostRef, audioSourceHostRef, use64BitSamples) };
         return encodeReply (readerRef);
     }
-    else if (isMethodCall (message, "readAudioSamples"))
+    else if (messageID == HOST_METHOD_ID (ARAAudioAccessControllerInterface, readAudioSamples))
     {
         ARAAudioAccessControllerHostRef controllerHostRef;
         ARAAudioReaderHostRef readerRef;
@@ -143,7 +143,7 @@ IPCMessage audioAccessFromPlugInCallBack (const IPCMessage& message)
         else
             return _readAudioSamples<float> (controllerHostRef, readerRef, samplePosition, samplesPerChannel);
     }
-    else if (isMethodCall (message, "destroyAudioReader"))
+    else if (messageID == HOST_METHOD_ID (ARAAudioAccessControllerInterface, destroyAudioReader))
     {
         ARAAudioAccessControllerHostRef controllerHostRef;
         ARAAudioReaderHostRef readerRef;
@@ -194,26 +194,32 @@ int main (int argc, const char * argv[])
     SizedStruct<ARA_STRUCT_MEMBER (ARADocumentProperties, name)> documentProperties { "Test document" };
     //documentControllerInstance = factory->createDocumentControllerWithDocument (&documentEntry, &documentProperties);
     auto remoteDocumentRef { decodeReply<ARADocumentControllerRef> (
-        modelPortToPlugIn.sendAndAwaitReply (encodeArguments ("createDocumentControllerWithDocument", kAudioAccessControllerHostRef, (ARADocumentProperties*)&documentProperties))) };
+        modelPortToPlugIn.sendAndAwaitReply (kCreateDocumentControllerMethodID,
+                                                encodeArguments (kAudioAccessControllerHostRef, (ARADocumentProperties*)&documentProperties))) };
 
     //documentControllerInterface->beginEditing (documentControllerRef);
-    modelPortToPlugIn.sendWithoutReply (encodeArguments ("beginEditing", remoteDocumentRef));
+    modelPortToPlugIn.sendWithoutReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, beginEditing),
+                                                encodeArguments (remoteDocumentRef));
 
     SizedStruct<ARA_STRUCT_MEMBER (ARAAudioSourceProperties, merits64BitSamples)> audioSourceProperties { "Test audio source", "audioSourceTestPersistentID",
                                                                 kTestAudioSourceSampleRate * kTestAudioSourceDuration, static_cast<double> (kTestAudioSourceSampleRate),
                                                                 kTestAudioSourceChannelCount, kARAFalse };
     //audioSourceRef = documentControllerInterface->createAudioSource (documentControllerRef, kHostAudioSourceHostRef, &audioSourceProperties);
     auto audioSourceRef { decodeReply<ARAAudioSourceRef> (
-        modelPortToPlugIn.sendAndAwaitReply (encodeArguments ("createAudioSource", remoteDocumentRef, kHostAudioSourceHostRef, (ARAAudioSourceProperties*)&audioSourceProperties))) };
+        modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioSource),
+                                                encodeArguments (remoteDocumentRef, kHostAudioSourceHostRef, (ARAAudioSourceProperties*)&audioSourceProperties))) };
 
     //documentControllerInterface->endEditing (documentControllerRef);
-    modelPortToPlugIn.sendWithoutReply (encodeArguments ("endEditing", remoteDocumentRef));
+    modelPortToPlugIn.sendWithoutReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, endEditing),
+                                                encodeArguments (remoteDocumentRef));
 
     //documentControllerInterface->enableAudioSourceSamplesAccess (documentControllerRef, audioSourceRef, kARATrue);
-    modelPortToPlugIn.sendWithoutReply (encodeArguments ("enableAudioSourceSamplesAccess", remoteDocumentRef, audioSourceRef, kARATrue));
+    modelPortToPlugIn.sendWithoutReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, enableAudioSourceSamplesAccess),
+                                                encodeArguments (remoteDocumentRef, audioSourceRef, kARATrue));
 
     //documentControllerInterface->requestAudioSourceContentAnalysis (documentControllerRef, audioSourceRef, 1, { kARAContentTypeNotes });
-    modelPortToPlugIn.sendWithoutReply (encodeArguments ("requestAudioSourceContentAnalysis", remoteDocumentRef, audioSourceRef, std::vector<ARAContentType> { kARAContentTypeNotes }));
+    modelPortToPlugIn.sendWithoutReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, requestAudioSourceContentAnalysis),
+                                                encodeArguments (remoteDocumentRef, audioSourceRef, std::vector<ARAContentType> { kARAContentTypeNotes }));
 
     //wait for documentControllerInterface->isAudioSourceContentAnalysisIncomplete (documentControllerRef, audioSourceRef, kARAContentTypeNotes);
     while (true)
@@ -228,7 +234,8 @@ int main (int argc, const char * argv[])
 
         //done = documentControllerInterface->isAudioSourceContentAnalysisIncomplete (documentControllerRef, audioSourceRef, kARAContentTypeNotes);
         if (decodeReply<ARABool> (
-                modelPortToPlugIn.sendAndAwaitReply (encodeArguments ("isAudioSourceContentAnalysisIncomplete", remoteDocumentRef, audioSourceRef, kARAContentTypeNotes)))
+                modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioSourceContentAnalysisIncomplete),
+                                                encodeArguments (remoteDocumentRef, audioSourceRef, kARAContentTypeNotes)))
             == kARAFalse)
             break;
 
@@ -237,43 +244,52 @@ int main (int argc, const char * argv[])
 
     //hasEvents = documentControllerInterface->isAudioSourceContentAvailable (documentControllerRef, audioSourceRef, kARAContentTypeNotes);
     if (decodeReply<ARABool> (
-            modelPortToPlugIn.sendAndAwaitReply (encodeArguments ("isAudioSourceContentAvailable", remoteDocumentRef, audioSourceRef, kARAContentTypeNotes)))
+            modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioSourceContentAvailable),
+                                                encodeArguments (remoteDocumentRef, audioSourceRef, kARAContentTypeNotes)))
         != kARAFalse)
     {
         //contentReaderRef = documentControllerInterface->createAudioSourceContentReader (documentControllerRef, audioSourceRef, kARAContentTypeNotes, nullptr);
         auto contentReaderRef { decodeReply<ARAContentReaderRef> (
-            modelPortToPlugIn.sendAndAwaitReply (encodeArguments ("createAudioSourceContentReader",
-                                                                    remoteDocumentRef, audioSourceRef, kARAContentTypeNotes, nullptr))) };
+            modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioSourceContentReader),
+                                                encodeArguments (remoteDocumentRef, audioSourceRef, kARAContentTypeNotes, nullptr))) };
 
         //eventCount = documentControllerInterface->getContentReaderEventCount (documentControllerRef, contentReaderRef);
         const auto eventCount { decodeReply<ARAInt32> (
-            modelPortToPlugIn.sendAndAwaitReply (encodeArguments ("getContentReaderEventCount", remoteDocumentRef, contentReaderRef))) };
+            modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, getContentReaderEventCount),
+                                                encodeArguments (remoteDocumentRef, contentReaderRef))) };
         ARA_LOG ("%i notes available for audio source %s:", eventCount, audioSourceProperties.name);
         for (ARAInt32 i = 0; i < eventCount; ++i)
         {
             //noteData = (const ARAContentNote *)documentControllerInterface->getContentReaderDataForEvent (documentControllerRef, contentReaderRef, i);
             ContentLogger::logEvent (i, decodeReply<ARAContentNote> (
-                modelPortToPlugIn.sendAndAwaitReply (encodeArguments ("getContentReaderDataForEvent", remoteDocumentRef, contentReaderRef, i))));
+                modelPortToPlugIn.sendAndAwaitReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, getContentReaderDataForEvent),
+                                                encodeArguments (remoteDocumentRef, contentReaderRef, i))));
         }
 
         //documentControllerInterface->destroyContentReader (documentControllerRef, contentReaderRef);
-        modelPortToPlugIn.sendWithoutReply (encodeArguments ("destroyContentReader", remoteDocumentRef, contentReaderRef));
+        modelPortToPlugIn.sendWithoutReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyContentReader),
+                                                encodeArguments (remoteDocumentRef, contentReaderRef));
     }
 
     //documentControllerInterface->enableAudioSourceSamplesAccess (documentControllerRef, audioSourceRef, kARAFalse);
-    modelPortToPlugIn.sendWithoutReply (encodeArguments ("enableAudioSourceSamplesAccess", remoteDocumentRef, audioSourceRef, kARAFalse));
+    modelPortToPlugIn.sendWithoutReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, enableAudioSourceSamplesAccess),
+                                                encodeArguments (remoteDocumentRef, audioSourceRef, kARAFalse));
 
     //documentControllerInterface->beginEditing (documentControllerRef);
-    modelPortToPlugIn.sendWithoutReply (encodeArguments ("beginEditing", remoteDocumentRef));
+    modelPortToPlugIn.sendWithoutReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, beginEditing),
+                                                encodeArguments (remoteDocumentRef));
 
     //documentControllerInterface->destroyAudioSource (documentControllerRef, audioSourceRef);
-    modelPortToPlugIn.sendWithoutReply (encodeArguments ("destroyAudioSource", remoteDocumentRef, audioSourceRef));
+    modelPortToPlugIn.sendWithoutReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyAudioSource),
+                                                encodeArguments (remoteDocumentRef, audioSourceRef));
 
     //documentControllerInterface->endEditing (documentControllerRef);
-    modelPortToPlugIn.sendWithoutReply (encodeArguments ("endEditing", remoteDocumentRef));
+    modelPortToPlugIn.sendWithoutReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, endEditing),
+                                                encodeArguments (remoteDocumentRef));
 
     //documentControllerInterface->destroyDocumentController (documentControllerRef);
-    modelPortToPlugIn.sendWithoutReply (encodeArguments ("destroyDocumentController", remoteDocumentRef));
+    modelPortToPlugIn.sendWithoutReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyDocumentController),
+                                                encodeArguments (remoteDocumentRef));
 
     // shut everything down
     keepRunning = false;

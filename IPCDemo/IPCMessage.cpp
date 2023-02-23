@@ -24,8 +24,22 @@
 #include "IPCMessage.h"
 #include "ARA_Library/Debug/ARADebug.h"
 
+#include <limits>
 #include <string>
 #include <set>
+#include <map>
+
+class _CFReleaser
+{
+public:
+    explicit _CFReleaser (CFStringRef ref) : _ref { ref } {}
+    _CFReleaser (const _CFReleaser& other) { _ref = (CFStringRef) CFRetain (other._ref); }
+    _CFReleaser (_CFReleaser&& other) { _ref = other._ref; other._ref = CFStringRef {}; }
+    ~_CFReleaser () { CFRelease (_ref); }
+    operator CFStringRef () { return _ref; }
+private:
+    CFStringRef _ref;
+};
 
 void IPCMessage::_setup (CFDictionaryRef dictionary, bool isWritable)
 {
@@ -71,11 +85,15 @@ IPCMessage::~IPCMessage ()
     _setup (nullptr, false);
 }
 
-CFStringRef IPCMessage::_createEncodedTag (const char* tag)
+CFStringRef IPCMessage::_getEncodedKey (size_t argKey)
 {
-    auto result { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, tag, kCFStringEncodingASCII,  kCFAllocatorNull) };
-    ARA_INTERNAL_ASSERT (result);
-    return result;
+    // \todo All plist formats available for CFPropertyListCreateData () in createEncodedMessage () need CFString keys.
+    //       Once we switch to the more modern (NS)XPC API we shall be able to use CFNumber keys directly...
+    static std::map<size_t, _CFReleaser> cache;
+    auto existingEntry { cache.find (argKey) };
+    if (existingEntry != cache.end ())
+        return existingEntry->second;
+    return  cache.emplace (argKey, CFStringCreateWithCString (kCFAllocatorDefault, std::to_string (argKey).c_str (), kCFStringEncodingUTF8)).first->second;
 }
 
 IPCMessage::IPCMessage (CFDataRef data)
@@ -86,51 +104,50 @@ IPCMessage::IPCMessage (CFDataRef data)
     CFRelease (dictionary);
 }
 
-void IPCMessage::_appendArg (const char* argKey, int32_t argValue)
+void IPCMessage::_appendArg (size_t argKey, int32_t argValue)
 {
     _appendEncodedArg (argKey, CFNumberCreate (kCFAllocatorDefault, kCFNumberSInt32Type, &argValue));
 }
 
-void IPCMessage::_appendArg (const char* argKey, int64_t argValue)
+void IPCMessage::_appendArg (size_t argKey, int64_t argValue)
 {
     _appendEncodedArg (argKey, CFNumberCreate (kCFAllocatorDefault, kCFNumberSInt64Type, &argValue));
 }
 
-void IPCMessage::_appendArg (const char* argKey, size_t argValue)
+void IPCMessage::_appendArg (size_t argKey, size_t argValue)
 {
     static_assert (sizeof (SInt64) == sizeof (size_t), "currently only implemented for 64 bit");
     _appendEncodedArg (argKey, CFNumberCreate (kCFAllocatorDefault, kCFNumberSInt64Type, &argValue));
 }
 
-void IPCMessage::_appendArg (const char* argKey, float argValue)
+void IPCMessage::_appendArg (size_t argKey, float argValue)
 {
     _appendEncodedArg (argKey, CFNumberCreate (kCFAllocatorDefault, kCFNumberFloatType, &argValue));
 }
 
-void IPCMessage::_appendArg (const char* argKey, double argValue)
+void IPCMessage::_appendArg (size_t argKey, double argValue)
 {
     _appendEncodedArg (argKey, CFNumberCreate (kCFAllocatorDefault, kCFNumberDoubleType, &argValue));
 }
 
-void IPCMessage::_appendArg (const char* argKey, const char* argValue)
+void IPCMessage::_appendArg (size_t argKey, const char* argValue)
 {
     _appendEncodedArg (argKey, CFStringCreateWithCString (kCFAllocatorDefault, argValue, kCFStringEncodingUTF8));
 }
 
-void IPCMessage::_appendArg (const char* argKey, const std::vector<uint8_t>& argValue)
+void IPCMessage::_appendArg (size_t argKey, const std::vector<uint8_t>& argValue)
 {
     _appendEncodedArg (argKey, CFDataCreate (kCFAllocatorDefault, argValue.data (), (CFIndex) argValue.size ()));
 }
 
-void IPCMessage::_appendArg (const char* argKey, const IPCMessage& argValue)
+void IPCMessage::_appendArg (size_t argKey, const IPCMessage& argValue)
 {
     _appendEncodedArg (argKey, (CFDictionaryRef) CFRetain (argValue._dictionary));  // since _dictionary is immutable after creation, we can reference it instead of copy
 }
 
-void IPCMessage::_appendEncodedArg (const char* argKey, CFTypeRef argObject)
+void IPCMessage::_appendEncodedArg (size_t argKey, CFTypeRef argObject)
 {
     ARA_INTERNAL_ASSERT (argObject);
-    auto keyObject { _createEncodedTag (argKey) };
     if (!_isWritable && _dictionary)
     {
         auto old = _dictionary;
@@ -140,8 +157,7 @@ void IPCMessage::_appendEncodedArg (const char* argKey, CFTypeRef argObject)
     _isWritable = true;
     if (!_dictionary)
         _dictionary = CFDictionaryCreateMutable (kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    CFDictionarySetValue ((CFMutableDictionaryRef) _dictionary, keyObject, argObject);
-    CFRelease (keyObject);
+    CFDictionarySetValue ((CFMutableDictionaryRef) _dictionary, _getEncodedKey (argKey), argObject);
     CFRelease (argObject);
 }
 
@@ -154,11 +170,10 @@ CFDataRef IPCMessage::createEncodedMessage () const
     return result;
 }
 
-void IPCMessage::_readArg (const char* argKey, int32_t& argValue, bool* didFindKey) const
+void IPCMessage::_readArg (size_t argKey, int32_t& argValue, bool* didFindKey) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
-    auto key { _createEncodedTag (argKey) };
-    auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, key) };
+    auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
     if (!_checkKeyFound (number != nullptr, didFindKey))
     {
         argValue = 0;
@@ -166,14 +181,12 @@ void IPCMessage::_readArg (const char* argKey, int32_t& argValue, bool* didFindK
     }
     ARA_INTERNAL_ASSERT (number && (CFGetTypeID (number) == CFNumberGetTypeID ()));
     CFNumberGetValue (number, kCFNumberSInt32Type, &argValue);
-    CFRelease (key);
 }
 
-void IPCMessage::_readArg (const char* argKey, int64_t& argValue, bool* didFindKey) const
+void IPCMessage::_readArg (size_t argKey, int64_t& argValue, bool* didFindKey) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
-    auto key { _createEncodedTag (argKey) };
-    auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, key) };
+    auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
     if (!_checkKeyFound (number != nullptr, didFindKey))
     {
         argValue = 0;
@@ -181,15 +194,13 @@ void IPCMessage::_readArg (const char* argKey, int64_t& argValue, bool* didFindK
     }
     ARA_INTERNAL_ASSERT (number && (CFGetTypeID (number) == CFNumberGetTypeID ()));
     CFNumberGetValue (number, kCFNumberSInt64Type, &argValue);
-    CFRelease (key);
 }
 
-void IPCMessage::_readArg (const char* argKey, size_t& argValue, bool* didFindKey) const
+void IPCMessage::_readArg (size_t argKey, size_t& argValue, bool* didFindKey) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     static_assert (sizeof (SInt64) == sizeof (size_t), "currently only implemented for 64 bit");
-    auto key { _createEncodedTag (argKey) };
-    auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, key) };
+    auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
     if (!_checkKeyFound (number != nullptr, didFindKey))
     {
         argValue = 0;
@@ -197,14 +208,12 @@ void IPCMessage::_readArg (const char* argKey, size_t& argValue, bool* didFindKe
     }
     ARA_INTERNAL_ASSERT (number && (CFGetTypeID (number) == CFNumberGetTypeID ()));
     CFNumberGetValue (number, kCFNumberSInt64Type, &argValue);
-    CFRelease (key);
 }
 
-void IPCMessage::_readArg (const char* argKey, float& argValue, bool* didFindKey) const
+void IPCMessage::_readArg (size_t argKey, float& argValue, bool* didFindKey) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
-    auto key { _createEncodedTag (argKey) };
-    auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, key) };
+    auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
     if (!_checkKeyFound (number != nullptr, didFindKey))
     {
         argValue = 0.0f;
@@ -212,14 +221,12 @@ void IPCMessage::_readArg (const char* argKey, float& argValue, bool* didFindKey
     }
     ARA_INTERNAL_ASSERT (number && (CFGetTypeID (number) == CFNumberGetTypeID ()));
     CFNumberGetValue (number, kCFNumberFloatType, &argValue);
-    CFRelease (key);
 }
 
-void IPCMessage::_readArg (const char* argKey, double& argValue, bool* didFindKey) const
+void IPCMessage::_readArg (size_t argKey, double& argValue, bool* didFindKey) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
-    auto key { _createEncodedTag (argKey) };
-    auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, key) };
+    auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
     if (!_checkKeyFound (number != nullptr, didFindKey))
     {
         argValue = 0.0;
@@ -227,14 +234,12 @@ void IPCMessage::_readArg (const char* argKey, double& argValue, bool* didFindKe
     }
     ARA_INTERNAL_ASSERT (number && (CFGetTypeID (number) == CFNumberGetTypeID ()));
     CFNumberGetValue (number, kCFNumberDoubleType, &argValue);
-    CFRelease (key);
 }
 
-void IPCMessage::_readArg (const char* argKey, const char*& argValue, bool* didFindKey) const
+void IPCMessage::_readArg (size_t argKey, const char*& argValue, bool* didFindKey) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
-    auto key { _createEncodedTag (argKey) };
-    auto string { (CFStringRef) CFDictionaryGetValue (_dictionary, key) };
+    auto string { (CFStringRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
     if (!_checkKeyFound (string != nullptr, didFindKey))
     {
         argValue = nullptr;
@@ -253,14 +258,12 @@ void IPCMessage::_readArg (const char* argKey, const char*& argValue, bool* didF
         strings.insert (temp);
         argValue = strings.find (temp)->c_str ();
     }
-    CFRelease (key);
 }
 
-void IPCMessage::_readArg (const char* argKey, std::vector<uint8_t>& argValue, bool* didFindKey) const
+void IPCMessage::_readArg (size_t argKey, std::vector<uint8_t>& argValue, bool* didFindKey) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
-    auto key { _createEncodedTag (argKey) };
-    auto bytes { (CFDataRef) CFDictionaryGetValue (_dictionary, key) };
+    auto bytes { (CFDataRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
     if (!_checkKeyFound (bytes != nullptr, didFindKey))
     {
         argValue.clear ();
@@ -270,14 +273,12 @@ void IPCMessage::_readArg (const char* argKey, std::vector<uint8_t>& argValue, b
     const auto length { CFDataGetLength (bytes) };
     argValue.resize (static_cast<size_t> (length));
     CFDataGetBytes (bytes, CFRangeMake (0, length), argValue.data ());
-    CFRelease (key);
 }
 
-void IPCMessage::_readArg (const char* argKey, IPCMessage& argValue, bool* didFindKey) const
+void IPCMessage::_readArg (size_t argKey, IPCMessage& argValue, bool* didFindKey) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
-    auto key { _createEncodedTag (argKey) };
-    auto dictionary { (CFDictionaryRef) CFDictionaryGetValue (_dictionary, key) };
+    auto dictionary { (CFDictionaryRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
     if (!_checkKeyFound (dictionary != nullptr, didFindKey))
     {
         argValue = {};
@@ -285,7 +286,6 @@ void IPCMessage::_readArg (const char* argKey, IPCMessage& argValue, bool* didFi
     }
     ARA_INTERNAL_ASSERT (dictionary && (CFGetTypeID (dictionary) == CFDictionaryGetTypeID ()));
     argValue._setup (dictionary, false);
-    CFRelease (key);
 }
 
 bool IPCMessage::_checkKeyFound (bool found, bool* didFindKey)
