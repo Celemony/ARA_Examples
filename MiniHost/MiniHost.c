@@ -344,10 +344,10 @@ int main (int argc, const char * argv[])
     ARA_LOG("loading and initializing plug-in binary");
 
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
-    AudioUnit audioUnit;
-    AudioComponent audioComponent = AudioUnitFindValidARAComponentWithIDs(ARA_PLUGIN_AUDIOUNIT_IDS);
-    ARA_INTERNAL_ASSERT(audioComponent != NULL);
-    factory = AudioUnitGetARAFactory(audioComponent);
+    AudioUnitInstance audioUnit;
+    AudioUnitComponent audioUnitComponent = AudioUnitPrepareComponentWithIDs(ARA_PLUGIN_AUDIOUNIT_IDS);
+    ARA_INTERNAL_ASSERT(audioUnitComponent != NULL);
+    factory = AudioUnitGetARAFactory(audioUnitComponent);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     VST3Effect vst3Effect;
     VST3Binary vst3Binary = VST3LoadBinary(ARA_PLUGIN_VST3_BINARY);
@@ -424,7 +424,7 @@ int main (int argc, const char * argv[])
     // create companion plug-in and bind it to the ARA document controller
     ARA_LOG("creating plug-in instance and binding it to the ARA document controller");
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
-    audioUnit = AudioUnitOpen(audioComponent);
+    audioUnit = AudioUnitOpenInstance(audioUnitComponent);
     plugInInstance = AudioUnitBindToARADocumentController(audioUnit, documentControllerRef, roles);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     vst3Effect = VST3CreateEffect (vst3Binary, ARA_PLUGIN_VST3_OPTIONAL_PLUGIN_NAME);
@@ -470,7 +470,7 @@ int main (int argc, const char * argv[])
     plugInInstance->playbackRendererInterface->removePlaybackRegion(plugInInstance->playbackRendererRef, playbackRegionRef);
 
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
-    AudioUnitClose(audioUnit);
+    AudioUnitCloseInstance(audioUnit);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     VST3DestroyEffect (vst3Effect);
 #endif

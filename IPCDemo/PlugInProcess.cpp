@@ -360,11 +360,11 @@ int main (int argc, const char * argv[])
     const SizedStruct<ARA_STRUCT_MEMBER (ARAInterfaceConfiguration, assertFunctionAddress)> interfaceConfig { kARAAPIGeneration_2_0_Final, assertFunctionReference };
 
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
-    AudioComponent audioComponent = AudioUnitFindValidARAComponentWithIDs ('aufx', 'AraT', 'ADeC');
-//  AudioComponent audioComponent = AudioUnitFindValidARAComponentWithIDs ('aumf', 'MPLG', 'CLMY');
-    ARA_INTERNAL_ASSERT (audioComponent != nullptr);
+    AudioUnitComponent audioUnitComponent = AudioUnitPrepareComponentWithIDs ('aufx', 'AraT', 'ADeC');
+//  AudioUnitComponent audioUnitComponent = AudioUnitPrepareComponentWithIDs ('aumf', 'MPLG', 'CLMY');
+    ARA_INTERNAL_ASSERT (audioUnitComponent != nullptr);
 
-    factory = AudioUnitGetARAFactory (audioComponent);
+    factory = AudioUnitGetARAFactory (audioUnitComponent);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     VST3Binary vst3Binary = VST3LoadBinary ("ARATestPlugIn.vst3");
 //  VST3Binary vst3Binary = VST3LoadBinary ("/Library/Audio/Plug-Ins/VST3/Melodyne.vst3");
