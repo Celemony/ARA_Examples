@@ -78,7 +78,7 @@ private:
 class VST3PlugInInstance : public PlugInInstance
 {
 public:
-    VST3PlugInInstance (VST3Effect* vst3Effect, const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance)
+    VST3PlugInInstance (VST3Effect vst3Effect, const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance)
     : PlugInInstance { plugInExtensionInstance },
       _vst3Effect { vst3Effect }
     {}
@@ -105,7 +105,7 @@ public:
     }
 
 private:
-    VST3Effect* const _vst3Effect;
+    VST3Effect const _vst3Effect;
     double _sampleRate { 44100.0 };
 };
 
@@ -182,7 +182,7 @@ public:
     }
 
 private:
-    VST3Binary* _vst3Binary;
+    VST3Binary const _vst3Binary;
     const std::string _optionalPlugInName;
 };
 

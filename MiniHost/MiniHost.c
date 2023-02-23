@@ -349,8 +349,8 @@ int main (int argc, const char * argv[])
     ARA_INTERNAL_ASSERT(audioComponent != NULL);
     factory = AudioUnitGetARAFactory(audioComponent);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
-    struct VST3Effect * vst3Effect;
-    struct VST3Binary * vst3Binary = VST3LoadBinary (ARA_PLUGIN_VST3_BINARY);
+    VST3Effect vst3Effect;
+    VST3Binary vst3Binary = VST3LoadBinary(ARA_PLUGIN_VST3_BINARY);
     ARA_INTERNAL_ASSERT(vst3Binary != NULL);
     factory = VST3GetARAFactory(vst3Binary, ARA_PLUGIN_VST3_OPTIONAL_PLUGIN_NAME);
 #endif
