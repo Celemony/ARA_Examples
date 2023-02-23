@@ -939,8 +939,17 @@ function(ara_configure_binary_package target extension apple_plist_file)
     elseif(APPLE)
         list(APPEND target_resources
             ${apple_plist_file}
-            "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/macOS/ARAExamples.entitlements"
         )
+        if (NOT ${extension} MATCHES "framework")
+            list(APPEND target_resources
+                "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/macOS/ARAExamples.icns"
+            )
+        endif()
+        if(NOT ${extension} MATCHES "appex")
+            list(APPEND target_resources
+                "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/macOS/ARAExamples.entitlements"
+            )
+        endif()
     endif()
     target_sources(${target} PRIVATE
         ${target_resources}
@@ -948,19 +957,35 @@ function(ara_configure_binary_package target extension apple_plist_file)
     source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${target_resources})
 
     if(APPLE)
-        set_target_properties(${target} PROPERTIES
-            BUNDLE ON
-            BUNDLE_EXTENSION ${extension}
-            MACOSX_BUNDLE_INFO_PLIST "${apple_plist_file}"
+        if(${extension} MATCHES "framework")
+            set_target_properties(${target} PROPERTIES
+                FRAMEWORK ON
+                FRAMEWORK_EXTENSION ${extension}
+                MACOSX_FRAMEWORK_INFO_PLIST "${apple_plist_file}"
+            )
+        else()
+            set_target_properties(${target} PROPERTIES
+                BUNDLE ON
+                BUNDLE_EXTENSION ${extension}
+                MACOSX_BUNDLE_INFO_PLIST "${apple_plist_file}"
+                RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/macOS/ARAExamples.icns"
+            )
+        endif()
 
+        set_target_properties(${target} PROPERTIES
             XCODE_ATTRIBUTE_INFOPLIST_PREPROCESS YES
             XCODE_ATTRIBUTE_GENERATE_PKGINFO_FILE YES
             XCODE_ATTRIBUTE_WRAPPER_EXTENSION ${extension}
             XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER $<TARGET_PROPERTY:${target},ARA_PRODUCT_BUNDLE_IDENTIFIER>
 
-            XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/macOS/ARAExamples.entitlements"
             XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME YES
         )
+        if(NOT ${extension} MATCHES "appex")
+            set_target_properties(${target} PROPERTIES
+                XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/macOS/ARAExamples.entitlements"
+            )
+        endif()
+
 
         # \todo this causes codesign to fail, Finder info and resource forks are forbidden these days...
         #if(${extension} MATCHES "component|vst3")
@@ -1147,7 +1172,7 @@ configure_ARA_Examples_target(ARATestPlugInVST3)
 
 ara_add_vst3_main(ARATestPlugInVST3)
 
-ara_configure_binary_package(ARATestPlugInVST3 vst3 "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Info.plist")
+ara_configure_binary_package(ARATestPlugInVST3 "vst3" "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Info.plist")
 
 if(ARA_SETUP_DEBUGGING)
     if(WIN32)
@@ -1206,7 +1231,7 @@ if(APPLE)
 
     configure_ARA_Examples_target(ARATestPlugInAudioUnit)
 
-    ara_configure_binary_package(ARATestPlugInAudioUnit component "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/TestAudioUnitInfo.plist")
+    ara_configure_binary_package(ARATestPlugInAudioUnit "component" "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/TestAudioUnitInfo.plist")
 
     if(ARA_SETUP_DEBUGGING)
         ara_postbuild_install_for_debugging(ARATestPlugInAudioUnit "$ENV{HOME}/Library/Audio/Plug-Ins/Components/" OFF)
@@ -1232,7 +1257,149 @@ endif(APPLE)
 
 
 # ======================
-# command line tool target for ARA audio file chunk authoring for the TestPlugIn 
+# audio plug-in target Audio Unit v3 App Extension Test Plug-In, including the required dummy app
+
+if(APPLE)
+
+    add_library(ARATestPlugInAUv3Framework SHARED
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Framework/BufferedAudioBus.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Framework/TestAUv3AudioUnit.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Framework/TestAUv3AudioUnit.mm"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Framework/TestAUv3DSPKernel.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Framework/TestAUv3Factory.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Framework/TestAUv3Factory.m"
+    )
+
+    set_target_properties(ARATestPlugInAUv3Framework PROPERTIES
+        FOLDER "Plug-In Examples/ARATestPlugIn/ARATestPlugInAUv3"
+        OUTPUT_NAME "ARATestPlugInAUv3"
+        XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
+        XCODE_ATTRIBUTE_APPLICATION_EXTENSION_API_ONLY YES
+        XCODE_GENERATE_SCHEME OFF
+    )
+
+    target_compile_options(ARATestPlugInAUv3Framework PRIVATE
+        -Wno-switch-enum
+        -Wno-sign-compare
+        -Wno-sign-conversion
+        -Wno-non-virtual-dtor
+        -Wno-nullable-to-nonnull-conversion
+        -Wno-old-style-cast
+        -Wno-unused-parameter
+        -Wno-objc-missing-property-synthesis
+        -Wno-atomic-properties
+    )
+
+    target_link_libraries(ARATestPlugInAUv3Framework PRIVATE
+        ARATestPlugInCommon
+        "-framework CoreServices"
+        "-framework AVFoundation"
+        "-framework AudioToolbox"
+        "-framework AudioUnit"
+    )
+
+    configure_ARA_Examples_target(ARATestPlugInAUv3Framework)
+
+    ara_configure_binary_package(ARATestPlugInAUv3Framework "framework" "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Framework/TestAUv3FrameworkInfo.plist")
+
+
+    add_executable(ARATestPlugInAUv3Extension MACOSX_BUNDLE
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Extension/TestAUv3Extension.m"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Extension/TestAUv3Extension.entitlements"
+    )
+
+    set_target_properties(ARATestPlugInAUv3Extension PROPERTIES
+        FOLDER "Plug-In Examples/ARATestPlugIn/ARATestPlugInAUv3"
+        OUTPUT_NAME "ARATestPlugInAUv3"
+        XCODE_PRODUCT_TYPE com.apple.product-type.app-extension
+        XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
+        XCODE_ATTRIBUTE_APPLICATION_EXTENSION_API_ONLY YES
+        XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Extension/TestAUv3Extension.entitlements"
+        XCODE_GENERATE_SCHEME OFF
+    )
+
+    target_link_libraries(ARATestPlugInAUv3Extension PRIVATE
+        ARATestPlugInAUv3Framework
+    )
+
+    configure_ARA_Examples_target(ARATestPlugInAUv3Extension)
+
+    ara_configure_binary_package(ARATestPlugInAUv3Extension "appex" "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Extension/TestAUv3ExtensionInfo.plist")
+
+    # hotfix: bundle identifier of extension must start with identifier of container application, patch accordingly
+    set(auv3_bundle_id com.arademocompany.ARATestPlugInAUv3App.AUv3Extension)
+    # \todo this would be cleaner:
+    #set(auv3_bundle_id $<TARGET_PROPERTY:ARATestPlugInAUv3App,ARA_PRODUCT_BUNDLE_IDENTIFIER>.AUv3Extension)
+    set_target_properties(ARATestPlugInAUv3Extension PROPERTIES
+        ARA_PRODUCT_BUNDLE_IDENTIFIER ${auv3_bundle_id}
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${auv3_bundle_id}
+    )
+    target_compile_definitions(ARATestPlugInAUv3Extension PRIVATE
+        -DARA_PRODUCT_BUNDLE_IDENTIFIER="${auv3_bundle_id}"
+    )
+    unset(auv3_bundle_id)
+
+    add_dependencies(ARATestPlugInAUv3Extension ARATestPlugInAUv3Framework)
+
+
+    add_executable(ARATestPlugInAUv3App MACOSX_BUNDLE
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/App/TestAUv3App.m"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/App/TestAUv3App.xib"
+    )
+
+    set_target_properties(ARATestPlugInAUv3App PROPERTIES
+        FOLDER "Plug-In Examples/ARATestPlugIn/ARATestPlugInAUv3"
+        OUTPUT_NAME "ARATestPlugInAUv3"
+        XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
+        XCODE_EMBED_APP_EXTENSIONS ARATestPlugInAUv3Extension
+    )
+
+    target_link_libraries(ARATestPlugInAUv3App PRIVATE
+        "-framework Cocoa"
+    )
+
+    configure_ARA_Examples_target(ARATestPlugInAUv3App)
+
+    ara_configure_binary_package(ARATestPlugInAUv3App "app" "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/App/TestAUv3AppInfo.plist")
+
+    # \todo this is the only target with actual resources in addition to the icon, improve ara_configure_binary_package to handle this correctly
+    set(ARATestPlugInAUv3App_Resources
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/App/TestAUv3App.xib"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/macOS/ARAExamples.icns"
+    )
+    set_target_properties(ARATestPlugInAUv3App PROPERTIES
+        RESOURCE "${ARATestPlugInAUv3App_Resources}"
+    )
+
+    add_dependencies(ARATestPlugInAUv3App ARATestPlugInAUv3Extension)
+
+    # copy framework and extension into application
+    set(app_dir "$<TARGET_BUNDLE_DIR:ARATestPlugInAUv3App>")
+    set(source_dir "$<TARGET_BUNDLE_DIR:ARATestPlugInAUv3Extension>")
+    set(source_name "$<TARGET_FILE_NAME:ARATestPlugInAUv3Extension>.$<TARGET_PROPERTY:ARATestPlugInAUv3Extension,BUNDLE_EXTENSION>")
+    add_custom_command(TARGET ARATestPlugInAUv3App POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E
+            rm -Rf "${app_dir}/Contents/PlugIns/${source_name}"
+        COMMAND "${CMAKE_COMMAND}" -E
+            copy_directory "${source_dir}" "${app_dir}/Contents/PlugIns/${source_name}"
+    )
+    set(source_dir "$<TARGET_BUNDLE_DIR:ARATestPlugInAUv3Framework>")
+    set(source_name "$<TARGET_FILE_NAME:ARATestPlugInAUv3Framework>.$<TARGET_PROPERTY:ARATestPlugInAUv3Framework,FRAMEWORK_EXTENSION>")
+    add_custom_command(TARGET ARATestPlugInAUv3App POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E
+            rm -Rf "${app_dir}/Contents/Frameworks/${source_name}"
+        COMMAND "${CMAKE_COMMAND}" -E
+            copy_directory "${source_dir}" "${app_dir}/Contents/Frameworks/${source_name}"
+    )
+    unset(source_name)
+    unset(source_dir)
+    unset(app_dir)
+
+endif(APPLE)
+
+
+# ======================
+# command line tool target for ARA audio file chunk authoring for the TestPlugIn
 
 add_executable(ARATestChunkWriter
     "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/SignalProcessing/PulsedSineSignal.h"
@@ -1251,7 +1418,7 @@ target_link_libraries(ARATestChunkWriter PRIVATE
 configure_ARA_Examples_target(ARATestChunkWriter)
 
 if(WIN32)
-    ara_configure_binary_package(ARATestChunkWriter exe "")
+    ara_configure_binary_package(ARATestChunkWriter "exe" "")
 endif()
 
 if(ARA_SETUP_DEBUGGING)
@@ -1341,7 +1508,7 @@ endif()
 configure_ARA_Examples_target(ARAMiniHost)
 
 if(WIN32)
-    ara_configure_binary_package(ARAMiniHost exe "")
+    ara_configure_binary_package(ARAMiniHost "exe" "")
 endif()
 
 if(ARA_SETUP_DEBUGGING)
@@ -1404,13 +1571,16 @@ endif()
 configure_ARA_Examples_target(ARATestHost)
 
 if(WIN32)
-    ara_configure_binary_package(ARATestHost exe "")
+    ara_configure_binary_package(ARATestHost "exe" "")
 endif()
 
 if(ARA_SETUP_DEBUGGING)
     add_dependencies(ARATestHost ARATestPlugInVST3)
     if(APPLE)
         add_dependencies(ARATestHost ARATestPlugInAudioUnit)
+    endif()
+    if(APPLE)
+        add_dependencies(ARATestHost ARATestPlugInAUv3App)
     endif()
 
     set(ARATestHost_Dbg_Arguments "")

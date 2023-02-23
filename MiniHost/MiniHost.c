@@ -65,6 +65,7 @@
     #include "ExamplesCommon/PlugInHosting/AudioUnitLoader.h"
 
     #define ARA_PLUGIN_AUDIOUNIT_IDS 'aufx', 'AraT', 'ADeC'
+//  #define ARA_PLUGIN_AUDIOUNIT_IDS 'aufx', 'Ara3', 'ADeC'
 //  #define ARA_PLUGIN_AUDIOUNIT_IDS 'aumf', 'MPLG', 'CLMY'
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     #include "ExamplesCommon/PlugInHosting/VST3Loader.h"

@@ -361,6 +361,7 @@ int main (int argc, const char * argv[])
 
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
     AudioUnitComponent audioUnitComponent = AudioUnitPrepareComponentWithIDs ('aufx', 'AraT', 'ADeC');
+//  AudioUnitComponent audioUnitComponent = AudioUnitPrepareComponentWithIDs ('aufx', 'Ara3', 'ADeC');
 //  AudioUnitComponent audioUnitComponent = AudioUnitPrepareComponentWithIDs ('aumf', 'MPLG', 'CLMY');
     ARA_INTERNAL_ASSERT (audioUnitComponent != nullptr);
 
