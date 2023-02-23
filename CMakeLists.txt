@@ -1223,6 +1223,11 @@ if(APPLE)
         )
     endif()
 
+    # the `${INFOPLIST_FILE}` variable is provided via Xcode's build system environment
+    add_custom_command(TARGET ARATestPlugInAudioUnit PRE_BUILD
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/mangle-plugin-version.sh "${ARA_API_DIR}/ARA_Version.cmake" \${INFOPLIST_FILE}
+    )
+
 endif(APPLE)
 
 
