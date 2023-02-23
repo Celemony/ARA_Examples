@@ -25,20 +25,13 @@
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-// unfortunately, AUDIOCOMPONENT_ENTRY() does not work well with hiding symbols per default.
-// luckily, we can work around by adding declarations of the exported functions with visibility set.
-extern "C" __attribute__((visibility("default"))) void * TestAudioUnitFactory(const AudioComponentDescription * inDesc);
-AUDIOCOMPONENT_ENTRY(AUBaseFactory, TestAudioUnit)
+AUSDK_COMPONENT_ENTRY(ausdk::AUBaseFactory, TestAudioUnit)
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 TestAudioUnit::TestAudioUnit(AudioUnit component)
     : AUEffectBase(component)
 {
     CreateElements();
-
-#if AU_DEBUG_DISPATCHER
-    mDebugDispatcher = new AUDebugDispatcher (this);
-#endif
 }
 
 OSStatus TestAudioUnit::Initialize()
@@ -82,7 +75,7 @@ OSStatus TestAudioUnit::GetPropertyInfo( AudioUnitPropertyID    inID,
                                             AudioUnitScope        inScope,
                                             AudioUnitElement    inElement,
                                             UInt32 &            outDataSize,
-                                            Boolean &            outWritable)
+                                            bool &              outWritable)
 {
     if (inScope == kAudioUnitScope_Global)
     {
@@ -173,8 +166,7 @@ OSStatus TestAudioUnit::ProcessBufferLists(    AudioUnitRenderActionFlags &    i
 
     Boolean outIsPlaying = FALSE;
     Float64 outCurrentSampleInTimeLine = 0.0;
-    if (mHostCallbackInfo.transportStateProc)
-        mHostCallbackInfo.transportStateProc(mHostCallbackInfo.hostUserData, &outIsPlaying, nullptr, &outCurrentSampleInTimeLine, nullptr, nullptr, nullptr);
+    CallHostTransportState(&outIsPlaying, nullptr, &outCurrentSampleInTimeLine, nullptr, nullptr, nullptr);
 
     UInt32 channelCount = GetNumberOfChannels();
     Float32 * channels[channelCount];
@@ -216,7 +208,7 @@ OSStatus TestAudioUnit::Render(    AudioUnitRenderActionFlags &ioActionFlags,
         AudioBufferList inputBufferList;
         inputBufferList.mNumberBuffers = 0;
 
-        AUOutputElement *pOutputElement = GetOutput(0);
+        ausdk::AUOutputElement *pOutputElement = GetOutput(0);
         if (!pOutputElement)
             return kAudioUnitErr_NoConnection;
 

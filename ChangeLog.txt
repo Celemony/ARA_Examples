@@ -5,7 +5,9 @@ This is a development build of the ARA Examples 2.3.
 Changes since previous releases:
 - initial draft of Audio Unit version 3 support (App Extension)
 - various related refactorings and cleanups in plug-in hosting code
-- various minor cleanups in macOS info.plist files
+- various cleanups in macOS info.plist files
+- updated Audio Unit SDK from the old CoreAudioUtilityClasses.zip sample code download to
+  Apple's current release on github (note: requires update to C++17 for affected targets)
 - updated VST3 SDK to version 3.7.4 build 25
 
 

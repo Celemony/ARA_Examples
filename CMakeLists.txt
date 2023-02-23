@@ -112,8 +112,8 @@ if(ARA_AUDIO_UNIT_SDK_DIR)
     # normalize path if provided (and if relative path, assume it's relative to the top-level project)
     get_filename_component(ARA_AUDIO_UNIT_SDK_DIR "${ARA_AUDIO_UNIT_SDK_DIR}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
 else()
-    # if no path provided, assume CoreAudioUtilityClasses is right next to our ARA_Examples directory
-    get_filename_component(ARA_AUDIO_UNIT_SDK_DIR ../CoreAudioUtilityClasses ABSOLUTE "${CMAKE_CURRENT_SOURCE_DIR}")
+    # if no path provided, assume AudioUnitSDK is right next to our ARA_Examples directory
+    get_filename_component(ARA_AUDIO_UNIT_SDK_DIR ../AudioUnitSDK ABSOLUTE "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 set(ARA_AUDIO_UNIT_SDK_DIR "${ARA_AUDIO_UNIT_SDK_DIR}" CACHE PATH "directory of the Audio Unit SDK")
 
@@ -370,64 +370,42 @@ endfunction()
 
 
 # ======================
-# external dependency: CoreAudioUtilityClasses (aka Audio Unit SDK)
+# external dependency: Audio Unit SDK
 if(APPLE)
-    message(STATUS "Importing CoreAudioUtilityClasses")
+    message(STATUS "Importing AudioUnitSDK")
 
-    add_library(CoreAudioUtilityClasses ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
-        "${ARA_AUDIO_UNIT_SDK_DIR}/Readme.rtf"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/AUBase.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/AUBase.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/AUDispatch.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/AUInputElement.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/AUInputElement.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/AUOutputElement.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/AUOutputElement.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/AUPlugInDispatch.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/AUPlugInDispatch.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/AUScopeElement.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/AUScopeElement.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/ComponentBase.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase/ComponentBase.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/OtherBases/AUEffectBase.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/OtherBases/AUEffectBase.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/Utility/AUBaseHelper.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/Utility/AUBaseHelper.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/Utility/AUBuffer.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/Utility/AUBuffer.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/Utility/AUSilentTimeout.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAAudioChannelLayout.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAAudioChannelLayout.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAAUParameter.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAAUParameter.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAAutoDisposer.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CADebugMacros.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAException.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAHostTimeBase.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAMath.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAMutex.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAMutex.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAStreamBasicDescription.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAStreamBasicDescription.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAThreadSafeList.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAVectorUnit.cpp"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAVectorUnit.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAVectorUnitTypes.h"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility/CAXException.h"
+    add_library(AudioUnitSDK ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
+        "${ARA_AUDIO_UNIT_SDK_DIR}/readme.md"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUBase.cpp"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUBase.h"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUBuffer.cpp"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUBuffer.h"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUBufferAllocator.cpp"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUEffectBase.cpp"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUEffectBase.h"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUInputElement.cpp"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUInputElement.h"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUOutputElement.cpp"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUOutputElement.h"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUPlugInDispatch.cpp"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUPlugInDispatch.h"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUScopeElement.cpp"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUScopeElement.h"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUSilentTimeout.h"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/AUUtility.h"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/ComponentBase.cpp"
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source/ComponentBase.h"
     )
 
-    target_include_directories(CoreAudioUtilityClasses PUBLIC
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/AUBase"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/OtherBases"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/AudioUnits/AUPublic/Utility"
-        "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio/PublicUtility"
+    target_include_directories(AudioUnitSDK PUBLIC
+        "${ARA_AUDIO_UNIT_SDK_DIR}/Source"
     )
 
-    target_compile_definitions(CoreAudioUtilityClasses PUBLIC
+    target_compile_definitions(AudioUnitSDK PUBLIC
         -DCA_USE_AUDIO_PLUGIN_ONLY=1
     )
 
-    target_compile_options(CoreAudioUtilityClasses
+    target_compile_options(AudioUnitSDK
         PUBLIC
             -Wno-undef
             -Wno-shadow
@@ -444,14 +422,15 @@ if(APPLE)
             $<$<CXX_COMPILER_ID:AppleClang>:-Wno-newline-eof>
     )
 
-    target_link_libraries(CoreAudioUtilityClasses PUBLIC
+    target_link_libraries(AudioUnitSDK PUBLIC
         "-framework CoreFoundation"
         "-framework CoreAudio"
         "-framework AudioToolbox"
         "-framework AudioUnit"
     )
 
-    set_target_properties(CoreAudioUtilityClasses PROPERTIES
+    set_target_properties(AudioUnitSDK PROPERTIES
+        CXX_STANDARD 17
         FOLDER "CompanionAPIs"
         XCODE_GENERATE_SCHEME OFF
         XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
@@ -1214,6 +1193,7 @@ if(APPLE)
     )
 
     set_target_properties(ARATestPlugInAudioUnit PROPERTIES
+        CXX_STANDARD 17
         FOLDER "Plug-In Examples/ARATestPlugIn"
         OUTPUT_NAME "ARATestPlugIn"
     )
@@ -1226,7 +1206,7 @@ if(APPLE)
 
     target_link_libraries(ARATestPlugInAudioUnit PRIVATE
         ARATestPlugInCommon
-        CoreAudioUtilityClasses
+        AudioUnitSDK
     )
 
     configure_ARA_Examples_target(ARATestPlugInAudioUnit)
