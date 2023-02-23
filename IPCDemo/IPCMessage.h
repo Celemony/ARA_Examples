@@ -51,9 +51,8 @@ struct _ArgWrapper<StructT *>
 // The basic data types transmitted are only int32_t, int64_t, size_t, float, double and C or C++
 // std strings (pure ASCII or UTF8). Pointers are encoded as size_t, which means they may not be
 // traversed on the receiving side, but they may be passed back to the sender to be used in callbacks.
-// Number types can be aggregated in homogenous arrays (std::vector), and messages can be nested
-// in a hierarchy.
-// The transmission channel handles proper endianess conversion of the numbers if needed.
+// Types can be aggregated in homogenous arrays (std::vector), and messages can be nested in a hierarchy.
+// The transmission channel handles proper endianness conversion of the numbers if needed.
 // Pointer size is currently limited to 64 bit - if either size had smaller pointers, some additional
 // infrastructure would be needed to allocate a unique 32 bit representation for each ref provided
 // by the 64 bit process to the 32 bit process, and then map between the two.
@@ -106,6 +105,9 @@ private:
     // wrap C string into CFString - must release result!
     static CFStringRef _createEncodedTag (const char* tag);
 
+    // provide reusable indexing-keys for arrays
+    static const char* _getKeyForArrayIndex (size_t index);
+
     // helpers for construction for sending code
     void _appendArg (const char* argKey, int32_t argValue);
     void _appendArg (const char* argKey, int64_t argValue);
@@ -113,12 +115,16 @@ private:
     void _appendArg (const char* argKey, float argValue);
     void _appendArg (const char* argKey, double argValue);
     void _appendArg (const char* argKey, const char* argValue);
-    template<typename T>
-    void _appendArg (const char* argKey, const std::vector<T> argValue)
+    void _appendArg (const char* argKey, const std::vector<uint8_t>& argValue);
+    template<typename T, typename std::enable_if<!std::is_same<T, uint8_t>::value, bool>::type = true>
+    void _appendArg (const char* argKey, const std::vector<T>& argValue)
     {
-        _appendBytesArg (argKey, argValue.data (), argValue.size () * sizeof (*argValue.data ()));
+        IPCMessage msg;
+        msg._appendArg ("count", static_cast<int64_t> (argValue.size ()));
+        for (auto i { 0u }; i < argValue.size (); ++i)
+            msg._appendArg (_getKeyForArrayIndex (i), argValue[i]);
+        _appendArg (argKey, msg);
     }
-    void _appendBytesArg (const char* argKey, const void* valueBytes, size_t valueSize);
     void _appendArg (const char* argKey, const IPCMessage& argValue);
     void _appendEncodedArg (const char* argKey, CFTypeRef argObject);   // ownership of the arg is transferred
 
@@ -130,15 +136,23 @@ private:
     void _readArg (const char* argKey, float& argValue) const;
     void _readArg (const char* argKey, double& argValue) const;
     void _readArg (const char* argKey, std::string& argValue) const;
-    template<typename T>
+    void _readArg (const char* argKey, std::vector<uint8_t>& argValue) const;
+    template<typename T, typename std::enable_if<!std::is_same<T, uint8_t>::value, bool>::type = true>
     void _readArg (const char* argKey, std::vector<T>& argValue) const
     {
-        argValue.clear();
-        argValue.resize (_readArrayArgCount (argKey, sizeof (*argValue.data ())));
-        _readArrayArgData (argKey, argValue.data ());
+        argValue.clear ();
+        IPCMessage msg;
+        _readArg (argKey, msg);
+        size_t count;
+        msg._readArg ("count", count);
+        argValue.reserve (count);
+        for (size_t i { 0 }; i < count; ++i)
+        {
+            T value;
+            msg._readArg (_getKeyForArrayIndex (i), value);
+            argValue.push_back (value);
+        }
     }
-    size_t _readArrayArgCount (const char* argKey, size_t valueSize) const;
-    void _readArrayArgData (const char* argKey, void* data) const;
     void _readArg (const char* argKey, IPCMessage& argValue) const;
 
 private:
