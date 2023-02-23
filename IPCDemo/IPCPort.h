@@ -29,21 +29,32 @@
 // Error handling is limited to assertions.
 class IPCPort
 {
+public:
+    // C++ "rule of five" standard methods - copying is not allowed, only move
     IPCPort (const IPCPort& other) = delete;
     IPCPort& operator= (const IPCPort& other) = delete;
-
-public:
     IPCPort (IPCPort&& other) noexcept;
-    IPCPort& operator= (IPCPort&& other)  noexcept;
+    IPCPort& operator= (IPCPort&& other) noexcept;
     ~IPCPort ();
 
-    typedef IPCMessage (*Callback) (const int32_t messageID, const IPCMessage&);
+    // uninitialized port - cannot be used until move-assigned from factory functions
+    IPCPort () = default;
+
+    // factory functions for send and receive ports
+    using Callback = IPCMessage (*) (const int32_t messageID, const IPCMessage&);
     static IPCPort createPublishingID (const char* remotePortID, Callback callback);
     static IPCPort createConnectedToID (const char* remotePortID);
-    explicit IPCPort (CFMessagePortRef __attribute__((cf_consumed)) port = nullptr);
 
-    void sendWithoutReply (const int32_t messageID, const IPCMessage& message);
+    // message sending
+    // If no reply is desired, blocking is still necessary in many cases to ensure consistent call order,
+    // e.g. if the message potentially triggers any synchronous callbacks from the other side.
+    void sendNonblocking (const int32_t messageID, const IPCMessage& message);
+    void sendBlocking (const int32_t messageID, const IPCMessage& message);
     IPCMessage sendAndAwaitReply (const int32_t messageID, const IPCMessage& message);
+
+private:
+    explicit IPCPort (CFMessagePortRef __attribute__((cf_consumed)) port);
+    __attribute__((cf_returns_retained)) CFDataRef _sendBlocking (const int32_t messageID, const IPCMessage& message);
 
 private:
     CFMessagePortRef _port {};
