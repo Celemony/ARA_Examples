@@ -29,6 +29,8 @@
 #include "ARA_Library/Debug/ARADebug.h"
 #include "ARA_Library/Dispatch/ARADispatchBase.h"
 
+#include <os/lock.h>
+
 using namespace ARA;
 
 
@@ -125,6 +127,9 @@ ARABool _readAudioSamples (const IPCMessage& reply, ARASampleCount samplesPerCha
 ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef,
                                         ARASamplePosition samplePosition, ARASampleCount samplesPerChannel, void* const buffers[])
 {
+    static os_unfair_lock_s lock { OS_UNFAIR_LOCK_INIT };
+    os_unfair_lock_lock (&lock);
+
     auto remoteAudioReader { reinterpret_cast<ARARemoteAudioReader *> (audioReaderHostRef) };
     IPCMessage reply { audioAccessFromPlugInPort.sendAndAwaitReply ({ "readAudioSamples",
                                                                           "controllerHostRef", controllerHostRef,
@@ -132,10 +137,12 @@ ARABool ARA_CALL ARAReadAudioSamples (ARAAudioAccessControllerHostRef controller
                                                                           "samplePosition", samplePosition,
                                                                           "samplesPerChannel", samplesPerChannel
                                                                         }) };
-    if (remoteAudioReader->use64BitSamples != kARAFalse)
-        return _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->properties.channelCount, buffers);
-    else
-        return _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->properties.channelCount, buffers);
+    const auto result { (remoteAudioReader->use64BitSamples != kARAFalse) ?
+                        _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->properties.channelCount, buffers):
+                        _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->properties.channelCount, buffers)};
+
+    os_unfair_lock_unlock (&lock);
+    return result;
 }
 
 void ARA_CALL ARADestroyAudioReader (ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef)
