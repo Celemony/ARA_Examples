@@ -260,14 +260,16 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
 
         auto remoteAudioSource { new ARARemoteAudioSource };
         remoteAudioSource->mainHostRef = message.getArgValue<ARAAudioSourceHostRef> ("hostRef");
-        remoteAudioSource->name = message.getArgValue<std::string> ("properties.name");
+
+        auto properties { message.getArgValue<IPCMessage> ("properties") };
+        remoteAudioSource->name = properties.getArgValue<std::string> ("name");
         remoteAudioSource->properties.name = remoteAudioSource->name.c_str ();
-        remoteAudioSource->persistentID = message.getArgValue<std::string> ("properties.persistentID");
+        remoteAudioSource->persistentID = properties.getArgValue<std::string> ("persistentID");
         remoteAudioSource->properties.persistentID = remoteAudioSource->persistentID.c_str ();
-        remoteAudioSource->properties.sampleCount = message.getArgValue<ARASampleCount> ("properties.sampleCount");
-        remoteAudioSource->properties.sampleRate = message.getArgValue<ARASampleRate> ("properties.sampleRate");
-        remoteAudioSource->properties.channelCount = message.getArgValue<ARAChannelCount> ("properties.channelCount");
-        remoteAudioSource->properties.merits64BitSamples = message.getArgValue<ARABool> ("properties.merits64BitSamples");
+        remoteAudioSource->properties.sampleCount = properties.getArgValue<ARASampleCount> ("sampleCount");
+        remoteAudioSource->properties.sampleRate = properties.getArgValue<ARASampleRate> ("sampleRate");
+        remoteAudioSource->properties.channelCount = properties.getArgValue<ARAChannelCount> ("channelCount");
+        remoteAudioSource->properties.merits64BitSamples = properties.getArgValue<ARABool> ("merits64BitSamples");
 
         remoteAudioSource->plugInRef = remoteDocument->documentController.documentControllerInterface->createAudioSource (
                                         remoteDocument->documentController.documentControllerRef, reinterpret_cast<ARAAudioSourceHostRef> (remoteAudioSource), &remoteAudioSource->properties);
@@ -347,20 +349,23 @@ IPCMessage modelPortToPlugInCallBack (const IPCMessage& message)
         auto remoteDocument { message.getArgValue<ARARemoteDocument*> ("controllerRef") };
         auto remoteContentReader { message.getArgValue<ARARemoteContentReader*> ("contentReaderRef") };
         auto eventIndex { message.getArgValue<ARAInt32> ("eventIndex") };
+
         const void* eventData = remoteDocument->documentController.documentControllerInterface->getContentReaderDataForEvent (remoteDocument->documentController.documentControllerRef, remoteContentReader->plugInRef, eventIndex);
-        IPCMessage contentData;
         if (remoteContentReader->contentType == kARAContentTypeNotes)
         {
             const auto note { static_cast<const ARAContentNote*> (eventData) };
-            contentData = IPCMessage { "ARAContentNote", "frequency", note->frequency, "pitchNumber", note->pitchNumber, "volume", note->volume,
-                                                            "startPosition", note->startPosition, "attackDuration", note->attackDuration,
-                                                            "noteDuration", note->noteDuration, "signalDuration", note->signalDuration };
+            return IPCMessage { "contentData",
+                                "frequency", note->frequency,
+                                "pitchNumber", note->pitchNumber,
+                                "volume", note->volume,
+                                "startPosition", note->startPosition,
+                                "attackDuration", note->attackDuration,
+                                "noteDuration", note->noteDuration,
+                                "signalDuration", note->signalDuration };
         }
-        else
-        {
-            ARA_INTERNAL_ASSERT (false && "content type not implemented yet");
-        }
-        return IPCMessage { "getContentReaderDataForEventReply", "contentData", contentData };
+
+        ARA_INTERNAL_ASSERT (false && "other content types are not implemented yet");
+        return IPCMessage {};
     }
     else if (message.isMessageWithID ("destroyContentReader"))
     {

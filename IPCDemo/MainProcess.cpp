@@ -197,12 +197,13 @@ int main (int argc, const char * argv[])
     reply = modelPortToPlugIn.sendAndAwaitReply ({ "createAudioSource",
                                                    "controllerRef", remoteDocumentRef,
                                                    "hostRef", kHostAudioSourceHostRef,
-                                                   "properties.name", audioSourceProperties.name,
-                                                   "properties.persistentID", audioSourceProperties.persistentID,
-                                                   "properties.sampleCount", audioSourceProperties.sampleCount,
-                                                   "properties.sampleRate", audioSourceProperties.sampleRate,
-                                                   "properties.channelCount", audioSourceProperties.channelCount,
-                                                   "properties.merits64BitSamples", audioSourceProperties.merits64BitSamples
+                                                   "properties", IPCMessage { "ARAAudioSourceProperties",
+                                                       "name", audioSourceProperties.name,
+                                                       "persistentID", audioSourceProperties.persistentID,
+                                                       "sampleCount", audioSourceProperties.sampleCount,
+                                                       "sampleRate", audioSourceProperties.sampleRate,
+                                                       "channelCount", audioSourceProperties.channelCount,
+                                                       "merits64BitSamples", audioSourceProperties.merits64BitSamples }
                                                  });
     auto audioSourceRef { reply.getArgValue<ARAAudioSourceRef> ("audioSourceRef") };
 
@@ -280,14 +281,13 @@ int main (int argc, const char * argv[])
                                                            "contentReaderRef", contentReaderRef,
                                                            "eventIndex", i
                                                          });
-            auto noteContent { reply.getArgValue<IPCMessage> ("contentData") };
-            ContentLogger::logEvent (i, ARAContentNote { noteContent.getArgValue<float>("frequency"),
-                                                         noteContent.getArgValue<ARAPitchNumber>("pitchNumber"),
-                                                         noteContent.getArgValue<float>("volume"),
-                                                         noteContent.getArgValue<ARATimePosition>("startPosition"),
-                                                         noteContent.getArgValue<ARATimeDuration>("attackDuration"),
-                                                         noteContent.getArgValue<ARATimeDuration>("noteDuration"),
-                                                         noteContent.getArgValue<ARATimeDuration>("signalDuration")
+            ContentLogger::logEvent (i, ARAContentNote { reply.getArgValue<float>("frequency"),
+                                                         reply.getArgValue<ARAPitchNumber>("pitchNumber"),
+                                                         reply.getArgValue<float>("volume"),
+                                                         reply.getArgValue<ARATimePosition>("startPosition"),
+                                                         reply.getArgValue<ARATimeDuration>("attackDuration"),
+                                                         reply.getArgValue<ARATimeDuration>("noteDuration"),
+                                                         reply.getArgValue<ARATimeDuration>("signalDuration")
                                                        });
         }
 
