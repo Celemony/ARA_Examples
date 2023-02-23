@@ -289,20 +289,26 @@ void PlugInEntry::validatePlugInExtensionInstance (const ARA::ARAPlugInExtension
 
 std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<std::string>& args, ARA::ARAAssertFunction* assertFunctionAddress)
 {
-    auto it = std::find (args.begin (), args.end (), "-vst3");
-    if (it < args.end () - 1)   // we need at least one follow-up argument
+    if (args.size () >= 2)
     {
-        const auto& binaryFileName { *++it };
-        std::string optionalPlugInName {};
-        if ((++it != args.end ()) && ((*it)[0] != '-'))
-            optionalPlugInName = *it;
-        return std::make_unique<VST3PlugInEntry> (binaryFileName, optionalPlugInName, assertFunctionAddress);
+        auto it { std::find (args.begin (), args.end (), "-vst3") };
+        if (it < args.end () - 1)   // we need at least one follow-up argument
+        {
+            const auto& binaryFileName { *++it };
+            std::string optionalPlugInName {};
+            if ((++it != args.end ()) && ((*it)[0] != '-'))
+                optionalPlugInName = *it;
+            return std::make_unique<VST3PlugInEntry> (binaryFileName, optionalPlugInName, assertFunctionAddress);
+        }
     }
 
 #if defined (__APPLE__)
-    it = std::find (args.begin (), args.end (), "-au");
-    if (it < args.end () - 3)   // we need 3 follow-up arguments
-        return std::make_unique<AUPlugInEntry> (*++it, *++it, *++it, assertFunctionAddress);
+    if (args.size () >= 4)
+    {
+        auto it { std::find (args.begin (), args.end (), "-au") };
+        if (it < args.end () - 3)   // we need 3 follow-up arguments
+            return std::make_unique<AUPlugInEntry> (*++it, *++it, *++it, assertFunctionAddress);
+    }
 #endif
 
     return nullptr;
