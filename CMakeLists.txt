@@ -1298,6 +1298,7 @@ if(APPLE)
         "-framework CoreServices"
         "-framework AVFoundation"
         "-framework AudioUnit"
+        "-framework AudioToolbox"
     )
 elseif(UNIX)
     target_link_libraries(ARAPlugInHosting PUBLIC

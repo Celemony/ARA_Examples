@@ -32,7 +32,13 @@
 
 struct _AudioUnitInstance
 {
-    AudioUnit v2AudioUnit;
+    BOOL isAUv2;
+    union
+    {
+        AudioUnit v2AudioUnit;
+        AUAudioUnit * v3AudioUnit;
+    };
+    AURenderBlock v3RenderBlock;    // only for AUv3: cache of render block outside ObjC runtime
     SInt64 samplePosition;
 };
 
@@ -64,6 +70,11 @@ AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype,
 //              ARA_VALIDATE_API_CONDITION([avComponent isSandboxSafe]);
                 if (![avComponent isSandboxSafe])
                     ARA_WARN("This Audio Unit is not sandbox-safe, and thus might not work in future macOS releases.");
+
+                // when migrating to ARM machines, we suggest to also move to Audio Unit v3 (AUv2 is deprecated)
+//              ARA_VALIDATE_API_CONDITION(([avComponent audioComponentDescription].componentFlags & kAudioComponentFlag_IsV3AudioUnit) != 0);
+//              if (([avComponent audioComponentDescription].componentFlags & kAudioComponentFlag_IsV3AudioUnit) == 0)
+//                  ARA_WARN("This Audio Unit has not yet been updated to version 3 of the Audio Unit API, and thus might not work in future macOS releases.");
 #endif
             }
         }
@@ -78,10 +89,47 @@ AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype,
 
 AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent)
 {
-    AudioUnitInstance result = malloc(sizeof(struct _AudioUnitInstance));
-    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioComponentInstanceNew(audioUnitComponent, &result->v2AudioUnit);
-    ARA_INTERNAL_ASSERT(status == noErr);
-    ARA_INTERNAL_ASSERT(result->v2AudioUnit != NULL);
+    __block AudioUnitInstance result = malloc(sizeof(struct _AudioUnitInstance));
+
+    AudioComponentDescription desc;
+    AudioComponentGetDescription(audioUnitComponent, &desc);
+    result->isAUv2 = ((desc.componentFlags & kAudioComponentFlag_IsV3AudioUnit) == 0);
+
+    if (result->isAUv2)
+    {
+        ARA_INTERNAL_ASSERT((desc.componentFlags & kAudioComponentFlag_RequiresAsyncInstantiation) == 0);
+//      \todo for some reason, the OS never sets this flag for v2 AUs, even though they naturally all support it.
+//      ARA_INTERNAL_ASSERT((desc.componentFlags & kAudioComponentFlag_CanLoadInProcess) != 0);
+        OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioComponentInstanceNew(audioUnitComponent, &result->v2AudioUnit);
+        ARA_INTERNAL_ASSERT(status == noErr);
+        ARA_INTERNAL_ASSERT(result->v2AudioUnit != NULL);
+    }
+    else
+    {
+        // to allow for best performance esp. when reading audio samples through the ARA audio readers,
+        // ARA-capable Audio Units should be packaged to support in-process loading
+        ARA_INTERNAL_ASSERT((desc.componentFlags & kAudioComponentFlag_CanLoadInProcess) != 0);
+        result->v3AudioUnit = nil;
+        @autoreleasepool
+        {
+            // simply blocking the thread is not allowed here, so we need to add proper NSRunLoop around the instantiation process
+            NSRunLoop * runloop = [NSRunLoop currentRunLoop];
+            [runloop performBlock:^()
+            {
+                [AUAudioUnit instantiateWithComponentDescription:desc options:kAudioComponentInstantiation_LoadInProcess
+                             completionHandler:^(AUAudioUnit * __nullable auAudioUnit, NSError * __nullable ARA_MAYBE_UNUSED_ARG (error))
+                {
+                    ARA_INTERNAL_ASSERT(auAudioUnit != nil);
+                    ARA_INTERNAL_ASSERT(error == nil);
+                    if (@available(macOS 10.15, *))
+                        ARA_INTERNAL_ASSERT([auAudioUnit isLoadedInProcess]);
+                    result->v3AudioUnit = [auAudioUnit retain];
+                }];
+            }];
+            [runloop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+        }
+        ARA_INTERNAL_ASSERT(result->v3AudioUnit != nil);
+    }
     return result;
 }
 
@@ -236,29 +284,85 @@ void ConfigureBusses(AudioUnit audioUnit, AudioUnitScope inScope, double sampleR
     status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ShouldAllocateBuffer, inScope, 0, &shouldAllocate, sizeof(shouldAllocate));
 }
 
+void ConfigureBussesArray(AUAudioUnitBusArray * bussesArray, double sampleRate)
+{
+    if (bussesArray.countChangeable)
+    {
+        if (bussesArray.count != 1)
+        {
+            BOOL ARA_MAYBE_UNUSED_VAR(success) = [bussesArray setBusCount:1 error:nil];
+            ARA_INTERNAL_ASSERT(success);
+        }
+    }
+    else
+    {
+        ARA_INTERNAL_ASSERT(bussesArray.count >= 1);
+    }
+
+    AudioStreamBasicDescription streamDesc = { sampleRate, kAudioFormatLinearPCM, kAudioFormatFlagsNativeFloatPacked|kAudioFormatFlagIsNonInterleaved,
+                                               sizeof(float), 1, sizeof(float), 1, sizeof(float) * 8, 0 };
+
+    AVAudioFormat * format = [[AVAudioFormat alloc] initWithStreamDescription:&streamDesc];
+    BOOL ARA_MAYBE_UNUSED_VAR(success) = [bussesArray[0] setFormat:format error:nil];
+    ARA_INTERNAL_ASSERT(success);
+    [format release];
+
+    bussesArray[0].shouldAllocateBuffer = YES;  // note that proper hosts are likely providing their own buffer and set this to NO to minimize allocations!
+}
+
 void AudioUnitStartRendering(AudioUnitInstance audioUnitInstance, UInt32 blockSize, double sampleRate)
 {
-    UInt32 bufferSize = blockSize;
-    OSStatus ARA_MAYBE_UNUSED_VAR(status) = noErr;
-    status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &bufferSize, sizeof(bufferSize));
-    ARA_INTERNAL_ASSERT(status == noErr);
+    if (audioUnitInstance->isAUv2)
+    {
+        OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &blockSize, sizeof(blockSize));
+        ARA_INTERNAL_ASSERT(status == noErr);
 
-    status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_SampleRate, kAudioUnitScope_Global, 0, &sampleRate, sizeof(sampleRate));
-    ARA_INTERNAL_ASSERT(status == noErr);
+        status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_SampleRate, kAudioUnitScope_Global, 0, &sampleRate, sizeof(sampleRate));
+        ARA_INTERNAL_ASSERT(status == noErr);
 
-    ConfigureBusses(audioUnitInstance->v2AudioUnit, kAudioUnitScope_Input, sampleRate);
-    ConfigureBusses(audioUnitInstance->v2AudioUnit, kAudioUnitScope_Output, sampleRate);
+        ConfigureBusses(audioUnitInstance->v2AudioUnit, kAudioUnitScope_Input, sampleRate);
+        ConfigureBusses(audioUnitInstance->v2AudioUnit, kAudioUnitScope_Output, sampleRate);
 
-    AURenderCallbackStruct callback = { RenderCallback, NULL };
-    status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Output, 0, &callback, sizeof(callback));
-    ARA_INTERNAL_ASSERT(status == noErr);
+        AURenderCallbackStruct callback = { RenderCallback, NULL };
+        status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Output, 0, &callback, sizeof(callback));
+        ARA_INTERNAL_ASSERT(status == noErr);
 
-    HostCallbackInfo callbacks = { audioUnitInstance, NULL, NULL, &GetTransportState1, &GetTransportState2 };
-    status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_HostCallbacks, kAudioUnitScope_Global, 0, &callbacks, sizeof(callbacks));
-    ARA_INTERNAL_ASSERT(status == noErr);
+        HostCallbackInfo callbacks = { audioUnitInstance, NULL, NULL, &GetTransportState1, &GetTransportState2 };
+        status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_HostCallbacks, kAudioUnitScope_Global, 0, &callbacks, sizeof(callbacks));
+        ARA_INTERNAL_ASSERT(status == noErr);
 
-    status = AudioUnitInitialize(audioUnitInstance->v2AudioUnit);
-    ARA_INTERNAL_ASSERT(status == noErr);
+        status = AudioUnitInitialize(audioUnitInstance->v2AudioUnit);
+        ARA_INTERNAL_ASSERT(status == noErr);
+    }
+    else
+    {
+        audioUnitInstance->v3AudioUnit.maximumFramesToRender = blockSize;
+
+        ConfigureBussesArray(audioUnitInstance->v3AudioUnit.inputBusses, sampleRate);
+        ConfigureBussesArray(audioUnitInstance->v3AudioUnit.outputBusses, sampleRate);
+
+        audioUnitInstance->v3RenderBlock = [audioUnitInstance->v3AudioUnit renderBlock];
+
+        audioUnitInstance->v3AudioUnit.transportStateBlock =
+            ^BOOL(AUHostTransportStateFlags * __nullable transportStateFlags, double * __nullable currentSamplePosition,
+                  double * __nullable cycleStartBeatPosition, double * __nullable cycleEndBeatPosition)
+            {
+                Boolean outIsPlaying = NO, outIsRecording = NO, outTransportStateChanged = NO, outIsCycling = NO;
+                Boolean checkTransport = (transportStateFlags != NULL);
+                OSStatus result =  GetTransportState2(audioUnitInstance, (checkTransport) ? &outIsPlaying : NULL, (checkTransport) ? &outIsRecording : NULL,
+                                                      (checkTransport) ? &outTransportStateChanged : NULL, currentSamplePosition,
+                                                      (checkTransport) ? &outIsCycling : NULL, cycleStartBeatPosition, cycleEndBeatPosition);
+                if (checkTransport)
+                    *transportStateFlags = ((outTransportStateChanged) ? AUHostTransportStateChanged : 0) +
+                                           ((outIsPlaying) ? AUHostTransportStateMoving : 0) +
+                                           ((outIsRecording) ? AUHostTransportStateRecording : 0) +
+                                           ((outIsCycling) ? AUHostTransportStateCycling : 0);
+                return (result == noErr);
+            };
+
+        ARA_MAYBE_UNUSED_VAR(BOOL) success = [audioUnitInstance->v3AudioUnit allocateRenderResourcesAndReturnError:nil];
+        ARA_INTERNAL_ASSERT(success == YES);
+    }
 }
 
 void AudioUnitRenderBuffer(AudioUnitInstance audioUnitInstance, UInt32 blockSize, SInt64 samplePosition, float * buffer)
@@ -272,24 +376,48 @@ void AudioUnitRenderBuffer(AudioUnitInstance audioUnitInstance, UInt32 blockSize
     timeStamp.mSampleTime = (double)samplePosition;
     timeStamp.mFlags = kAudioTimeStampSampleTimeValid;
 
-    UInt32 bufferSize = blockSize;
+    AudioBufferList audioBufferList = { 1, { { 1, (UInt32)(sizeof(float) * blockSize), buffer } } };
 
-    AudioBufferList audioBufferList = { 1, { { 1, (UInt32)(sizeof(float) * bufferSize), buffer } } };
-
-    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitRender(audioUnitInstance->v2AudioUnit, &flags, &timeStamp, 0, bufferSize, &audioBufferList);
-    ARA_INTERNAL_ASSERT(status == noErr);
+    if (audioUnitInstance->isAUv2)
+    {
+        OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitRender(audioUnitInstance->v2AudioUnit, &flags, &timeStamp, 0, blockSize, &audioBufferList);
+        ARA_INTERNAL_ASSERT(status == noErr);
+    }
+    else
+    {
+        OSStatus ARA_MAYBE_UNUSED_VAR(status) = audioUnitInstance->v3RenderBlock(&flags, &timeStamp, blockSize, 0, &audioBufferList,
+            ^AUAudioUnitStatus(AudioUnitRenderActionFlags *actionFlags, const AudioTimeStamp *timestamp,
+                               AUAudioFrameCount frameCount, NSInteger inputBusNumber, AudioBufferList *inputData)
+            {
+                return RenderCallback (NULL, actionFlags, timestamp, (UInt32)inputBusNumber, frameCount, inputData);
+            });
+        ARA_INTERNAL_ASSERT(status == noErr);
+    }
 }
 
 void AudioUnitStopRendering(AudioUnitInstance audioUnitInstance)
 {
-    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitUninitialize(audioUnitInstance->v2AudioUnit);
-    ARA_INTERNAL_ASSERT(status == noErr);
+    if (audioUnitInstance->isAUv2)
+    {
+        OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitUninitialize(audioUnitInstance->v2AudioUnit);
+        ARA_INTERNAL_ASSERT(status == noErr);
+    }
+    else
+    {
+        [audioUnitInstance->v3AudioUnit deallocateRenderResources];
+    }
 }
 
 void AudioUnitCloseInstance(AudioUnitInstance audioUnitInstance)
 {
-    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioComponentInstanceDispose(audioUnitInstance->v2AudioUnit);
-    ARA_INTERNAL_ASSERT(status == noErr);
-    
+    if (audioUnitInstance->isAUv2)
+    {
+        OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioComponentInstanceDispose(audioUnitInstance->v2AudioUnit);
+        ARA_INTERNAL_ASSERT(status == noErr);
+    }
+    else
+    {
+        [audioUnitInstance->v3AudioUnit release];
+    }
     free(audioUnitInstance);
 }
