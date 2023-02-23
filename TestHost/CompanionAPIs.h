@@ -85,7 +85,7 @@ public:
     const ARA::ARAFactory* getARAFactory () const { return _factory; }
 
     // Factory function for new ARA plug-in instances with the desired roles
-    virtual std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles  (ARA::Host::DocumentController* documentController, ARA::ARAPlugInInstanceRoleFlags assignedRoles) = 0;
+    virtual std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) = 0;
 
 protected:
     // implementation helpers for derived classes

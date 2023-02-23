@@ -31,8 +31,7 @@
 
 /*******************************************************************************/
 // Simple audio source reader class that will be passed to readAudioSamples
-// as the 'ARAAudioReaderHostRef audioReaderHostRef' parameter. Because our
-// AudioSource class contains no data, the reader returns a pulsed sine wave.
+// as the 'ARAAudioReaderHostRef audioReaderHostRef' parameter.
 class AudioSourceReader
 {
 public:

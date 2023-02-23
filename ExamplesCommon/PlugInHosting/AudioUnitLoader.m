@@ -37,7 +37,7 @@ struct _AudioUnitInstance
     union
     {
         AudioUnit v2AudioUnit;
-        AUAudioUnit * v3AudioUnit;
+        AUAudioUnit * __strong v3AudioUnit;
     };
     AURenderBlock v3RenderBlock;    // only for AUv3: cache of render block outside ObjC runtime
     SInt64 samplePosition;
@@ -53,9 +53,10 @@ AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype,
         @autoreleasepool
         {
 // debug code: list all Audio Units that support ARA v2.0
-//          [[AVAudioUnitComponentManager sharedAudioUnitComponentManager] componentsPassingTest:^BOOL(AVAudioUnitComponent *comp, BOOL *stop) {
+//          [[AVAudioUnitComponentManager sharedAudioUnitComponentManager] componentsPassingTest:^BOOL (AVAudioUnitComponent *comp, BOOL *stop)
+//          {
 //              if ([[comp allTagNames] indexOfObject:@kARAAudioComponentTag] != NSNotFound)
-//                  NSLog(@"%@ %@ v%@ (%@, %@sandbox-safe) %@", [comp manufacturerName], [comp name], [comp versionString], [comp typeName], [comp isSandboxSafe] ? @"": @"not ", [comp iconURL]);
+//                  NSLog(@"%@ %@ v%@ (%@, %@sandbox-safe) %@", [comp manufacturerName], [comp name], [comp versionString], [comp typeName], [comp isSandboxSafe] ? @"" : @"not ", [comp iconURL]);
 //              *stop = NO;
 //              return NO;
 //          }];
@@ -115,10 +116,10 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent)
         {
             // simply blocking the thread is not allowed here, so we need to add proper NSRunLoop around the instantiation process
             NSRunLoop * runloop = [NSRunLoop currentRunLoop];
-            [runloop performBlock:^()
+            [runloop performBlock:^void (void)
             {
                 [AUAudioUnit instantiateWithComponentDescription:desc options:kAudioComponentInstantiation_LoadInProcess
-                             completionHandler:^(AUAudioUnit * __nullable auAudioUnit, NSError * __nullable ARA_MAYBE_UNUSED_ARG (error))
+                             completionHandler:^void (AUAudioUnit * _Nullable auAudioUnit, NSError * _Nullable ARA_MAYBE_UNUSED_ARG(error))
                 {
                     ARA_INTERNAL_ASSERT(auAudioUnit != nil);
                     ARA_INTERNAL_ASSERT(error == nil);
@@ -134,9 +135,9 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent)
     return result;
 }
 
-const struct ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitComponent)
+const ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitComponent)
 {
-    const struct ARAFactory * result = NULL;    // initially assume this plug-in doesn't support ARA
+    const ARAFactory * result = NULL;    // initially assume this plug-in doesn't support ARA
     AudioUnitInstance audioUnitInstance = AudioUnitOpenInstance(audioUnitComponent);
 
     // check whether the AU supports ARA by trying to get the factory
@@ -159,7 +160,6 @@ const struct ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitCom
                 ARA_VALIDATE_API_CONDITION(audioUnitFactory.outFactory != NULL);
                 result = audioUnitFactory.outFactory;
             }
-
         }
     }
     else
@@ -171,25 +171,30 @@ const struct ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitCom
         }
     }
 
-    // validate the AU is properly tagged as ARA
-    if (@available(macOS 10.10, *))
+    // validate the AU is properly tagged as ARA (if it supports ARA)
+#if ARA_VALIDATE_API_CALLS
+    if (result)
     {
-        @autoreleasepool
+        if (@available(macOS 10.10, *))
         {
-            AudioComponentDescription compDesc;
-            OSStatus status = AudioComponentGetDescription(audioUnitComponent, &compDesc);
-            ARA_INTERNAL_ASSERT(status == noErr);
-            AVAudioUnitComponent * avComponent = [[[AVAudioUnitComponentManager sharedAudioUnitComponentManager] componentsMatchingDescription:compDesc] firstObject];
-            ARA_INTERNAL_ASSERT(avComponent);
-            ARA_VALIDATE_API_CONDITION([[avComponent allTagNames] indexOfObject:@kARAAudioComponentTag] != NSNotFound);
+            @autoreleasepool
+            {
+                AudioComponentDescription compDesc;
+                OSStatus status = AudioComponentGetDescription(audioUnitComponent, &compDesc);
+                ARA_INTERNAL_ASSERT(status == noErr);
+                AVAudioUnitComponent * avComponent = [[[AVAudioUnitComponentManager sharedAudioUnitComponentManager] componentsMatchingDescription:compDesc] firstObject];
+                ARA_INTERNAL_ASSERT(avComponent);
+                ARA_VALIDATE_API_CONDITION([[avComponent allTagNames] indexOfObject:@kARAAudioComponentTag] != NSNotFound);
+            }
         }
     }
+#endif
 
     AudioUnitCloseInstance(audioUnitInstance);
     return result;
 }
 
-const struct ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnitInstance, ARADocumentControllerRef controllerRef, ARAPlugInInstanceRoleFlags assignedRoles)
+const ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnitInstance, ARADocumentControllerRef controllerRef, ARAPlugInInstanceRoleFlags assignedRoles)
 {
     const ARAPlugInInstanceRoleFlags knownRoles = kARAPlaybackRendererRole | kARAEditorRendererRole | kARAEditorViewRole;
     if (audioUnitInstance->isAUv2)
@@ -265,7 +270,7 @@ OSStatus GetTransportState1(void * inHostUserData, Boolean * outIsPlaying,
 
 OSStatus RenderCallback(void * ARA_MAYBE_UNUSED_ARG(inRefCon), AudioUnitRenderActionFlags * ARA_MAYBE_UNUSED_ARG(ioActionFlags),
                         const AudioTimeStamp * ARA_MAYBE_UNUSED_ARG(inTimeStamp), UInt32 ARA_MAYBE_UNUSED_ARG(inBusNumber),
-                        UInt32 ARA_MAYBE_UNUSED_ARG(inNumberFrames), AudioBufferList * __nullable ioData)
+                        UInt32 ARA_MAYBE_UNUSED_ARG(inNumberFrames), AudioBufferList * _Nullable ioData)
 {
     for (UInt32 i = 0; i < ioData->mNumberBuffers; ++i)
         memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
@@ -333,11 +338,11 @@ void ConfigureBussesArray(AUAudioUnitBusArray * bussesArray, double sampleRate)
     bussesArray[0].shouldAllocateBuffer = YES;  // note that proper hosts are likely providing their own buffer and set this to NO to minimize allocations!
 }
 
-void AudioUnitStartRendering(AudioUnitInstance audioUnitInstance, UInt32 blockSize, double sampleRate)
+void AudioUnitStartRendering(AudioUnitInstance audioUnitInstance, UInt32 maxBlockSize, double sampleRate)
 {
     if (audioUnitInstance->isAUv2)
     {
-        OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &blockSize, sizeof(blockSize));
+        OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxBlockSize, sizeof(maxBlockSize));
         ARA_INTERNAL_ASSERT(status == noErr);
 
         status = AudioUnitSetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_SampleRate, kAudioUnitScope_Global, 0, &sampleRate, sizeof(sampleRate));
@@ -359,7 +364,7 @@ void AudioUnitStartRendering(AudioUnitInstance audioUnitInstance, UInt32 blockSi
     }
     else
     {
-        audioUnitInstance->v3AudioUnit.maximumFramesToRender = blockSize;
+        audioUnitInstance->v3AudioUnit.maximumFramesToRender = maxBlockSize;
 
         ConfigureBussesArray(audioUnitInstance->v3AudioUnit.inputBusses, sampleRate);
         ConfigureBussesArray(audioUnitInstance->v3AudioUnit.outputBusses, sampleRate);
@@ -367,8 +372,8 @@ void AudioUnitStartRendering(AudioUnitInstance audioUnitInstance, UInt32 blockSi
         audioUnitInstance->v3RenderBlock = [[audioUnitInstance->v3AudioUnit renderBlock] retain];
 
         audioUnitInstance->v3AudioUnit.transportStateBlock =
-            ^BOOL(AUHostTransportStateFlags * __nullable transportStateFlags, double * __nullable currentSamplePosition,
-                  double * __nullable cycleStartBeatPosition, double * __nullable cycleEndBeatPosition)
+            ^BOOL (AUHostTransportStateFlags * _Nullable transportStateFlags, double * _Nullable currentSamplePosition,
+                   double * _Nullable cycleStartBeatPosition, double * _Nullable cycleEndBeatPosition)
             {
                 Boolean outIsPlaying = NO, outIsRecording = NO, outTransportStateChanged = NO, outIsCycling = NO;
                 Boolean checkTransport = (transportStateFlags != NULL);
@@ -409,8 +414,8 @@ void AudioUnitRenderBuffer(AudioUnitInstance audioUnitInstance, UInt32 blockSize
     else
     {
         OSStatus ARA_MAYBE_UNUSED_VAR(status) = audioUnitInstance->v3RenderBlock(&flags, &timeStamp, blockSize, 0, &audioBufferList,
-            ^AUAudioUnitStatus(AudioUnitRenderActionFlags *actionFlags, const AudioTimeStamp *timestamp,
-                               AUAudioFrameCount frameCount, NSInteger inputBusNumber, AudioBufferList *inputData)
+            ^AUAudioUnitStatus (AudioUnitRenderActionFlags *actionFlags, const AudioTimeStamp *timestamp,
+                                AUAudioFrameCount frameCount, NSInteger inputBusNumber, AudioBufferList *inputData)
             {
                 return RenderCallback (NULL, actionFlags, timestamp, (UInt32)inputBusNumber, frameCount, inputData);
             });

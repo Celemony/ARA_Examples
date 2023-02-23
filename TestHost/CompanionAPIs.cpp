@@ -137,10 +137,10 @@ public:
         // unloading is not supported for Audio Units
     }
 
-    std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::Host::DocumentController* documentController, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
+    std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
     {
-        AudioUnitInstance audioUnit = AudioUnitOpenInstance (_audioUnitComponent);
-        const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance = AudioUnitBindToARADocumentController (audioUnit, documentController->getRef (), assignedRoles);
+        auto audioUnit { AudioUnitOpenInstance (_audioUnitComponent) };
+        const auto plugInExtensionInstance { AudioUnitBindToARADocumentController (audioUnit, documentControllerRef, assignedRoles) };
         validatePlugInExtensionInstance (plugInExtensionInstance, assignedRoles);
         return std::make_unique<AUPlugInInstance> (audioUnit, plugInExtensionInstance);
     }
@@ -173,10 +173,10 @@ public:
         VST3UnloadBinary (_vst3Binary);
     }
 
-    std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::Host::DocumentController* documentController, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
+    std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
     {
-        auto vst3Instance = VST3CreateEffect (_vst3Binary, (_optionalPlugInName.empty ()) ? nullptr : _optionalPlugInName.c_str ());
-        const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance = VST3BindToARADocumentController (vst3Instance, documentController->getRef (), assignedRoles);
+        auto vst3Instance { VST3CreateEffect (_vst3Binary, (_optionalPlugInName.empty ()) ? nullptr : _optionalPlugInName.c_str ()) };
+        const auto plugInExtensionInstance { VST3BindToARADocumentController (vst3Instance, documentControllerRef, assignedRoles) };
         validatePlugInExtensionInstance (plugInExtensionInstance, assignedRoles);
         return std::make_unique<VST3PlugInInstance> (vst3Instance, plugInExtensionInstance);
     }
