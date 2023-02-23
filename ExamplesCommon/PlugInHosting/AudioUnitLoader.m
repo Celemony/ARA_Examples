@@ -185,7 +185,6 @@ OSStatus GetTransportState1(void * inHostUserData, Boolean * outIsPlaying,
                             outIsCycling, outCycleStartBeat, outCycleEndBeat);
 }
 
-
 OSStatus RenderCallback(void * ARA_MAYBE_UNUSED_ARG(inRefCon), AudioUnitRenderActionFlags * ARA_MAYBE_UNUSED_ARG(ioActionFlags),
                         const AudioTimeStamp * ARA_MAYBE_UNUSED_ARG(inTimeStamp), UInt32 ARA_MAYBE_UNUSED_ARG(inBusNumber),
                         UInt32 ARA_MAYBE_UNUSED_ARG(inNumberFrames), AudioBufferList * __nullable ioData)
@@ -194,6 +193,40 @@ OSStatus RenderCallback(void * ARA_MAYBE_UNUSED_ARG(inRefCon), AudioUnitRenderAc
         memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
 
     return noErr;
+}
+
+void ConfigureBusses(AudioUnit audioUnit, AudioUnitScope inScope, double sampleRate)
+{
+    UInt32 busCount = 1;
+    Boolean outWriteable = NO;
+    UInt32 propertySize = 0;
+    OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitGetPropertyInfo(audioUnit, kAudioUnitProperty_BusCount, inScope, 0, &propertySize, &outWriteable);
+    ARA_INTERNAL_ASSERT(status == noErr);
+    ARA_INTERNAL_ASSERT(propertySize == sizeof(busCount));
+    status = AudioUnitGetProperty(audioUnit, kAudioUnitProperty_BusCount, inScope, 0, &busCount, &propertySize);
+    ARA_INTERNAL_ASSERT(status == noErr);
+    ARA_INTERNAL_ASSERT(propertySize == sizeof(busCount));
+
+    if (outWriteable)
+    {
+        if (busCount != 1)
+        {
+            status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_BusCount, inScope, 0, &busCount, sizeof(busCount));
+            ARA_INTERNAL_ASSERT(status == noErr);
+        }
+    }
+    else
+    {
+        ARA_INTERNAL_ASSERT(busCount >= 1);
+    }
+
+    AudioStreamBasicDescription streamDesc = { sampleRate, kAudioFormatLinearPCM, kAudioFormatFlagsNativeFloatPacked|kAudioFormatFlagIsNonInterleaved,
+                                               sizeof(float), 1, sizeof(float), 1, sizeof(float) * 8, 0 };
+    status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_StreamFormat, inScope, 0, &streamDesc, sizeof(streamDesc));
+    ARA_INTERNAL_ASSERT(status == noErr);
+
+    UInt32 shouldAllocate = YES;                // note that proper hosts are likely providing their own buffer and set this to NO to minimize allocations!
+    status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ShouldAllocateBuffer, inScope, 0, &shouldAllocate, sizeof(shouldAllocate));
 }
 
 void AudioUnitStartRendering(AudioUnit audioUnit, UInt32 blockSize, double sampleRate)
@@ -206,12 +239,8 @@ void AudioUnitStartRendering(AudioUnit audioUnit, UInt32 blockSize, double sampl
     status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_SampleRate, kAudioUnitScope_Global, 0, &sampleRate, sizeof(sampleRate));
     ARA_INTERNAL_ASSERT(status == noErr);
 
-    AudioStreamBasicDescription streamDesc = { sampleRate, kAudioFormatLinearPCM, kAudioFormatFlagsNativeFloatPacked|kAudioFormatFlagIsNonInterleaved,
-                                                sizeof(float), 1, sizeof(float), 1, sizeof(float) * 8, 0 };
-    status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &streamDesc, sizeof(streamDesc));
-    ARA_INTERNAL_ASSERT(status == noErr);
-    status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &streamDesc, sizeof(streamDesc));
-    ARA_INTERNAL_ASSERT(status == noErr);
+    ConfigureBusses(audioUnit, kAudioUnitScope_Input, sampleRate);
+    ConfigureBusses(audioUnit, kAudioUnitScope_Output, sampleRate);
 
     AURenderCallbackStruct callback = { RenderCallback, NULL };
     status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Output, 0, &callback, sizeof(callback));
