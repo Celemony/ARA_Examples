@@ -305,15 +305,13 @@ else()
     set(SMTG_ADD_VSTGUI OFF CACHE BOOL "Disable SMTG_ADD_VSTGUI per default")
 endif()
 
-set(vst3sdk_SOURCE_DIR "${ARA_VST3_SDK_DIR}")
 # when adding these paths, the VST3 SDK CMake file implicitly adds the corresponding wrapper targets,
 # which we currently do not want because we build these plug-ins natively
 #set(SMTG_COREAUDIO_SDK_PATH "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio")
 #set(SMTG_AAX_SDK_PATH "${ARA_AAX_SDK_DIR}")
-add_subdirectory("${vst3sdk_SOURCE_DIR}" "${PROJECT_BINARY_DIR}/vst3sdk" EXCLUDE_FROM_ALL)
-unset(vst3sdk_SOURCE_DIR)
+add_subdirectory("${ARA_VST3_SDK_DIR}" "${PROJECT_BINARY_DIR}/vst3sdk" EXCLUDE_FROM_ALL)
 
-set_target_properties(base cmake_modules pluginterfaces sdk_hosting sdk_common sdk validator PROPERTIES
+set_target_properties(base cmake_modules cmake_VST_modules pluginterfaces sdk_hosting sdk_common sdk validator PROPERTIES
     FOLDER "CompanionAPIs/vst3sdk"
     XCODE_GENERATE_SCHEME OFF
     XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
@@ -349,7 +347,7 @@ function(ara_add_vst3_main target)
     get_target_property(sources_old ${target} SOURCES)
 
     set(public_sdk_SOURCE_DIR "${ARA_VST3_SDK_DIR}/public.sdk")
-    smtg_add_library_main(${target})
+    smtg_target_add_library_main(${target})
 
     get_target_property(sources_new ${target} SOURCES)
     list(REMOVE_ITEM sources_new ${sources_old})
