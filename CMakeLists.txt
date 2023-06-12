@@ -1555,6 +1555,29 @@ elseif(UNIX)
     )
 endif()
 
+# \todo IPC implementation is Apple-only at this point
+if(APPLE)
+    target_sources(ARATestHost PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCEncoding.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCProxyHost.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCProxyHost.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCProxyPlugIn.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCProxyPlugIn.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCMessage.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCMessage.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCPort.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCPort.cpp"
+    )
+
+    target_link_libraries(ARATestHost PRIVATE
+        # \todo Linking the plug-in library (used in the IPC proxy) results in some duplicate symbols
+        #       with host libs - however these should be identical since we use the same compiler
+        #       setup for both libs. Actual host might rather not use the libraries and directly
+        #       compile the required files within their target.
+        ARA_PlugIn_Library
+    )
+endif()
+
 configure_ARA_Examples_target(ARATestHost)
 
 if(WIN32)
@@ -1583,6 +1606,8 @@ if(ARA_SETUP_DEBUGGING)
         string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
         # alternatively for testing with Audio Unit example plug-in:
         #string(APPEND ARATestHost_Dbg_Arguments "-au aufx AraT ADeC")
+        # alternatively for testing with Audio Unit example plug-in in a remote process via IPC:
+        #string(APPEND ARATestHost_Dbg_Arguments "-ipc_au aufx AraT ADeC")
         # alternatively for testing with Audio Unit v3 example plug-in:
         #string(APPEND ARATestHost_Dbg_Arguments "-au aufx Ara3 ADeC")
         # alternatively for testing with Melodyne VST3 or Audio Unit:
@@ -1613,90 +1638,6 @@ if(ARA_SETUP_DEBUGGING)
         XCODE_SCHEME_ARGUMENTS ${ARATestHost_Dbg_Arguments}
     )
 endif()
-
-
-# ======================
-# command line tool target IPC Demo: Plug-in Process
-
-if(APPLE)
-
-    add_executable(ARAIPCDemoPlugInProcess
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCEncoding.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCProxyHost.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCProxyHost.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCPort.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCPort.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/PlugInProcess.cpp"
-    )
-
-    set_target_properties(ARAIPCDemoPlugInProcess PROPERTIES
-        FOLDER "Host Examples/ARAIPCDemo"
-        XCODE_GENERATE_SCHEME OFF
-    )
-
-    target_compile_definitions(ARAIPCDemoPlugInProcess PRIVATE
-        -DPLUGIN_FORMAT=PLUGIN_FORMAT_AU
-#       -DPLUGIN_FORMAT=PLUGIN_FORMAT_VST3
-    )
-
-    target_compile_options(ARAIPCDemoPlugInProcess PRIVATE
-        -Wno-old-style-cast
-    )
-
-    target_link_libraries(ARAIPCDemoPlugInProcess PRIVATE
-        ARAPlugInHosting
-    )
-
-    configure_ARA_Examples_target(ARAIPCDemoPlugInProcess)
-
-    if(ARA_SETUP_DEBUGGING)
-        add_dependencies(ARAIPCDemoPlugInProcess ARATestPlugInVST3)
-        add_dependencies(ARAIPCDemoPlugInProcess ARATestPlugInAudioUnit)
-    endif()
-
-endif(APPLE)
-
-
-# ======================
-# command line tool target IPC Demo: Main Process
-
-if(APPLE)
-
-    add_executable(ARAIPCDemoMainProcess
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCEncoding.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCProxyPlugIn.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCProxyPlugIn.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCPort.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCPort.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/MainProcess.cpp"
-    )
-
-    set_target_properties(ARAIPCDemoMainProcess PROPERTIES
-        FOLDER "Host Examples/ARAIPCDemo"
-    )
-
-    target_compile_options(ARAIPCDemoMainProcess PRIVATE
-        -Wno-old-style-cast
-    )
-
-    target_link_libraries(ARAIPCDemoMainProcess PRIVATE
-        ARAPlugInHosting
-        # \todo Linking the plug-in library (used in the IPC proxy) results in some duplicate symbols
-        #       with host libs - however these should be identical since we use the same compiler
-        #       setup for both libs. Actual host might rather not use the libraries and directly
-        #       compile the required files within their target.
-        ARA_PlugIn_Library
-    )
-
-    configure_ARA_Examples_target(ARAIPCDemoMainProcess)
-
-    add_dependencies(ARAIPCDemoMainProcess ARAIPCDemoPlugInProcess)
-
-endif(APPLE)
 
 
 # ======================

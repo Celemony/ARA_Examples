@@ -33,26 +33,26 @@ AudioFileList createDummyAudioFiles (size_t numFiles);
 
 // Demonstrates updating several properties of ARA model graph objects within an edit cycle
 // (note: in an actual application, these updates would likely be spread across individual cycles)
-void testPropertyUpdates (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
+void testPropertyUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
 
 // Demonstrates how to update content information if changed in the host
 // The plug-in will call back into the host's ARAContentAccessController implementation
 // to read the updated data - see ARAContentAccessController
-void testContentUpdates (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
+void testContentUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
 
 // Demonstrates how to read ARAContentTypes from a plug-in -
 // see ContentLogger::log () for implementation of the actual content reading
-void testContentReading (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
+void testContentReading (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
 
 // Demonstrates how to clone an audio modification to enable two separate edits of the same audio source
-void testModificationCloning (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
+void testModificationCloning (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
 
 // Demonstrates how to store and restore plug-in document archives
-void testArchiving (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
+void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
 
 // Simulates a "drag & drop" operation by archiving one source and its modification in a
 // two source/modification document with a StoreObjectsFilter, and restoring them in another document
-void testDragAndDrop (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
+void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
 
 // Demonstrates using a plug-in playback renderer instance to process audio for a playback region,
 // using the companion API rendering methods
@@ -65,12 +65,12 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
 void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
 
 // Requests plug-in analysis, using every processing algorithm published by the plug-in.
-void testProcessingAlgorithms (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
+void testProcessingAlgorithms (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
 
 // Loads an `iXML` ARA audio file chunk from a supplied .WAV or .AIFF file
-void testAudioFileChunkLoading (const PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
+void testAudioFileChunkLoading (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
 
 // Requests plug-in analysis and saves audio source state into an `iXML` data chunk in each audio file
 // (if chunk authoring is supported by the plug-in) -
 // overwrites any current iXML chunk in the files (but only in-memory)
-void testAudioFileChunkSaving (const PlugInEntry* plugInEntry, AudioFileList& audioFiles);
+void testAudioFileChunkSaving (PlugInEntry* plugInEntry, AudioFileList& audioFiles);

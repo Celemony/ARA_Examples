@@ -115,8 +115,9 @@ inline bool isValidInstance (const SubclassT* instance)
 
 /*******************************************************************************/
 
-DocumentController::DocumentController (IPCPort& port, const ARADocumentControllerHostInstance* instance, const ARADocumentProperties* properties) noexcept
+DocumentController::DocumentController (IPCPort& port, const ARAFactory* factory, const ARADocumentControllerHostInstance* instance, const ARADocumentProperties* properties) noexcept
 : ARAIPCMessageSender { port },
+  _factory { factory },
   _hostAudioAccessController { instance },
   _hostArchivingController { instance },
   _hostContentAccessController { instance },
@@ -137,42 +138,6 @@ DocumentController::DocumentController (IPCPort& port, const ARADocumentControll
                                                                   properties);
 
     ARA_LOG_MODELOBJECT_LIFETIME ("did create document controller", _remoteRef);
-
-    // keep local copy of message before decoding it so that all pointer data remains valid until properly copied
-    const auto remoteFactoryMsg { remoteCallWithReply<IPCMessage> (PLUGIN_METHOD_ID (ARADocumentControllerInterface, getFactory), _remoteRef) };
-    const auto remoteFactory { decodeReply<ARAFactory> (remoteFactoryMsg) };
-
-    _factoryStrings.factoryID = remoteFactory.factoryID;
-    _factoryStrings.plugInName = remoteFactory.plugInName;
-    _factoryStrings.manufacturerName = remoteFactory.manufacturerName;
-    _factoryStrings.informationURL = remoteFactory.informationURL;
-    _factoryStrings.version = remoteFactory.version;
-    _factoryStrings.documentArchiveID = remoteFactory.documentArchiveID;
-
-    _factoryCompatibleIDStrings.reserve (remoteFactory.compatibleDocumentArchiveIDsCount);
-    _factoryCompatibleIDs.reserve (remoteFactory.compatibleDocumentArchiveIDsCount);
-    for (auto i { 0u }; i < remoteFactory.compatibleDocumentArchiveIDsCount; ++i)
-    {
-        _factoryCompatibleIDStrings.emplace_back (remoteFactory.compatibleDocumentArchiveIDs[i]);
-        _factoryCompatibleIDs.emplace_back (_factoryCompatibleIDStrings[i].c_str ());
-    }
-
-    _factoryAnalyzableTypes.reserve (remoteFactory.analyzeableContentTypesCount);
-    for (auto i { 0u }; i < remoteFactory.analyzeableContentTypesCount; ++i)
-        _factoryAnalyzableTypes.emplace_back (remoteFactory.analyzeableContentTypes[i]);
-
-    _factory = remoteFactory;   // copy data as bulk, then adjust the many fields that need adjusting...
-    _factory.factoryID = _factoryStrings.factoryID.c_str ();
-    _factory.initializeARAWithConfiguration = nullptr;
-    _factory.uninitializeARA = nullptr;
-    _factory.plugInName = _factoryStrings.plugInName.c_str ();
-    _factory.manufacturerName = _factoryStrings.manufacturerName.c_str ();
-    _factory.informationURL = _factoryStrings.informationURL.c_str ();
-    _factory.version = _factoryStrings.version.c_str ();
-    _factory.createDocumentControllerWithDocument = nullptr;
-    _factory.documentArchiveID = _factoryStrings.documentArchiveID.c_str ();
-    _factory.compatibleDocumentArchiveIDs = _factoryCompatibleIDs.data ();
-    _factory.analyzeableContentTypes = _factoryAnalyzableTypes.data ();
 }
 
 void DocumentController::destroyDocumentController () noexcept
@@ -208,7 +173,7 @@ const ARAFactory* DocumentController::getFactory () const noexcept
     ARA_LOG_HOST_ENTRY (this);
     ARA_VALIDATE_API_ARGUMENT (this, isValidInstance (this));
 
-    return &_factory;
+    return _factory;
 }
 
 /*******************************************************************************/
@@ -295,18 +260,18 @@ bool DocumentController::storeAudioSourceToAudioFileChunk (ARAArchiveWriterHostR
     const auto reply { decodeReply<ARAIPCStoreAudioSourceToAudioFileChunkReply> (replyMsg) };
 
     // find ID string in factory because our return value is a temporary copy
-    if (0 == std::strcmp (reply.documentArchiveID, _factory.documentArchiveID))
+    if (0 == std::strcmp (reply.documentArchiveID, _factory->documentArchiveID))
     {
-        *documentArchiveID = _factory.documentArchiveID;
+        *documentArchiveID = _factory->documentArchiveID;
     }
     else
     {
         *documentArchiveID = nullptr;
-        for (auto i { 0U }; i < _factory.compatibleDocumentArchiveIDsCount; ++i)
+        for (auto i { 0U }; i < _factory->compatibleDocumentArchiveIDsCount; ++i)
         {
-            if (0 == std::strcmp (reply.documentArchiveID, _factory.compatibleDocumentArchiveIDs[i]))
+            if (0 == std::strcmp (reply.documentArchiveID, _factory->compatibleDocumentArchiveIDs[i]))
             {
-                *documentArchiveID = _factory.compatibleDocumentArchiveIDs[i];
+                *documentArchiveID = _factory->compatibleDocumentArchiveIDs[i];
                 break;
             }
         }
@@ -945,7 +910,45 @@ PlugInExtension::~PlugInExtension () noexcept
 Factory::Factory (const char* hostCommandsPortID, const char* plugInCallbacksPortID)
 : _plugInCallbacksThread { &Factory::_plugInCallbacksThreadFunction, this, plugInCallbacksPortID },
   _hostCommandsPort { IPCPort::createConnectedToID (hostCommandsPortID) }
-{}
+{
+    // keep local copy of message before decoding it so that all pointer data remains valid until properly copied
+    const auto remoteFactoryMsg { ARA::ARAIPCMessageSender (_hostCommandsPort).remoteCallWithReply<IPCMessage> (kGetFactoryMethodID) };
+    const auto remoteFactory { decodeReply<ARAFactory> (remoteFactoryMsg) };
+
+    ARA_VALIDATE_API_ARGUMENT(&remoteFactory, remoteFactory.highestSupportedApiGeneration >= kARAAPIGeneration_2_0_Final);
+
+    _factoryStrings.factoryID = remoteFactory.factoryID;
+    _factoryStrings.plugInName = remoteFactory.plugInName;
+    _factoryStrings.manufacturerName = remoteFactory.manufacturerName;
+    _factoryStrings.informationURL = remoteFactory.informationURL;
+    _factoryStrings.version = remoteFactory.version;
+    _factoryStrings.documentArchiveID = remoteFactory.documentArchiveID;
+
+    _factoryCompatibleIDStrings.reserve (remoteFactory.compatibleDocumentArchiveIDsCount);
+    _factoryCompatibleIDs.reserve (remoteFactory.compatibleDocumentArchiveIDsCount);
+    for (auto i { 0U }; i < remoteFactory.compatibleDocumentArchiveIDsCount; ++i)
+    {
+        _factoryCompatibleIDStrings.emplace_back (remoteFactory.compatibleDocumentArchiveIDs[i]);
+        _factoryCompatibleIDs.emplace_back (_factoryCompatibleIDStrings[i].c_str ());
+    }
+
+    _factoryAnalyzableTypes.reserve (remoteFactory.analyzeableContentTypesCount);
+    for (auto i { 0U }; i < remoteFactory.analyzeableContentTypesCount; ++i)
+        _factoryAnalyzableTypes.emplace_back (remoteFactory.analyzeableContentTypes[i]);
+
+    _factory = remoteFactory;   // copy data as bulk, then adjust the many fields that need adjusting...
+    _factory.factoryID = _factoryStrings.factoryID.c_str ();
+    _factory.initializeARAWithConfiguration = nullptr;
+    _factory.uninitializeARA = nullptr;
+    _factory.plugInName = _factoryStrings.plugInName.c_str ();
+    _factory.manufacturerName = _factoryStrings.manufacturerName.c_str ();
+    _factory.informationURL = _factoryStrings.informationURL.c_str ();
+    _factory.version = _factoryStrings.version.c_str ();
+    _factory.createDocumentControllerWithDocument = nullptr;
+    _factory.documentArchiveID = _factoryStrings.documentArchiveID.c_str ();
+    _factory.compatibleDocumentArchiveIDs = _factoryCompatibleIDs.data ();
+    _factory.analyzeableContentTypes = _factoryAnalyzableTypes.data ();
+}
 
 Factory::~Factory ()
 {
@@ -965,7 +968,7 @@ void Factory::_plugInCallbacksThreadFunction (const char* plugInCallbacksPortID)
 
 const ARADocumentControllerInstance* Factory::createDocumentControllerWithDocument (const ARADocumentControllerHostInstance* hostInstance, const ARADocumentProperties* properties)
 {
-    auto result { new DocumentController { _hostCommandsPort, hostInstance, properties } };
+    auto result { new DocumentController { _hostCommandsPort, &_factory, hostInstance, properties } };
     return result->getInstance ();
 }
 

@@ -15,11 +15,6 @@
 //!             See the License for the specific language governing permissions and
 //!             limitations under the License.
 //------------------------------------------------------------------------------
-// This is a brief proof-of-concept demo that hooks up an ARA capable plug-in
-// in a separate process using IPC.
-// This educational example is not suitable for production code -
-// see MainProcess.cpp for a list of issues.
-//------------------------------------------------------------------------------
 
 #include "IPCMessage.h"
 #include "ARA_Library/Debug/ARADebug.h"
@@ -28,6 +23,9 @@
 #include <string>
 #include <set>
 #include <map>
+
+_Pragma ("GCC diagnostic push")
+_Pragma ("GCC diagnostic ignored \"-Wold-style-cast\"")
 
 class _CFReleaser
 {
@@ -299,3 +297,5 @@ bool IPCMessage::_checkKeyFound (bool found, bool* didFindKey)
     }
     return true;
 }
+
+_Pragma ("GCC diagnostic pop")

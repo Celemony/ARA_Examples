@@ -39,7 +39,13 @@
 
 /*******************************************************************************/
 
+#if ARA_ENABLE_IPC
+    #include "IPC/ARAIPCEncoding.h"
+    #include "IPC/ARAIPCProxyPlugIn.h"
+#endif
+
 #if defined (__APPLE__)
+
 class AUPlugInInstance : public PlugInInstance
 {
 public:
@@ -71,7 +77,8 @@ public:
 private:
     AudioUnitInstance const _audioUnit;
 };
-#endif
+
+#endif // defined (__APPLE__)
 
 /*******************************************************************************/
 
@@ -112,23 +119,29 @@ private:
 /*******************************************************************************/
 
 #if defined (__APPLE__)
+
+// very crude conversion from string to OSType
+OSType parseOSType (const std::string& idString)
+{
+    ARA_INTERNAL_ASSERT (idString.size () == sizeof (OSType));
+    return static_cast<uint32_t> (idString[3])        | (static_cast<uint32_t> (idString[2]) << 8) |
+          (static_cast<uint32_t> (idString[1]) << 16) | (static_cast<uint32_t> (idString[0]) << 24);
+}
+
+std::string createAUEntryDescription (const std::string& type, const std::string& subType, const std::string& manufacturer, bool useIPC)
+{
+    return std::string { "Audio Unit (" } + ((useIPC) ? "via IPC) (" : "") + type + " - " + subType + " - " + manufacturer + ")";
+}
+
 class AUPlugInEntry : public PlugInEntry
 {
-    // very crude conversion from string to OSType
-    static OSType parseOSType (const std::string& idString)
-    {
-        ARA_INTERNAL_ASSERT (idString.size () == sizeof (OSType));
-        return static_cast<uint32_t> (idString[3])        | (static_cast<uint32_t> (idString[2]) << 8) |
-              (static_cast<uint32_t> (idString[1]) << 16) | (static_cast<uint32_t> (idString[0]) << 24);
-    }
-
 public:
     AUPlugInEntry (const std::string& type, const std::string& subType, const std::string& manufacturer, ARA::ARAAssertFunction* assertFunctionAddress)
     : _audioUnitComponent { AudioUnitPrepareComponentWithIDs (parseOSType (type), parseOSType (subType), parseOSType (manufacturer)) }
     {
         initializeARA (AudioUnitGetARAFactory (_audioUnitComponent), assertFunctionAddress);
 
-        _description = std::string { "Audio Unit (" } + type + " - " + subType + " - " + manufacturer + ")";
+        _description = createAUEntryDescription (type, subType, manufacturer, false);
     }
 
     ~AUPlugInEntry () override
@@ -148,7 +161,8 @@ public:
 private:
     AudioUnitComponent const _audioUnitComponent;
 };
-#endif
+
+#endif // defined (__APPLE__)
 
 /*******************************************************************************/
 
@@ -188,6 +202,95 @@ private:
 
 /*******************************************************************************/
 
+#if ARA_ENABLE_IPC
+
+#if defined (__APPLE__)
+
+class IPCAUPlugInInstance : public PlugInInstance
+{
+public:
+    IPCAUPlugInInstance (const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance)
+    : PlugInInstance { plugInExtensionInstance }
+    {}
+
+    ~IPCAUPlugInInstance () override
+    {
+    }
+
+    void startRendering (int /*maxBlockSize*/, double /*sampleRate*/) override
+    {
+        // \todo dummy
+    }
+
+    void renderSamples (int /*blockSize*/, int64_t /*samplePosition*/, float* /*buffer*/) override
+    {
+        // \todo dummy
+    }
+
+    void stopRendering () override
+    {
+        // \todo dummy
+    }
+
+private:
+};
+
+class IPCAUPlugInEntry : public PlugInEntry
+{
+private:
+    static const std::string _createPortID ()
+    {
+        CFUUIDRef uuid { CFUUIDCreate (kCFAllocatorDefault) };
+        CFStringRef asString { CFUUIDCreateString(kCFAllocatorDefault, uuid) };
+        const auto result { std::string { "com.arademocompany.TestHost.IPC." } + CFStringGetCStringPtr (asString, kCFStringEncodingMacRoman) };
+        CFRelease (asString);
+        CFRelease (uuid);
+        return result;
+    }
+
+public:
+    IPCAUPlugInEntry (const std::string& type, const std::string& subType, const std::string& manufacturer, ARA::ARAAssertFunction* assertFunctionAddress)
+    : _hostCommandsPortID { _createPortID () },
+      _plugInCallbacksPortID { _createPortID () }
+    {
+        ARA_LOG ("launching remote plug-in process.");
+        const auto commandLine { std:: string { "./ARATestHost -au " + type + " " + subType + " " + manufacturer +
+                                                " -_ipcRemote " + _hostCommandsPortID + " " + _plugInCallbacksPortID + " &" } };
+        const auto launchResult = system (commandLine.c_str ());
+        ARA_INTERNAL_ASSERT (launchResult == 0);
+
+        _proxyFactory = std::make_unique<ARA::ProxyPlugIn::Factory> (_hostCommandsPortID.c_str (), _plugInCallbacksPortID.c_str ());
+
+        setUsesIPC ();
+        initializeARA (_proxyFactory->getFactory (), assertFunctionAddress);
+
+        _description = createAUEntryDescription (type, subType, manufacturer, true);
+    }
+
+    const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
+                                                                                    const ARA::ARADocumentProperties* properties) override
+    {
+        return _proxyFactory->createDocumentControllerWithDocument (hostInstance, properties);
+    }
+
+    std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef /*documentControllerRef*/, ARA::ARAPlugInInstanceRoleFlags /*assignedRoles*/) override
+    {
+        // \todo dummy
+        return nullptr;
+    }
+
+private:
+    const std::string _hostCommandsPortID;
+    const std::string _plugInCallbacksPortID;
+    std::unique_ptr<ARA::ProxyPlugIn::Factory> _proxyFactory;
+};
+
+#endif // defined (__APPLE__)
+
+#endif // ARA_ENABLE_IPC
+
+/*******************************************************************************/
+
 void PlugInEntry::initializeARA (const ARA::ARAFactory* factory, ARA::ARAAssertFunction* assertFunctionAddress)
 {
     ARA_INTERNAL_ASSERT (_factory == nullptr);
@@ -206,15 +309,24 @@ void PlugInEntry::initializeARA (const ARA::ARAFactory* factory, ARA::ARAAssertF
 
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->factoryID) > 5);          // at least "xx.y." needed to form a valid url-based unique ID
 
-    ARA_VALIDATE_API_CONDITION (factory->initializeARAWithConfiguration != nullptr);
-    ARA_VALIDATE_API_CONDITION (factory->uninitializeARA != nullptr);
+    if (usesIPC ())
+        ARA_VALIDATE_API_CONDITION (factory->initializeARAWithConfiguration == nullptr);
+    else
+        ARA_VALIDATE_API_CONDITION (factory->initializeARAWithConfiguration != nullptr);
+    if (usesIPC ())
+        ARA_VALIDATE_API_CONDITION (factory->uninitializeARA == nullptr);
+    else
+        ARA_VALIDATE_API_CONDITION (factory->uninitializeARA != nullptr);
 
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->plugInName) > 0);
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->manufacturerName) > 0);
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->informationURL) > 0);
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->version) > 0);
 
-    ARA_VALIDATE_API_CONDITION (factory->createDocumentControllerWithDocument != nullptr);
+    if (usesIPC ())
+        ARA_VALIDATE_API_CONDITION (factory->createDocumentControllerWithDocument == nullptr);
+    else
+        ARA_VALIDATE_API_CONDITION (factory->createDocumentControllerWithDocument != nullptr);
 
     ARA_VALIDATE_API_CONDITION (std::strlen (factory->documentArchiveID) > 5);  // at least "xx.y." needed to form a valid url-based unique ID
     if (factory->compatibleDocumentArchiveIDsCount == 0)
@@ -248,15 +360,18 @@ void PlugInEntry::initializeARA (const ARA::ARAFactory* factory, ARA::ARAAssertF
         desiredApiGeneration = factory->highestSupportedApiGeneration;
 
     // initialize ARA factory with interface configuration
-    const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAInterfaceConfiguration, assertFunctionAddress)> interfaceConfig = { desiredApiGeneration, assertFunctionAddress };
-    factory->initializeARAWithConfiguration (&interfaceConfig);
+    if (!_usesIPC)
+    {
+        const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAInterfaceConfiguration, assertFunctionAddress)> interfaceConfig = { desiredApiGeneration, assertFunctionAddress };
+        factory->initializeARAWithConfiguration (&interfaceConfig);
+    }
 
     _factory = factory;
 }
 
 void PlugInEntry::uninitializeARA ()
 {
-    if (_factory)
+    if (_factory && !_usesIPC)
         _factory->uninitializeARA ();
 }
 
@@ -285,6 +400,12 @@ void PlugInEntry::validatePlugInExtensionInstance (const ARA::ARAPlugInExtension
         ARA_VALIDATE_API_STATE (plugInExtensionInstance->editorViewInterface == nullptr);
 }
 
+const ARA::ARADocumentControllerInstance* PlugInEntry::createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
+                                                                                             const ARA::ARADocumentProperties* properties)
+{
+    return _factory->createDocumentControllerWithDocument (hostInstance, properties);
+}
+
 /*******************************************************************************/
 
 std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<std::string>& args, ARA::ARAAssertFunction* assertFunctionAddress)
@@ -308,6 +429,12 @@ std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<st
         auto it { std::find (args.begin (), args.end (), "-au") };
         if (it < args.end () - 3)   // we need 3 follow-up arguments
             return std::make_unique<AUPlugInEntry> (*++it, *++it, *++it, assertFunctionAddress);
+
+#if ARA_ENABLE_IPC
+        it = std::find (args.begin (), args.end (), "-ipc_au");
+        if (it < args.end () - 3)   // we need 3 follow-up arguments
+            return std::make_unique<IPCAUPlugInEntry> (*++it, *++it, *++it, assertFunctionAddress);
+#endif
     }
 #endif
 

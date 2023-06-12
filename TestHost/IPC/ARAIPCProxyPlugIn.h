@@ -91,7 +91,7 @@ private:
 class DocumentController : public PlugIn::DocumentControllerInterface, public ARAIPCMessageSender, public InstanceValidator<DocumentController>
 {
 public:
-    DocumentController (IPCPort& port, const ARADocumentControllerHostInstance* instance, const ARADocumentProperties* properties) noexcept;
+    DocumentController (IPCPort& port, const ARAFactory* factory, const ARADocumentControllerHostInstance* instance, const ARADocumentProperties* properties) noexcept;
 
 public:
     template <typename StructType>
@@ -197,19 +197,7 @@ private:
     void removePlugInExtension (PlugInExtension* plugInExtension) noexcept { _plugInExtensions.erase (plugInExtension); if (_plugInExtensions.empty ()) destroyIfUnreferenced (); }
 
 private:
-    ARAFactory _factory;
-    struct
-    {
-        std::string factoryID;
-        std::string plugInName;
-        std::string manufacturerName;
-        std::string informationURL;
-        std::string version;
-        std::string documentArchiveID;
-    } _factoryStrings;
-    std::vector<std::string> _factoryCompatibleIDStrings;
-    std::vector<const char*> _factoryCompatibleIDs;
-    std::vector<ARAContentType> _factoryAnalyzableTypes;
+    const ARAFactory* const _factory;
 
     PlugIn::HostAudioAccessController _hostAudioAccessController;
     PlugIn::HostArchivingController _hostArchivingController;
@@ -329,8 +317,13 @@ class Factory
 public:
     Factory (const char* hostCommandsPortID, const char* plugInCallbacksPortID);
     ~Factory ();
+
+    // proxy document controller creation call, to be used instead of getFactory ()->createDocumentControllerWithDocument ()
     const ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARADocumentControllerHostInstance* hostInstance,
                                                                                const ARADocumentProperties* properties);
+
+    // copy of the remote factory data, but with all function calls removed
+    const ARAFactory* getFactory () { return &_factory; }
 
 private:
     void _plugInCallbacksThreadFunction (const char* plugInCallbacksPortID);
@@ -341,6 +334,20 @@ private:
     bool _terminateCallbacksThread { false };
     IPCPort _plugInCallbacksPort;
     IPCPort _hostCommandsPort;
+
+    ARAFactory _factory;
+    struct
+    {
+        std::string factoryID;
+        std::string plugInName;
+        std::string manufacturerName;
+        std::string informationURL;
+        std::string version;
+        std::string documentArchiveID;
+    } _factoryStrings;
+    std::vector<std::string> _factoryCompatibleIDStrings;
+    std::vector<const char*> _factoryCompatibleIDs;
+    std::vector<ARAContentType> _factoryAnalyzableTypes;
 };
 
 

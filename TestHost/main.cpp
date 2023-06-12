@@ -30,6 +30,9 @@
 // On macOS, Audio Units can also be tested:
 // ./ARATestHost -au [type] [subType] [manufacturer] -test [TestCase(s)] -file [AudioFile(s)]
 //
+// The Audio Unit version also supports running the plug-in in a separate process, connected via IPC,
+// by specifying `-ipc_au` instead of `-au`.
+//
 // If the optional `-test` argument is not supplied, all test cases will be run.
 // See implementation of main() at the end of this file for a list of available test cases.
 //
@@ -58,6 +61,12 @@
 #include "ARA_Library/Utilities/ARAStdVectorUtilities.h"
 
 #include <cstring>
+
+
+#if ARA_ENABLE_IPC
+    #include "IPC/ARAIPCProxyHost.h"
+#endif
+
 
 // asserts
 ARA::ARAAssertFunction assertFunction { &ARA::ARAInterfaceAssert };
@@ -117,6 +126,20 @@ int main (int argc, const char* argv[])
 
     ARA::ARASetExternalAssertReference (assertFunctionReference);
 
+#if ARA_ENABLE_IPC
+    // check if run as remote host
+    auto it { std::find (args.begin (), args.end (), "-_ipcRemote") };
+    const bool isRemoteHost { (args.size () >= 3) && (it < args.end () - 2) };  // we need 2 follow-up arguments
+    std::string hostCommandsPortID;
+    std::string plugInCallbacksPortID;
+    if (isRemoteHost)
+    {
+        hostCommandsPortID = *(++it);
+        plugInCallbacksPortID = *(++it);
+        ARA::ARASetupDebugMessagePrefix ("REMOTE ARATestHost");
+    }
+#endif
+
     // parse the plug-in binary from the command line arguments
     auto plugInEntry { PlugInEntry::parsePlugInEntry (args, assertFunctionReference) };
     if (!plugInEntry)
@@ -124,6 +147,9 @@ int main (int argc, const char* argv[])
         ARA_LOG ("No plug-in binary specified via -vst3 [binaryFilePath].");
 #if defined (__APPLE__)
         ARA_LOG ("No plug-in binary specified via -au [typeID] [subTypeID] [manufacturerID].");
+#if ARA_ENABLE_IPC
+        ARA_LOG ("No plug-in binary specified via -ipc_au [typeID] [subTypeID] [manufacturerID].");
+#endif
 #endif
         return -1;
     }
@@ -134,6 +160,18 @@ int main (int argc, const char* argv[])
         return -1;
     }
 
+#if ARA_ENABLE_IPC
+    if (isRemoteHost)
+    {
+        ARA_LOG ("Remotely hosting ARA plug-in '%s' in %s", plugInEntry->getARAFactory ()->plugInName, plugInEntry->getDescription ().c_str ());
+
+        ARA::ProxyHost::runHost (*plugInEntry->getARAFactory (), hostCommandsPortID.c_str (), plugInCallbacksPortID.c_str ());
+
+        return 0;
+    }
+#endif
+
+    // when using IPC, set a breakpoint to this line if you want to attach the debugger to the plug-in process
     ARA_LOG ("Testing ARA plug-in '%s' in %s", plugInEntry->getARAFactory ()->plugInName, plugInEntry->getDescription ().c_str ());
 
     // parse any optional test cases or audio files

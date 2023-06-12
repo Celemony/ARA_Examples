@@ -27,6 +27,7 @@
 
 #include "ModelObjects.h"
 #include "ARADocumentController.h"
+#include "CompanionAPIs.h"
 
 /*******************************************************************************/
 // TestHost
@@ -41,7 +42,7 @@ public:
     ~TestHost ();
 
     // document control
-    void addDocument (std::string documentName, const ARA::ARAFactory* factory);
+    void addDocument (std::string documentName, PlugInEntry* plugInEntry);
     void destroyDocument (std::string documentName);
 
     MusicalContext* addMusicalContext (std::string documentName, std::string name, ARA::ARAColor color);
