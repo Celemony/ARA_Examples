@@ -7,6 +7,7 @@ Changes since previous releases:
 - various related refactorings and cleanups in plug-in hosting code
 - IPCDemo refactored and merged into ARATestHost, drafting a generic ARA IPC implementation
 - IPC now also supports using VST3 (was previously limited to Audio Units)
+- IPC now also works on Windows (was previously limited to macOS)
 - IPC now also supports using pugixml as encoder (was previously limited to the macOS-only CFDictionary)
 - various cleanups in macOS info.plist files
 - updated Audio Unit SDK from the old CoreAudioUtilityClasses.zip sample code download to

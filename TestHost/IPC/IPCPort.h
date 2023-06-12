@@ -20,7 +20,13 @@
 
 #include "IPCMessage.h"
 
-#include <os/lock.h>
+#if defined (_WIN32)
+    #include <Windows.h>
+#elif defined (__APPLE__)
+    #include <os/lock.h>
+#elif defined (__linux__)
+    #error "IPC not yet implemented for Linux"
+#endif
 
 // A simple proof-of-concept wrapper for an IPC communication channel.
 // Error handling is limited to assertions.
@@ -49,11 +55,40 @@ public:
     void sendBlocking (const int32_t messageID, const IPCMessage& message);
     IPCMessage sendAndAwaitReply (const int32_t messageID, const IPCMessage& message);
 
-private:
-    explicit IPCPort (CFMessagePortRef __attribute__((cf_consumed)) port);
-    __attribute__((cf_returns_retained)) CFDataRef _sendBlocking (const int32_t messageID, const IPCMessage& message);
+    // message receiving
+    // waits up to the specified amount of milliseconds for an incoming event and processes it
+    void runReceiveLoop (int32_t milliseconds);
 
 private:
+#if defined (_WIN32)
+    IPCPort (const char* remotePortID);
+    void _sendMessage (bool blocking, const int32_t messageID, const IPCMessage& message, std::string* result);
+#elif defined (__APPLE__)
+    explicit IPCPort (CFMessagePortRef __attribute__((cf_consumed)) port);
+    __attribute__((cf_returns_retained)) CFDataRef _sendBlocking (const int32_t messageID, const IPCMessage& message);
+#endif
+
+private:
+#if defined (_WIN32)
+    struct SharedMemory
+    {
+        static constexpr DWORD maxMessageSize { 4 * 1024 * 1024L - 64};
+
+        size_t messageSize;
+        int32_t messageID;
+        char messageData[maxMessageSize];
+    };
+
+    Callback _handler {};
+    HANDLE _hSendMutex {};
+    HANDLE _hWriteMutex {};
+    HANDLE _hRequest {};
+    HANDLE _hResult {};
+    HANDLE _hMap {};
+    SharedMemory* _sharedMemory {};
+
+#elif defined (__APPLE__)
     CFMessagePortRef _port {};
     os_unfair_lock_s _sendLock { OS_UNFAIR_LOCK_INIT };
+#endif
 };

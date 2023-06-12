@@ -68,12 +68,24 @@ ARAAudioReaderHostRef AudioAccessController::createAudioReaderForSource (ARAAudi
 void _swap (float* ptr)
 {
     auto asIntPtr { reinterpret_cast<uint32_t*> (ptr) };
-    *asIntPtr = CFSwapInt32 (*asIntPtr);
+#if defined (_MSC_VER)
+    *asIntPtr = _byteswap_ulong (*asIntPtr);
+#elif defined (__GNUC__)
+    *asIntPtr = __builtin_bswap32 (*asIntPtr);
+#else
+    #error "not implemented for this compiler."
+#endif
 }
 void _swap (double* ptr)
 {
     auto asIntPtr { reinterpret_cast<uint64_t*> (ptr) };
-    *asIntPtr = CFSwapInt64 (*asIntPtr);
+#if defined (_MSC_VER)
+    *asIntPtr = _byteswap_uint64 (*asIntPtr);
+#elif defined (__GNUC__)
+    *asIntPtr = __builtin_bswap64 (*asIntPtr);
+#else
+    #error "not implemented for this compiler."
+#endif
 }
 
 template<typename FloatT>
@@ -86,9 +98,13 @@ ARABool _readAudioSamples (const IPCMessage& reply, ARASampleCount samplesPerCha
     else
         ARA_INTERNAL_ASSERT (decoded.dataCount == 0);
 
+#if defined (__APPLE__)    
     const auto endian { CFByteOrderGetCurrent () };
     ARA_INTERNAL_ASSERT (endian != CFByteOrderUnknown);
-    bool needSwap { endian != ((decoded.isLittleEndian != kARAFalse) ? CFByteOrderLittleEndian : CFByteOrderBigEndian) };
+    const bool needSwap { endian != ((decoded.isLittleEndian != kARAFalse) ? CFByteOrderLittleEndian : CFByteOrderBigEndian) };
+#else
+    const bool needSwap { false }; // std::endian c++20
+#endif
 
     auto sourcePtr = decoded.data;
     const auto channelSize { sizeof (FloatT) * static_cast<size_t> (samplesPerChannel) };
@@ -125,7 +141,8 @@ bool AudioAccessController::readAudioSamples (ARAAudioReaderHostRef audioReaderH
 
         const auto sampleSize { (remoteAudioReader->use64BitSamples != kARAFalse) ? sizeof (double) : sizeof (float) };
         const auto samplesPerChannel2 { samplesPerChannel - samplesPerChannel1 };
-        void* buffers2[remoteAudioReader->audioSource->channelCount];
+        void* buffers2[32];
+        ARA_INTERNAL_ASSERT(remoteAudioReader->audioSource->channelCount < 32);
         for (auto i { 0 }; i < remoteAudioReader->audioSource->channelCount; ++i)
             buffers2[i] = static_cast<uint8_t*> (buffers[i]) + static_cast<size_t> (samplesPerChannel1) * sampleSize;
 

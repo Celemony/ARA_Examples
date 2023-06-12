@@ -970,17 +970,22 @@ IPCMessage _readAudioSamples (DocumentController* documentController, HostAudioR
 {
     std::vector<ARAByte> bufferData;
     bufferData.resize (sizeof (FloatT) * static_cast<size_t> (reader->audioSource->_channelCount * samplesPerChannel));
-    void* sampleBuffers[reader->audioSource->_channelCount];
+    void* sampleBuffers[32];
+    ARA_INTERNAL_ASSERT(reader->audioSource->_channelCount < 32);
     for (auto i { 0 }; i < reader->audioSource->_channelCount; ++i)
         sampleBuffers[i] = bufferData.data () + sizeof (FloatT) * static_cast<size_t> (i * samplesPerChannel);
 
     const auto success { documentController->getHostAudioAccessController ()->readAudioSamples (reader->hostRef, samplePosition, samplesPerChannel, sampleBuffers) };
 
+#if defined (__APPLE__)    
     const auto endian { CFByteOrderGetCurrent () };
     ARA_INTERNAL_ASSERT (endian != CFByteOrderUnknown);
+    const auto needSwap { (endian == CFByteOrderLittleEndian) ? kARATrue : kARAFalse };
+#else
+    const auto needSwap { kARAFalse };
+#endif
     return encodeReply (ARAIPCReadSamplesReply { (success != kARAFalse) ? bufferData.size () : 0,
-                                                       (success != kARAFalse) ? bufferData.data () : nullptr,
-                                                       (endian == CFByteOrderLittleEndian) ? kARATrue : kARAFalse });
+                                                 (success != kARAFalse) ? bufferData.data () : nullptr, needSwap });
 }
 
 IPCMessage Factory::plugInCallbacksDispatcher (const int32_t messageID, const IPCMessage& message)

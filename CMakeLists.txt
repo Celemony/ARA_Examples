@@ -1535,8 +1535,8 @@ elseif(UNIX)
     )
 endif()
 
-# \todo IPC implementation is Apple-only at this point
-if(APPLE)
+# \todo add IPC implementation for Linux
+if(APPLE OR WIN32)
     target_sources(ARATestHost PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCEncoding.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCProxyHost.h"
@@ -1577,6 +1577,8 @@ if(ARA_SETUP_DEBUGGING)
     if(WIN32)
         # per default, test with VST3 example plug-in
         string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
+        # alternatively for testing with VST3 example plug-in in a remote process via IPC:
+        #string(APPEND ARATestHost_Dbg_Arguments "-ipc_vst3 ARATestPlugIn.vst3")
         # alternatively for testing with Melodyne VST3:
         #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{CommonProgramW6432}\\VST3\\Celemony\\Melodyne\\Melodyne.vst3\"")
         # alternatively for testing with JUCE_ARA VST3 example:

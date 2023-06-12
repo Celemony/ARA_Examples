@@ -32,6 +32,8 @@
 #endif
 #include "ExamplesCommon/PlugInHosting/VST3Loader.h"
 
+#include <codecvt>
+#include <locale>
 #include <memory>
 #include <string>
 #include <vector>
@@ -43,6 +45,10 @@
 
 #include "IPC/ARAIPCProxyHost.h"
 #include "IPC/ARAIPCProxyPlugIn.h"
+
+#if defined (__linux__)
+    #error "IPC not yet implemented for Linux"
+#endif
 
 // minimal set of commands to run a companion API plug-in through IPC
 enum
@@ -61,12 +67,42 @@ enum
 // helper function to create unique port IDs for each run
 static const std::string _createPortID ()
 {
+    std::string baseID { "com.arademocompany.TestHost.IPC." };
+
+#if defined (_WIN32)
+    std::string uniqueID;
+    GUID guid;
+    if (SUCCEEDED (::CoCreateGuid (&guid)))
+    {
+        LPOLESTR wszCLSID { nullptr };
+        if (SUCCEEDED (::StringFromCLSID (guid, &wszCLSID)))
+        {
+            if (lstrlenW (wszCLSID) == 38)
+            {
+                std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t> convert;
+#if (1900 <= _MSCVER) && (_MSCVER < 1920)
+                // Visual Studio 2015 and 2017 have a bug regarding linking, see
+                // https://stackoverflow.com/questions/32055357/visual-studio-c-2015-stdcodecvt-with-char16-t-or-char32-t
+                auto temp { reinterpret_cast<const wchar_t *> (wszCLSID) };
+                uniqueID = convert.to_bytes (temp + 1, temp + 37);
+#else
+                uniqueID = convert.to_bytes (wszCLSID + 1, wszCLSID + 37);
+#endif
+            }
+            ::CoTaskMemFree (wszCLSID);
+        }
+    }
+    ARA_INTERNAL_ASSERT (uniqueID.size () == 36);
+    return baseID + uniqueID;
+
+#elif defined (__APPLE__)
     CFUUIDRef uuid { CFUUIDCreate (kCFAllocatorDefault) };
     CFStringRef asString { CFUUIDCreateString(kCFAllocatorDefault, uuid) };
-    const auto result { std::string { "com.arademocompany.TestHost.IPC." } + CFStringGetCStringPtr (asString, kCFStringEncodingMacRoman) };
+    const auto result { baseID + CFStringGetCStringPtr (asString, kCFStringEncodingMacRoman) };
     CFRelease (asString);
     CFRelease (uuid);
     return result;
+#endif
 }
 
 #endif // ARA_ENABLE_IPC
@@ -291,8 +327,13 @@ private:
         explicit RemoteLauncher (const std::string& launchArgs, const std::string& hostCommandsPortID, const std::string& plugInCallbacksPortID)
         {
             ARA_LOG ("launching remote plug-in process.");
-            const auto commandLine { std:: string { "./ARATestHost " + launchArgs +
-                                                    " -_ipcRemote " + hostCommandsPortID + " " + plugInCallbacksPortID + " &" } };
+#if defined (_WIN32)
+            const auto commandLine { std::string { "start ARATestHost " + launchArgs +
+                                                   " -_ipcRemote " + hostCommandsPortID + " " + plugInCallbacksPortID  } };
+#else
+            const auto commandLine { std::string { "./ARATestHost " + launchArgs +
+                                                   " -_ipcRemote " + hostCommandsPortID + " " + plugInCallbacksPortID + " &" } };
+#endif
             const auto launchResult { system (commandLine.c_str ()) };
             ARA_INTERNAL_ASSERT (launchResult == 0);
         }
@@ -347,7 +388,7 @@ private:
         _plugInCallbacksPort = IPCPort::createPublishingID (_plugInCallbacksPortID.c_str (), &ARA::ProxyPlugIn::Factory::plugInCallbacksDispatcher);
 
         while (!_terminateCallbacksThread)
-            CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.05, false);
+            _plugInCallbacksPort.runReceiveLoop (100);
     }
 
 private:
@@ -395,6 +436,7 @@ public:
 /*******************************************************************************/
 
 std::unique_ptr<PlugInEntry> RemoteHost::_plugInEntry {};
+bool _shutDown { false };
 
 IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMessage& message)
 {
@@ -453,7 +495,7 @@ IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMe
     }
     else if (messageID == kIPCTerminate)
     {
-        CFRunLoopStop (CFRunLoopGetCurrent ()); // will terminate run loop & shut down
+        _shutDown = true;
         return {};
     }
     else
@@ -471,7 +513,8 @@ int RemoteHost::main (std::unique_ptr<PlugInEntry> plugInEntry, const std::strin
 
     ARA::ProxyHost::setupHostCommandHandler (_plugInEntry->getARAFactory (), &plugInCallbacksPort);
 
-    CFRunLoopRunInMode (kCFRunLoopDefaultMode, DBL_MAX, false);
+    while (!_shutDown)
+        hostCommandsPort.runReceiveLoop (100);
 
     _plugInEntry.reset ();
 
