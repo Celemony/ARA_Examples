@@ -131,7 +131,7 @@ DocumentController::DocumentController (IPCPort& port, const ARAFactory* factory
     ARAContentAccessControllerHostRef contentAccessControllerHostRef { toHostRef (this) };
     ARAModelUpdateControllerHostRef modelUpdateControllerHostRef { toHostRef (this) };
     ARAPlaybackControllerHostRef playbackControllerHostRef { toHostRef (this) };
-    remoteCallWithReply (_remoteRef, kCreateDocumentControllerMethodID, _factory->factoryID,
+    remoteCallWithReply (_remoteRef, kCreateDocumentControllerMessageID, _factory->factoryID,
                           audioAccessControllerHostRef, archivingControllerHostRef,
                           (_hostContentAccessController.isProvided ()) ? kARATrue : kARAFalse, contentAccessControllerHostRef,
                           (_hostModelUpdateController.isProvided ()) ? kARATrue : kARAFalse, modelUpdateControllerHostRef,
@@ -944,7 +944,7 @@ std::vector<Factory> Factory::_factories {};
 size_t Factory::initializeFactories (IPCPort& hostCommandsPort)
 {
     size_t count;
-    ARA::ARAIPCMessageSender (hostCommandsPort).remoteCallWithReply (count, kGetFactoriesCountMethodID);
+    ARA::ARAIPCMessageSender (hostCommandsPort).remoteCallWithReply (count, kGetFactoriesCountMessageID);
     ARA_INTERNAL_ASSERT (count > 0);
 
     _factories.reserve (count);
@@ -958,7 +958,7 @@ Factory::Factory (IPCPort& hostCommandsPort, size_t index)
 {
     // keep local copy of message before decoding it so that all pointer data remains valid until properly copied
     IPCMessage reply;
-    ARA::ARAIPCMessageSender (_hostCommandsPort).remoteCallWithReply (reply, kGetFactoryMethodID, index);
+    ARA::ARAIPCMessageSender (_hostCommandsPort).remoteCallWithReply (reply, kGetFactoryMessageID, index);
     decodeReply (_factory, reply);
 
     ARA_VALIDATE_API_ARGUMENT(&_factory, _factory.highestSupportedApiGeneration >= kARAAPIGeneration_2_0_Final);
@@ -1044,7 +1044,7 @@ std::unique_ptr<PlugInExtension> Factory::createPlugInExtension (size_t remoteEx
 
 IPCMessage Factory::plugInCallbacksDispatcher (const int32_t messageID, const IPCMessage& message)
 {
-//  ARA_LOG ("_plugInCallbackDispatcher received message %s", decodeHostMethodID (messageID));
+//  ARA_LOG ("_plugInCallbackDispatcher received message %s", decodeHostMessageID (messageID));
 
     // ARAAudioAccessControllerInterface
     if (messageID == ARA_IPC_HOST_METHOD_ID (ARAAudioAccessControllerInterface, createAudioReaderForSource))
