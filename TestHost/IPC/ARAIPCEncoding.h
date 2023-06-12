@@ -98,9 +98,6 @@ struct _IsStructPointerArg
 //------------------------------------------------------------------------------
 // private primitive wrappers for IPCMessage API that drop the type encoding
 // from the name (which is required there for potential C compatibility)
-// \todo we might choose to use overloads on IPCMessage and just add the
-//       type encoding to the function names in the C wrapper,
-//       which would allow to just drop these wrappers here.
 //------------------------------------------------------------------------------
 
 
@@ -174,6 +171,28 @@ inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, I
 
 
 //------------------------------------------------------------------------------
+// templated overloads of the IPCMessage primitives for ARA (host) ref types,
+// which are stored as size_t
+//------------------------------------------------------------------------------
+
+template<typename T, typename std::enable_if<_IsRefType<T>::value, bool>::type = true>
+inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const T argValue)
+{
+    message.appendSize (argKey, reinterpret_cast<size_t> (argValue));
+}
+template<typename T, typename std::enable_if<_IsRefType<T>::value, bool>::type = true>
+inline bool _readFromMessage (const IPCMessage& message, const int32_t argKey, T& argValue)
+{
+    // \todo is there a safe/proper way across all compilers for this cast to avoid the copy?
+//  return message.readSize (argKey, *reinterpret_cast<size_t*> (&argValue));
+    size_t tmp;
+    const auto success { message.readSize (argKey, tmp) };
+    argValue = reinterpret_cast<T> (tmp);
+    return success;
+}
+
+
+//------------------------------------------------------------------------------
 // private helper templates to encode ARA API values as IPCMessage data and decode back
 // mapping is 1:1 except for ARA (host)refs which are encoded as size_t and aggregate types
 // (i.e. ARA structs or std::vector<> of types other than ARAByte), which are encoded as sub-messages
@@ -191,19 +210,14 @@ std::pair<ArgT, bool> _decodeOptionalValue (const IPCMessage& message, const int
 
 
 // generic type encodings
-template<typename T, typename std::enable_if<!_IsRefType<T>::value, bool>::type = true>
-inline T _encodeValue (const T& value)      // overload for basic types (numbers, strings) and raw bytes
+template<typename T>
+inline const T& _encodeValue (const T& value)   // overloads for basic types (numbers, strings, (host)refs and raw bytes)
 {
     return value;
 }
-template<typename T, typename std::enable_if<_IsRefType<T>::value, bool>::type = true>
-inline size_t _encodeValue (T value)        // overload for ref types
-{
-    return reinterpret_cast<size_t> (value);
-}
 template<typename ElementT, typename std::enable_if<!std::is_same<ElementT, uint8_t>::value, bool>::type = true>
 inline IPCMessage _encodeValue (const std::vector<ElementT>& value)
-{                                           // overload for arrays
+{                                           // overloads for arrays
     IPCMessage result;
     ARA_INTERNAL_ASSERT (value.size () < static_cast<size_t> (std::numeric_limits<int32_t>::max ()));
     const auto count { static_cast<int32_t> (value.size ()) };
@@ -218,23 +232,10 @@ inline IPCMessage _encodeValue (const std::vector<ElementT>& value)
 template<typename ValueT>                   // primary template for basic types (numbers, strings) and ref types
 struct _ValueDecoder
 {
-private:
-    template<typename RetT, typename ArgT, typename std::enable_if<std::is_same<RetT, ArgT>::value, bool>::type = true>
-    static inline RetT _convertValue (const ArgT& value)
+    using EncodedType = ValueT;
+    static inline const ValueT& decode (const EncodedType& value)
     {
         return value;
-    }
-    template<typename RetT, typename ArgT, typename std::enable_if<_IsRefType<RetT>::value, bool>::type = true>
-    static inline RetT _convertValue (const ArgT& value)
-    {
-        return reinterpret_cast<RetT> (value);
-    }
-
-public:
-    using EncodedType = typename std::conditional<_IsRefType<ValueT>::value, size_t, ValueT>::type;
-    static inline ValueT decode (const EncodedType& value)
-    {
-        return _ValueDecoder::_convertValue<ValueT, EncodedType> (value);
     }
 };
 
