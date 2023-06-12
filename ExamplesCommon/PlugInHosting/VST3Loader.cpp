@@ -24,8 +24,6 @@
     #define DEVELOPMENT 1
 #endif
 
-#define INIT_CLASS_IID
-
 #include "ARA_API/ARAVST3.h"
 #include "ARA_Library/Debug/ARADebug.h"
 
@@ -36,7 +34,11 @@ ARA_DISABLE_VST3_WARNINGS_BEGIN
 #include "pluginterfaces/vst/ivstprocesscontext.h"
 ARA_DISABLE_VST3_WARNINGS_END
 
-#undef INIT_CLASS_IID
+DEF_CLASS_IID (Steinberg::Vst::IComponent)
+DEF_CLASS_IID (Steinberg::Vst::IAudioProcessor)
+DEF_CLASS_IID (ARA::IMainFactory)
+DEF_CLASS_IID (ARA::IPlugInEntryPoint)
+DEF_CLASS_IID (ARA::IPlugInEntryPoint2)
 
 #include <cstring>
 #include <string>

@@ -312,7 +312,7 @@ endif()
 add_subdirectory("${ARA_VST3_SDK_DIR}" "${PROJECT_BINARY_DIR}/vst3sdk" EXCLUDE_FROM_ALL)
 
 set_target_properties(base cmake_modules cmake_VST_modules pluginterfaces sdk_hosting sdk_common sdk validator PROPERTIES
-    FOLDER "CompanionAPIs/vst3sdk"
+    FOLDER "3rdParty/vst3sdk"
     XCODE_GENERATE_SCHEME OFF
     XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
 )
@@ -431,7 +431,7 @@ if(APPLE)
 
     set_target_properties(AudioUnitSDK PROPERTIES
         CXX_STANDARD 17
-        FOLDER "CompanionAPIs"
+        FOLDER "3rdParty"
         XCODE_GENERATE_SCHEME OFF
         XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
     )
@@ -1053,10 +1053,18 @@ add_library(ARAExamplesCommon ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
     "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/AudioFiles/AudioFiles.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/SignalProcessing/PulsedSineSignal.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/SignalProcessing/PulsedSineSignal.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/VST3Loader.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/VST3Loader.cpp"
 )
+if(APPLE)
+    target_sources(ARAExamplesCommon PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/AudioUnitLoader.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/AudioUnitLoader.m"
+    )
+endif()
 
 set_target_properties(ARAExamplesCommon PROPERTIES
-    FOLDER "ExamplesCommon"
+    FOLDER "Examples"
     XCODE_GENERATE_SCHEME OFF
 )
 
@@ -1066,11 +1074,26 @@ target_link_libraries(ARAExamplesCommon PUBLIC
     pugixml
 )
 
+if(APPLE)
+    target_link_libraries(ARAExamplesCommon PUBLIC
+        "-framework CoreServices"
+        "-framework AVFoundation"
+        "-framework AudioUnit"
+        "-framework AudioToolbox"
+    )
+elseif(UNIX)
+    target_link_libraries(ARAExamplesCommon PUBLIC
+        "m"
+        "dl"
+    )
+endif()
+
 target_include_directories(ARAExamplesCommon
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}"
     PRIVATE
         "${ARA_LIBRARY_DIR}/.."
+        "${ARA_VST3_SDK_DIR}"
 )
 
 configure_ARA_Examples_target(ARAExamplesCommon)
@@ -1094,7 +1117,7 @@ add_library(ARATestPlugInCommon ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
 )
 
 set_target_properties(ARATestPlugInCommon PROPERTIES
-    FOLDER "Plug-In Examples/ARATestPlugIn"
+    FOLDER "Examples/ARATestPlugIn"
     XCODE_GENERATE_SCHEME OFF
 )
 
@@ -1127,7 +1150,7 @@ target_sources(ARATestPlugInVST3 PRIVATE
 )
 
 set_target_properties(ARATestPlugInVST3 PROPERTIES
-    FOLDER "Plug-In Examples/ARATestPlugIn"
+    FOLDER "Examples/ARATestPlugIn"
     OUTPUT_NAME "ARATestPlugIn"
 )
 
@@ -1193,7 +1216,7 @@ if(APPLE)
 
     set_target_properties(ARATestPlugInAudioUnit PROPERTIES
         CXX_STANDARD 17
-        FOLDER "Plug-In Examples/ARATestPlugIn"
+        FOLDER "Examples/ARATestPlugIn"
         OUTPUT_NAME "ARATestPlugIn"
     )
 
@@ -1250,7 +1273,7 @@ if(APPLE)
     )
 
     set_target_properties(ARATestPlugInAUv3Framework PROPERTIES
-        FOLDER "Plug-In Examples/ARATestPlugIn/ARATestPlugInAUv3"
+        FOLDER "Examples/ARATestPlugIn/ARATestPlugInAUv3"
         OUTPUT_NAME "ARATestPlugInAUv3"
         XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
         XCODE_ATTRIBUTE_APPLICATION_EXTENSION_API_ONLY YES
@@ -1288,7 +1311,7 @@ if(APPLE)
     )
 
     set_target_properties(ARATestPlugInAUv3Extension PROPERTIES
-        FOLDER "Plug-In Examples/ARATestPlugIn/ARATestPlugInAUv3"
+        FOLDER "Examples/ARATestPlugIn/ARATestPlugInAUv3"
         OUTPUT_NAME "ARATestPlugInAUv3"
         XCODE_PRODUCT_TYPE com.apple.product-type.app-extension
         XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
@@ -1327,7 +1350,7 @@ if(APPLE)
     )
 
     set_target_properties(ARATestPlugInAUv3App PROPERTIES
-        FOLDER "Plug-In Examples/ARATestPlugIn/ARATestPlugInAUv3"
+        FOLDER "Examples/ARATestPlugIn/ARATestPlugInAUv3"
         OUTPUT_NAME "ARATestPlugInAUv3"
         XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
         XCODE_EMBED_APP_EXTENSIONS ARATestPlugInAUv3Extension
@@ -1387,7 +1410,7 @@ add_executable(ARATestChunkWriter
 )
 
 set_target_properties(ARATestChunkWriter PROPERTIES
-    FOLDER "Plug-In Examples/ARATestPlugIn"
+    FOLDER "Examples/ARATestPlugIn"
 )
 
 target_link_libraries(ARATestChunkWriter PRIVATE
@@ -1413,50 +1436,6 @@ endif()
 
 
 # ======================
-# plug-in hosting code shared between the multiple host applications
-
-add_library(ARAPlugInHosting ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
-    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/VST3Loader.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/VST3Loader.cpp"
-)
-if(APPLE)
-    target_sources(ARAPlugInHosting PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/AudioUnitLoader.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/AudioUnitLoader.m"
-    )
-endif()
-
-set_target_properties(ARAPlugInHosting PROPERTIES
-    FOLDER "Host Examples"
-    XCODE_GENERATE_SCHEME OFF
-)
-
-target_include_directories(ARAPlugInHosting PRIVATE
-        "${ARA_VST3_SDK_DIR}"
-)
-
-target_link_libraries(ARAPlugInHosting PUBLIC
-    ARA_Host_Library
-    ARAExamplesCommon
-)
-if(APPLE)
-    target_link_libraries(ARAPlugInHosting PUBLIC
-        "-framework CoreServices"
-        "-framework AVFoundation"
-        "-framework AudioUnit"
-        "-framework AudioToolbox"
-    )
-elseif(UNIX)
-    target_link_libraries(ARAPlugInHosting PUBLIC
-        "m"
-        "dl"
-    )
-endif()
-
-configure_ARA_Examples_target(ARAPlugInHosting)
-
-
-# ======================
 # command line tool target Mini Host (C only)
 
 add_executable(ARAMiniHost
@@ -1464,13 +1443,14 @@ add_executable(ARAMiniHost
 )
 
 set_target_properties(ARAMiniHost PROPERTIES
-    FOLDER "Host Examples"
     LINKER_LANGUAGE C
+    FOLDER "Examples"
 )
 
 target_link_libraries(ARAMiniHost PRIVATE
     ARA_API
-    ARAPlugInHosting
+    ARAExamplesCommon
+    ARA_Host_Library
 )
 
 target_compile_definitions(ARAMiniHost PRIVATE
@@ -1534,7 +1514,7 @@ add_executable(ARATestHost
 )
 
 set_target_properties(ARATestHost PROPERTIES
-    FOLDER "Host Examples"
+    FOLDER "Examples"
 )
 
 target_include_directories(ARATestHost PRIVATE
@@ -1542,8 +1522,8 @@ target_include_directories(ARATestHost PRIVATE
 )
 
 target_link_libraries(ARATestHost PRIVATE
-    ARAPlugInHosting
     ARAExamplesCommon
+    ARA_Host_Library
 )
 if(APPLE)
     target_link_libraries(ARATestHost PRIVATE
