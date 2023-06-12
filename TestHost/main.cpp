@@ -30,8 +30,8 @@
 // On macOS, Audio Units can also be tested:
 // ./ARATestHost -au [type] [subType] [manufacturer] -test [TestCase(s)] -file [AudioFile(s)]
 //
-// The Audio Unit version also supports running the plug-in in a separate process, connected via IPC,
-// by specifying `-ipc_au` instead of `-au`.
+// The macOS version also supports running the plug-in in a separate process, connected via IPC,
+// by specifying `-ipc_vst3` or `-ipc_au` instead of `-vst3` or `-au`.
 //
 // If the optional `-test` argument is not supplied, all test cases will be run.
 // See implementation of main() at the end of this file for a list of available test cases.
@@ -145,6 +145,7 @@ int main (int argc, const char* argv[])
     if (!plugInEntry)
     {
         ARA_LOG ("No plug-in binary specified via -vst3 [binaryFilePath].");
+        ARA_LOG ("No plug-in binary specified via -ipc_vst3 [binaryFilePath].");
 #if defined (__APPLE__)
         ARA_LOG ("No plug-in binary specified via -au [typeID] [subTypeID] [manufacturerID].");
 #if ARA_ENABLE_IPC

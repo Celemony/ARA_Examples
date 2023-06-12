@@ -1584,6 +1584,8 @@ if(ARA_SETUP_DEBUGGING)
     elseif(APPLE)
         # per default, test with VST3 example plug-in
         string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
+        # alternatively for testing with VST3 example plug-in in a remote process via IPC:
+        #string(APPEND ARATestHost_Dbg_Arguments "-ipc_vst3 ARATestPlugIn.vst3")
         # alternatively for testing with Audio Unit example plug-in:
         #string(APPEND ARATestHost_Dbg_Arguments "-au aufx AraT ADeC")
         # alternatively for testing with Audio Unit example plug-in in a remote process via IPC:
