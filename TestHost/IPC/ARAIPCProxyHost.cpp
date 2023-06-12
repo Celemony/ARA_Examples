@@ -96,7 +96,7 @@ ARAAudioReaderHostRef AudioAccessController::createAudioReaderForSource (ARAAudi
         remoteAudioReader->swapFunction = nullptr;
     else
         remoteAudioReader->swapFunction = (use64BitSamples) ? &_swapBuffer<double> : &_swapBuffer<float>;
-    remoteCallWithReply (remoteAudioReader->mainHostRef, HOST_METHOD_ID (ARAAudioAccessControllerInterface, createAudioReaderForSource), _remoteHostRef, remoteAudioReader->audioSource->mainHostRef, use64BitSamples);
+    remoteCallWithReply (remoteAudioReader->mainHostRef, ARA_IPC_HOST_METHOD_ID (ARAAudioAccessControllerInterface, createAudioReaderForSource), _remoteHostRef, remoteAudioReader->audioSource->mainHostRef, use64BitSamples);
     return toHostRef (remoteAudioReader);
 }
 
@@ -132,7 +132,7 @@ bool AudioAccessController::readAudioSamples (ARAAudioReaderHostRef audioReaderH
 
     // local message copy to deal with float data memory ownership
     IPCMessage replyMsg;
-    remoteCallWithReply (replyMsg, HOST_METHOD_ID (ARAAudioAccessControllerInterface, readAudioSamples),
+    remoteCallWithReply (replyMsg, ARA_IPC_HOST_METHOD_ID (ARAAudioAccessControllerInterface, readAudioSamples),
                         _remoteHostRef, remoteAudioReader->mainHostRef, samplePosition, samplesPerChannel);
 
     const auto bufferSize { remoteAudioReader->sampleSize * static_cast<size_t> (samplesPerChannel) };
@@ -170,7 +170,7 @@ bool AudioAccessController::readAudioSamples (ARAAudioReaderHostRef audioReaderH
 void AudioAccessController::destroyAudioReader (ARAAudioReaderHostRef audioReaderHostRef) noexcept
 {
     auto remoteAudioReader { fromHostRef (audioReaderHostRef) };
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAAudioAccessControllerInterface, destroyAudioReader), _remoteHostRef, remoteAudioReader->mainHostRef);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAAudioAccessControllerInterface, destroyAudioReader), _remoteHostRef, remoteAudioReader->mainHostRef);
     delete remoteAudioReader;
 }
 
@@ -179,7 +179,7 @@ void AudioAccessController::destroyAudioReader (ARAAudioReaderHostRef audioReade
 ARASize ArchivingController::getArchiveSize (ARAArchiveReaderHostRef archiveReaderHostRef) noexcept
 {
     ARASize size;
-    remoteCallWithReply (size, HOST_METHOD_ID (ARAArchivingControllerInterface, getArchiveSize), _remoteHostRef, archiveReaderHostRef);
+    remoteCallWithReply (size, ARA_IPC_HOST_METHOD_ID (ARAArchivingControllerInterface, getArchiveSize), _remoteHostRef, archiveReaderHostRef);
     return size;
 }
 
@@ -206,7 +206,7 @@ bool ArchivingController::readBytesFromArchive (ARAArchiveReaderHostRef archiveR
 
     auto resultLength { length };
     BytesDecoder writer { buffer, resultLength };
-    remoteCallWithReply (writer, HOST_METHOD_ID (ARAArchivingControllerInterface, readBytesFromArchive),
+    remoteCallWithReply (writer, ARA_IPC_HOST_METHOD_ID (ARAArchivingControllerInterface, readBytesFromArchive),
                         _remoteHostRef, archiveReaderHostRef, position, length);
     if (resultLength == length)
     {
@@ -240,26 +240,26 @@ bool ArchivingController::writeBytesToArchive (ARAArchiveWriterHostRef archiveWr
     }
 
     ARABool success;
-    remoteCallWithReply (success, HOST_METHOD_ID (ARAArchivingControllerInterface, writeBytesToArchive),
+    remoteCallWithReply (success, ARA_IPC_HOST_METHOD_ID (ARAArchivingControllerInterface, writeBytesToArchive),
                         _remoteHostRef, archiveWriterHostRef, position, BytesEncoder { buffer, length, false });
     return (success != kARAFalse);
 }
 
 void ArchivingController::notifyDocumentArchivingProgress (float value) noexcept
 {
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAArchivingControllerInterface, notifyDocumentArchivingProgress), _remoteHostRef, value);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAArchivingControllerInterface, notifyDocumentArchivingProgress), _remoteHostRef, value);
 }
 
 void ArchivingController::notifyDocumentUnarchivingProgress (float value) noexcept
 {
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAArchivingControllerInterface, notifyDocumentUnarchivingProgress), _remoteHostRef, value);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAArchivingControllerInterface, notifyDocumentUnarchivingProgress), _remoteHostRef, value);
 }
 
 ARAPersistentID ArchivingController::getDocumentArchiveID (ARAArchiveReaderHostRef archiveReaderHostRef) noexcept
 {
     // local message copy to deal with string memory ownership
     IPCMessage replyMsg;
-    remoteCallWithReply (replyMsg, HOST_METHOD_ID (ARAArchivingControllerInterface, getDocumentArchiveID), _remoteHostRef, archiveReaderHostRef);
+    remoteCallWithReply (replyMsg, ARA_IPC_HOST_METHOD_ID (ARAArchivingControllerInterface, getDocumentArchiveID), _remoteHostRef, archiveReaderHostRef);
     ARAPersistentID persistentID;
     decodeReply (persistentID, replyMsg);
     _archiveID.assign (persistentID);
@@ -271,7 +271,7 @@ ARAPersistentID ArchivingController::getDocumentArchiveID (ARAArchiveReaderHostR
 bool ContentAccessController::isMusicalContextContentAvailable (ARAMusicalContextHostRef musicalContextHostRef, ARAContentType type) noexcept
 {
     ARABool result;
-    remoteCallWithReply (result, HOST_METHOD_ID (ARAContentAccessControllerInterface, isMusicalContextContentAvailable),
+    remoteCallWithReply (result, ARA_IPC_HOST_METHOD_ID (ARAContentAccessControllerInterface, isMusicalContextContentAvailable),
                         _remoteHostRef, musicalContextHostRef, type);
     return (result != kARAFalse);
 }
@@ -279,7 +279,7 @@ bool ContentAccessController::isMusicalContextContentAvailable (ARAMusicalContex
 ARAContentGrade ContentAccessController::getMusicalContextContentGrade (ARAMusicalContextHostRef musicalContextHostRef, ARAContentType type) noexcept
 {
     ARAContentGrade grade;
-    remoteCallWithReply (grade, HOST_METHOD_ID (ARAContentAccessControllerInterface, getMusicalContextContentGrade),
+    remoteCallWithReply (grade, ARA_IPC_HOST_METHOD_ID (ARAContentAccessControllerInterface, getMusicalContextContentGrade),
                         _remoteHostRef, musicalContextHostRef, type);
     return grade;
 }
@@ -287,7 +287,7 @@ ARAContentGrade ContentAccessController::getMusicalContextContentGrade (ARAMusic
 ARAContentReaderHostRef ContentAccessController::createMusicalContextContentReader (ARAMusicalContextHostRef musicalContextHostRef, ARAContentType type, const ARAContentTimeRange* range) noexcept
 {
     ARAContentReaderHostRef contentReaderHostRef;
-    remoteCallWithReply (contentReaderHostRef, HOST_METHOD_ID (ARAContentAccessControllerInterface, createMusicalContextContentReader),
+    remoteCallWithReply (contentReaderHostRef, ARA_IPC_HOST_METHOD_ID (ARAContentAccessControllerInterface, createMusicalContextContentReader),
                         _remoteHostRef, musicalContextHostRef, type, range);
     auto contentReader { new RemoteHostContentReader { contentReaderHostRef, type } };
     return toHostRef (contentReader);
@@ -296,7 +296,7 @@ ARAContentReaderHostRef ContentAccessController::createMusicalContextContentRead
 bool ContentAccessController::isAudioSourceContentAvailable (ARAAudioSourceHostRef audioSourceHostRef, ARAContentType type) noexcept
 {
     ARABool result;
-    remoteCallWithReply (result, HOST_METHOD_ID (ARAContentAccessControllerInterface, isAudioSourceContentAvailable),
+    remoteCallWithReply (result, ARA_IPC_HOST_METHOD_ID (ARAContentAccessControllerInterface, isAudioSourceContentAvailable),
                         _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, type);
     return (result != kARAFalse);
 }
@@ -304,7 +304,7 @@ bool ContentAccessController::isAudioSourceContentAvailable (ARAAudioSourceHostR
 ARAContentGrade ContentAccessController::getAudioSourceContentGrade (ARAAudioSourceHostRef audioSourceHostRef, ARAContentType type) noexcept
 {
     ARAContentGrade grade;
-    remoteCallWithReply (grade, HOST_METHOD_ID (ARAContentAccessControllerInterface, getAudioSourceContentGrade),
+    remoteCallWithReply (grade, ARA_IPC_HOST_METHOD_ID (ARAContentAccessControllerInterface, getAudioSourceContentGrade),
                         _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, type);
     return grade;
 }
@@ -312,7 +312,7 @@ ARAContentGrade ContentAccessController::getAudioSourceContentGrade (ARAAudioSou
 ARAContentReaderHostRef ContentAccessController::createAudioSourceContentReader (ARAAudioSourceHostRef audioSourceHostRef, ARAContentType type, const ARAContentTimeRange* range) noexcept
 {
     ARAContentReaderHostRef contentReaderHostRef;
-    remoteCallWithReply (contentReaderHostRef, HOST_METHOD_ID (ARAContentAccessControllerInterface, createAudioSourceContentReader),
+    remoteCallWithReply (contentReaderHostRef, ARA_IPC_HOST_METHOD_ID (ARAContentAccessControllerInterface, createAudioSourceContentReader),
                         _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, type, range);
     auto contentReader { new RemoteHostContentReader { contentReaderHostRef, type } };
     return toHostRef (contentReader);
@@ -322,7 +322,7 @@ ARAInt32 ContentAccessController::getContentReaderEventCount (ARAContentReaderHo
 {
     const auto contentReader { fromHostRef (contentReaderHostRef) };
     ARAInt32 count;
-    remoteCallWithReply (count, HOST_METHOD_ID (ARAContentAccessControllerInterface, getContentReaderEventCount),
+    remoteCallWithReply (count, ARA_IPC_HOST_METHOD_ID (ARAContentAccessControllerInterface, getContentReaderEventCount),
                         _remoteHostRef, contentReader->remoteHostRef);
     return count;
 }
@@ -331,7 +331,7 @@ const void* ContentAccessController::getContentReaderDataForEvent (ARAContentRea
 {
     const auto contentReader { fromHostRef (contentReaderHostRef) };
     IPCMessage reply;
-    remoteCallWithReply (reply, HOST_METHOD_ID (ARAContentAccessControllerInterface, getContentReaderDataForEvent),
+    remoteCallWithReply (reply, ARA_IPC_HOST_METHOD_ID (ARAContentAccessControllerInterface, getContentReaderDataForEvent),
                         _remoteHostRef, contentReader->remoteHostRef, eventIndex);
     return contentReader->decoder.decode (reply);
 }
@@ -339,7 +339,7 @@ const void* ContentAccessController::getContentReaderDataForEvent (ARAContentRea
 void ContentAccessController::destroyContentReader (ARAContentReaderHostRef contentReaderHostRef) noexcept
 {
     const auto contentReader { fromHostRef (contentReaderHostRef) };
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAContentAccessControllerInterface, destroyContentReader), _remoteHostRef, contentReader->remoteHostRef);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAContentAccessControllerInterface, destroyContentReader), _remoteHostRef, contentReader->remoteHostRef);
     delete contentReader;
 }
 
@@ -347,49 +347,49 @@ void ContentAccessController::destroyContentReader (ARAContentReaderHostRef cont
 
 void ModelUpdateController::notifyAudioSourceAnalysisProgress (ARAAudioSourceHostRef audioSourceHostRef, ARAAnalysisProgressState state, float value) noexcept
 {
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAModelUpdateControllerInterface, notifyAudioSourceAnalysisProgress), _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, state, value);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAModelUpdateControllerInterface, notifyAudioSourceAnalysisProgress), _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, state, value);
 }
 
 void ModelUpdateController::notifyAudioSourceContentChanged (ARAAudioSourceHostRef audioSourceHostRef, const ARAContentTimeRange* range, ContentUpdateScopes scopeFlags) noexcept
 {
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAModelUpdateControllerInterface, notifyAudioSourceContentChanged), _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, range, scopeFlags);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAModelUpdateControllerInterface, notifyAudioSourceContentChanged), _remoteHostRef, fromHostRef (audioSourceHostRef)->mainHostRef, range, scopeFlags);
 }
 
 void ModelUpdateController::notifyAudioModificationContentChanged (ARAAudioModificationHostRef audioModificationHostRef, const ARAContentTimeRange* range, ContentUpdateScopes scopeFlags) noexcept
 {
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAModelUpdateControllerInterface, notifyAudioModificationContentChanged), _remoteHostRef, audioModificationHostRef, range, scopeFlags);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAModelUpdateControllerInterface, notifyAudioModificationContentChanged), _remoteHostRef, audioModificationHostRef, range, scopeFlags);
 }
 
 void ModelUpdateController::notifyPlaybackRegionContentChanged (ARAPlaybackRegionHostRef playbackRegionHostRef, const ARAContentTimeRange* range, ContentUpdateScopes scopeFlags) noexcept
 {
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAModelUpdateControllerInterface, notifyPlaybackRegionContentChanged), _remoteHostRef, playbackRegionHostRef, range, scopeFlags);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAModelUpdateControllerInterface, notifyPlaybackRegionContentChanged), _remoteHostRef, playbackRegionHostRef, range, scopeFlags);
 }
 
 /*******************************************************************************/
 
 void PlaybackController::requestStartPlayback () noexcept
 {
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAPlaybackControllerInterface, requestStartPlayback), _remoteHostRef);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAPlaybackControllerInterface, requestStartPlayback), _remoteHostRef);
 }
 
 void PlaybackController::requestStopPlayback () noexcept
 {
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAPlaybackControllerInterface, requestStopPlayback), _remoteHostRef);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAPlaybackControllerInterface, requestStopPlayback), _remoteHostRef);
 }
 
 void PlaybackController::requestSetPlaybackPosition (ARATimePosition timePosition) noexcept
 {
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAPlaybackControllerInterface, requestSetPlaybackPosition), _remoteHostRef, timePosition);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAPlaybackControllerInterface, requestSetPlaybackPosition), _remoteHostRef, timePosition);
 }
 
 void PlaybackController::requestSetCycleRange (ARATimePosition startTime, ARATimeDuration duration) noexcept
 {
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAPlaybackControllerInterface, requestSetCycleRange), _remoteHostRef, startTime, duration);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAPlaybackControllerInterface, requestSetCycleRange), _remoteHostRef, startTime, duration);
 }
 
 void PlaybackController::requestEnableCycle (bool enable) noexcept
 {
-    remoteCallWithoutReply (HOST_METHOD_ID (ARAPlaybackControllerInterface, requestEnableCycle), _remoteHostRef, (enable) ? kARATrue : kARAFalse);
+    remoteCallWithoutReply (ARA_IPC_HOST_METHOD_ID (ARAPlaybackControllerInterface, requestEnableCycle), _remoteHostRef, (enable) ? kARATrue : kARAFalse);
 }
 
 /*******************************************************************************/
@@ -475,7 +475,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
     }
 
     //ARADocumentControllerInterface
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyDocumentController))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyDocumentController))
     {
         ARADocumentControllerRef controllerRef;
         decodeArguments (message, controllerRef);
@@ -490,7 +490,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         delete documentController->getHostInstance ();
         delete documentController;
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getFactory))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, getFactory))
     {
         ARA_INTERNAL_ASSERT (false && "should never be queried here but instead cached from companion API upon setup");
 
@@ -500,21 +500,21 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         return encodeReply (*(fromRef (controllerRef)->getFactory ()));
     }
 
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, beginEditing))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, beginEditing))
     {
         ARADocumentControllerRef controllerRef;
         decodeArguments (message, controllerRef);
 
         fromRef (controllerRef)->beginEditing ();
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, endEditing))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, endEditing))
     {
         ARADocumentControllerRef controllerRef;
         decodeArguments (message, controllerRef);
 
         fromRef (controllerRef)->endEditing ();
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, notifyModelUpdates))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, notifyModelUpdates))
     {
         ARADocumentControllerRef controllerRef;
         decodeArguments (message, controllerRef);
@@ -522,7 +522,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         fromRef (controllerRef)->notifyModelUpdates ();
     }
 
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, restoreObjectsFromArchive))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, restoreObjectsFromArchive))
     {
         ARADocumentControllerRef controllerRef;
         ARAArchiveReaderHostRef archiveReaderHostRef;
@@ -531,7 +531,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->restoreObjectsFromArchive (archiveReaderHostRef, (filter.second) ? &filter.first : nullptr) ? kARATrue : kARAFalse);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, storeObjectsToArchive))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, storeObjectsToArchive))
     {
         ARADocumentControllerRef controllerRef;
         ARAArchiveWriterHostRef archiveWriterHostRef;
@@ -551,7 +551,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         return encodeReply (fromRef (controllerRef)->storeObjectsToArchive (archiveWriterHostRef, (filter.second) ? &filter.first : nullptr) ? kARATrue : kARAFalse);
     }
 
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateDocumentProperties))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateDocumentProperties))
     {
         ARADocumentControllerRef controllerRef;
         ARADocumentProperties properties;
@@ -560,7 +560,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         fromRef (controllerRef)->updateDocumentProperties (&properties);
     }
 
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, createMusicalContext))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, createMusicalContext))
     {
         ARADocumentControllerRef controllerRef;
         ARAMusicalContextHostRef hostRef;
@@ -569,7 +569,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->createMusicalContext (hostRef, &properties));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateMusicalContextProperties))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateMusicalContextProperties))
     {
         ARADocumentControllerRef controllerRef;
         ARAMusicalContextRef musicalContextRef;
@@ -578,7 +578,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (controllerRef)->updateMusicalContextProperties (musicalContextRef, &properties);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateMusicalContextContent))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateMusicalContextContent))
     {
         ARADocumentControllerRef controllerRef;
         ARAMusicalContextRef musicalContextRef;
@@ -588,7 +588,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (controllerRef)->updateMusicalContextContent (musicalContextRef, (range.second) ? &range.first : nullptr, flags);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyMusicalContext))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyMusicalContext))
     {
         ARADocumentControllerRef controllerRef;
         ARAMusicalContextRef musicalContextRef;
@@ -597,7 +597,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         fromRef (controllerRef)->destroyMusicalContext (musicalContextRef);
     }
 
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, createRegionSequence))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, createRegionSequence))
     {
         ARADocumentControllerRef controllerRef;
         ARARegionSequenceHostRef hostRef;
@@ -606,7 +606,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->createRegionSequence (hostRef, &properties));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateRegionSequenceProperties))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateRegionSequenceProperties))
     {
         ARADocumentControllerRef controllerRef;
         ARARegionSequenceRef regionSequenceRef;
@@ -615,7 +615,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (controllerRef)->updateRegionSequenceProperties (regionSequenceRef, &properties);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyRegionSequence))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyRegionSequence))
     {
         ARADocumentControllerRef controllerRef;
         ARARegionSequenceRef regionSequenceRef;
@@ -624,7 +624,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         fromRef (controllerRef)->destroyRegionSequence (regionSequenceRef);
     }
 
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioSource))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioSource))
     {
         auto remoteAudioSource { new RemoteAudioSource };
 
@@ -637,7 +637,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (ARAAudioSourceRef { toRef (remoteAudioSource) });
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateAudioSourceProperties))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateAudioSourceProperties))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -646,7 +646,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (controllerRef)->updateAudioSourceProperties (fromRef (audioSourceRef)->plugInRef, &properties);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateAudioSourceContent))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateAudioSourceContent))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -656,7 +656,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (controllerRef)->updateAudioSourceContent (fromRef (audioSourceRef)->plugInRef, (range.second) ? &range.first : nullptr, flags);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, enableAudioSourceSamplesAccess))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, enableAudioSourceSamplesAccess))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -665,7 +665,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (controllerRef)->enableAudioSourceSamplesAccess (fromRef (audioSourceRef)->plugInRef, (enable) ? kARATrue : kARAFalse);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, deactivateAudioSourceForUndoHistory))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, deactivateAudioSourceForUndoHistory))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -674,7 +674,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (controllerRef)->deactivateAudioSourceForUndoHistory (fromRef (audioSourceRef)->plugInRef, (deactivate) ? kARATrue : kARAFalse);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, storeAudioSourceToAudioFileChunk))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, storeAudioSourceToAudioFileChunk))
     {
         ARADocumentControllerRef controllerRef;
         ARAArchiveWriterHostRef archiveWriterHostRef;
@@ -688,7 +688,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         reply.openAutomatically = (openAutomatically) ? kARATrue : kARAFalse;
         return encodeReply (reply);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioSourceContentAnalysisIncomplete))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioSourceContentAnalysisIncomplete))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -697,7 +697,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->isAudioSourceContentAnalysisIncomplete (fromRef (audioSourceRef)->plugInRef, contentType));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, requestAudioSourceContentAnalysis))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, requestAudioSourceContentAnalysis))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -706,7 +706,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (controllerRef)->requestAudioSourceContentAnalysis (fromRef (audioSourceRef)->plugInRef, contentTypes.size (), contentTypes.data ());
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioSourceContentAvailable))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioSourceContentAvailable))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -715,7 +715,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply ((fromRef (controllerRef)->isAudioSourceContentAvailable (fromRef (audioSourceRef)->plugInRef, contentType)) ? kARATrue : kARAFalse);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getAudioSourceContentGrade))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, getAudioSourceContentGrade))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -724,7 +724,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->getAudioSourceContentGrade (fromRef (audioSourceRef)->plugInRef, contentType));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioSourceContentReader))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioSourceContentReader))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -737,7 +737,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         remoteContentReader->contentType = contentType;
         return encodeReply (ARAContentReaderRef { toRef (remoteContentReader) });
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyAudioSource))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyAudioSource))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -749,7 +749,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         delete remoteAudioSource;
     }
 
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioModification))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioModification))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -759,7 +759,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->createAudioModification (fromRef (audioSourceRef)->plugInRef, hostRef, &properties));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, cloneAudioModification))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, cloneAudioModification))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioModificationRef audioModificationRef;
@@ -769,7 +769,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->cloneAudioModification (audioModificationRef, hostRef, &properties));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateAudioModificationProperties))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, updateAudioModificationProperties))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioModificationRef audioModificationRef;
@@ -778,7 +778,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (controllerRef)->updateAudioModificationProperties (audioModificationRef, &properties);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioModificationPreservingAudioSourceSignal))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioModificationPreservingAudioSourceSignal))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioModificationRef audioModificationRef;
@@ -786,7 +786,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply ((fromRef (controllerRef)->isAudioModificationPreservingAudioSourceSignal (audioModificationRef)) ? kARATrue : kARAFalse);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, deactivateAudioModificationForUndoHistory))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, deactivateAudioModificationForUndoHistory))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioModificationRef audioModificationRef;
@@ -795,7 +795,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (controllerRef)->deactivateAudioModificationForUndoHistory (audioModificationRef, (deactivate) ? kARATrue : kARAFalse);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioModificationContentAvailable))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, isAudioModificationContentAvailable))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioModificationRef audioModificationRef;
@@ -804,7 +804,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply ((fromRef (controllerRef)->isAudioModificationContentAvailable (audioModificationRef, contentType)) ? kARATrue : kARAFalse);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getAudioModificationContentGrade))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, getAudioModificationContentGrade))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioModificationRef audioModificationRef;
@@ -813,7 +813,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->getAudioModificationContentGrade (audioModificationRef, contentType));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioModificationContentReader))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, createAudioModificationContentReader))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioModificationRef audioModificationRef;
@@ -826,7 +826,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         remoteContentReader->contentType = contentType;
         return encodeReply (ARAContentReaderRef { toRef (remoteContentReader) });
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyAudioModification))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyAudioModification))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioModificationRef audioModificationRef;
@@ -835,7 +835,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         fromRef (controllerRef)->destroyAudioModification (audioModificationRef);
     }
 
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, createPlaybackRegion))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, createPlaybackRegion))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioModificationRef audioModificationRef;
@@ -845,7 +845,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->createPlaybackRegion (audioModificationRef, hostRef, &properties));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, updatePlaybackRegionProperties))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, updatePlaybackRegionProperties))
     {
         ARADocumentControllerRef controllerRef;
         ARAPlaybackRegionRef playbackRegionRef;
@@ -854,7 +854,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (controllerRef)->updatePlaybackRegionProperties (playbackRegionRef, &properties);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getPlaybackRegionHeadAndTailTime))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, getPlaybackRegionHeadAndTailTime))
     {
         ARADocumentControllerRef controllerRef;
         ARAPlaybackRegionRef playbackRegionRef;
@@ -867,7 +867,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
                                                                                         (wantsTailTime != kARAFalse) ? &reply.tailTime : nullptr);
         return encodeReply (reply);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, isPlaybackRegionContentAvailable))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, isPlaybackRegionContentAvailable))
     {
         ARADocumentControllerRef controllerRef;
         ARAPlaybackRegionRef playbackRegionRef;
@@ -876,7 +876,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply ((fromRef (controllerRef)->isPlaybackRegionContentAvailable (playbackRegionRef, contentType)) ? kARATrue : kARAFalse);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getPlaybackRegionContentGrade))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, getPlaybackRegionContentGrade))
     {
         ARADocumentControllerRef controllerRef;
         ARAPlaybackRegionRef playbackRegionRef;
@@ -885,7 +885,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->getPlaybackRegionContentGrade (playbackRegionRef, contentType));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, createPlaybackRegionContentReader))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, createPlaybackRegionContentReader))
     {
         ARADocumentControllerRef controllerRef;
         ARAPlaybackRegionRef playbackRegionRef;
@@ -898,7 +898,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         remoteContentReader->contentType = contentType;
         return encodeReply (ARAContentReaderRef { toRef (remoteContentReader) });
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyPlaybackRegion))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyPlaybackRegion))
     {
         ARADocumentControllerRef controllerRef;
         ARAPlaybackRegionRef playbackRegionRef;
@@ -907,7 +907,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         fromRef (controllerRef)->destroyPlaybackRegion (playbackRegionRef);
     }
 
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getContentReaderEventCount))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, getContentReaderEventCount))
     {
         ARADocumentControllerRef controllerRef;
         ARAContentReaderRef contentReaderRef;
@@ -915,7 +915,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->getContentReaderEventCount (fromRef (contentReaderRef)->plugInRef));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getContentReaderDataForEvent))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, getContentReaderDataForEvent))
     {
         ARADocumentControllerRef controllerRef;
         ARAContentReaderRef contentReaderRef;
@@ -926,7 +926,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         const void* eventData { fromRef (controllerRef)->getContentReaderDataForEvent (remoteContentReader->plugInRef, eventIndex) };
         return encodeContentEvent (remoteContentReader->contentType, eventData);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyContentReader))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, destroyContentReader))
     {
         ARADocumentControllerRef controllerRef;
         ARAContentReaderRef contentReaderRef;
@@ -938,14 +938,14 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         delete remoteContentReader;
     }
 
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getProcessingAlgorithmsCount))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, getProcessingAlgorithmsCount))
     {
         ARADocumentControllerRef controllerRef;
         decodeArguments (message, controllerRef);
 
         return encodeReply (fromRef (controllerRef)->getProcessingAlgorithmsCount ());
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getProcessingAlgorithmProperties))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, getProcessingAlgorithmProperties))
     {
         ARADocumentControllerRef controllerRef;
         ARAInt32 algorithmIndex;
@@ -953,7 +953,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (*(fromRef (controllerRef)->getProcessingAlgorithmProperties (algorithmIndex)));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getProcessingAlgorithmForAudioSource))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, getProcessingAlgorithmForAudioSource))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -961,7 +961,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         return encodeReply (fromRef (controllerRef)->getProcessingAlgorithmForAudioSource (fromRef (audioSourceRef)->plugInRef));
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, requestProcessingAlgorithmForAudioSource))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, requestProcessingAlgorithmForAudioSource))
     {
         ARADocumentControllerRef controllerRef;
         ARAAudioSourceRef audioSourceRef;
@@ -971,7 +971,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         fromRef (controllerRef)->requestProcessingAlgorithmForAudioSource (fromRef (audioSourceRef)->plugInRef, algorithmIndex);
     }
 
-    else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, isLicensedForCapabilities))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARADocumentControllerInterface, isLicensedForCapabilities))
     {
         ARADocumentControllerRef controllerRef;
         ARABool runModalActivationDialogIfNeeded;
@@ -984,7 +984,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
     }
 
     // ARAPlaybackRendererInterface
-    else if (messageID == PLUGIN_METHOD_ID (ARAPlaybackRendererInterface, addPlaybackRegion))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARAPlaybackRendererInterface, addPlaybackRegion))
     {
         ARAPlaybackRendererRef playbackRendererRef;
         ARAPlaybackRegionRef playbackRegionRef;
@@ -992,7 +992,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (playbackRendererRef)->getPlaybackRenderer ()->addPlaybackRegion (playbackRegionRef);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARAPlaybackRendererInterface, removePlaybackRegion))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARAPlaybackRendererInterface, removePlaybackRegion))
     {
         ARAPlaybackRendererRef playbackRendererRef;
         ARAPlaybackRegionRef playbackRegionRef;
@@ -1002,7 +1002,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
     }
 
     // ARAEditorRendererInterface
-    else if (messageID == PLUGIN_METHOD_ID (ARAEditorRendererInterface, addPlaybackRegion))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARAEditorRendererInterface, addPlaybackRegion))
     {
         ARAEditorRendererRef editorRendererRef;
         ARAPlaybackRegionRef playbackRegionRef;
@@ -1010,7 +1010,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (editorRendererRef)->getEditorRenderer ()->addPlaybackRegion (playbackRegionRef);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARAEditorRendererInterface, removePlaybackRegion))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARAEditorRendererInterface, removePlaybackRegion))
     {
         ARAEditorRendererRef editorRendererRef;
         ARAPlaybackRegionRef playbackRegionRef;
@@ -1018,7 +1018,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (editorRendererRef)->getEditorRenderer ()->removePlaybackRegion (playbackRegionRef);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARAEditorRendererInterface, addRegionSequence))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARAEditorRendererInterface, addRegionSequence))
     {
         ARAEditorRendererRef editorRendererRef;
         ARARegionSequenceRef regionSequenceRef;
@@ -1026,7 +1026,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (editorRendererRef)->getEditorRenderer ()->addRegionSequence (regionSequenceRef);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARAEditorRendererInterface, removeRegionSequence))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARAEditorRendererInterface, removeRegionSequence))
     {
         ARAEditorRendererRef editorRendererRef;
         ARARegionSequenceRef regionSequenceRef;
@@ -1036,7 +1036,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
     }
 
     // ARAEditorViewInterface
-    else if (messageID == PLUGIN_METHOD_ID (ARAEditorViewInterface, notifySelection))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARAEditorViewInterface, notifySelection))
     {
         ARAEditorViewRef editorViewRef;
         ARAViewSelection selection;
@@ -1044,7 +1044,7 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 
         fromRef (editorViewRef)->getEditorView ()->notifySelection (&selection);
     }
-    else if (messageID == PLUGIN_METHOD_ID (ARAEditorViewInterface, notifyHideRegionSequences))
+    else if (messageID == ARA_IPC_PLUGIN_METHOD_ID (ARAEditorViewInterface, notifyHideRegionSequences))
     {
         ARAEditorViewRef editorViewRef;
         std::vector<ARARegionSequenceRef> regionSequenceRefs;
