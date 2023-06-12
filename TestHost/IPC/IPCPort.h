@@ -59,6 +59,11 @@ public:
     // waits up to the specified amount of milliseconds for an incoming event and processes it
     void runReceiveLoop (int32_t milliseconds);
 
+    // indicate byte order mismatch between sending and receiving machine
+    // \todo currently not implemented, we rely on running on the same machine for now
+    //       C++20 offers std::endian which allows for a simple implementation upon connecting...
+    bool endianessMatches () { return true; }
+
 private:
 #if defined (_WIN32)
     IPCPort (const char* remotePortID);

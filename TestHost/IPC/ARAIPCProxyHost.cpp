@@ -89,24 +89,15 @@ void _swap (double* ptr)
 }
 
 template<typename FloatT>
-ARABool _readAudioSamples (const IPCMessage& reply, ARASampleCount samplesPerChannel, ARAChannelCount channelCount, void* const buffers[])
+ARABool _readAudioSamples (const std::vector<uint8_t>& reply, ARASampleCount samplesPerChannel, ARAChannelCount channelCount, void* const buffers[], bool needSwap)
 {
-    const auto decoded { decodeReply<ARAIPCReadSamplesReply> (reply) };
-    const bool success { decoded.dataCount > 0 };
-    if (success != kARAFalse)
-        ARA_INTERNAL_ASSERT (decoded.dataCount == sizeof (FloatT) * static_cast<size_t> (samplesPerChannel * channelCount));
+    const bool success { reply.size () > 0 };
+    if (success)
+        ARA_INTERNAL_ASSERT (reply.size () == sizeof (FloatT) * static_cast<size_t> (samplesPerChannel * channelCount));
     else
-        ARA_INTERNAL_ASSERT (decoded.dataCount == 0);
+        ARA_INTERNAL_ASSERT (reply.size () == 0);
 
-#if defined (__APPLE__)    
-    const auto endian { CFByteOrderGetCurrent () };
-    ARA_INTERNAL_ASSERT (endian != CFByteOrderUnknown);
-    const bool needSwap { endian != ((decoded.isLittleEndian != kARAFalse) ? CFByteOrderLittleEndian : CFByteOrderBigEndian) };
-#else
-    const bool needSwap { false }; // std::endian c++20
-#endif
-
-    auto sourcePtr = decoded.data;
+    auto sourcePtr = reply.data ();
     const auto channelSize { sizeof (FloatT) * static_cast<size_t> (samplesPerChannel) };
     for (auto i { 0 }; i < channelCount; ++i)
     {
@@ -158,11 +149,11 @@ bool AudioAccessController::readAudioSamples (ARAAudioReaderHostRef audioReaderH
         }
     }
 
-    const auto reply { remoteCallWithReply<IPCMessage> (HOST_METHOD_ID (ARAAudioAccessControllerInterface, readAudioSamples),
+    const auto reply { remoteCallWithReply<std::vector<uint8_t>> (HOST_METHOD_ID (ARAAudioAccessControllerInterface, readAudioSamples),
                                                         _remoteHostRef, remoteAudioReader->mainHostRef, samplePosition, samplesPerChannel) };
     const auto result { (remoteAudioReader->use64BitSamples != kARAFalse) ?
-                        _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers):
-                        _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers)};
+                        _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers, !portEndianessMatches ()):
+                        _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers, !portEndianessMatches ()) };
     return (result != kARAFalse);
 }
 
