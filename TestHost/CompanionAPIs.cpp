@@ -36,6 +36,7 @@
 #include <locale>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 #include <cstring>
 
@@ -277,16 +278,16 @@ private:
 class IPCPlugInInstance : public PlugInInstance
 {
 public:
-    IPCPlugInInstance (size_t remoteRef, IPCPort& port, std::unique_ptr<ARA::ProxyPlugIn::PlugInExtension> plugInExtension)
-    : PlugInInstance { plugInExtension->getInstance () },
+    IPCPlugInInstance (size_t remoteRef, IPCPort& port, const ARA::ARAPlugInExtensionInstance* instance)
+    : PlugInInstance { instance },
       _remoteRef { remoteRef },
-      _sender { port },
-      _plugInExtension { std::move (plugInExtension) }
+      _sender { port }
     {}
 
     ~IPCPlugInInstance () override
     {
-        _sender.remoteCallWithoutReply (kIPCDestroyEffect, _remoteRef, reinterpret_cast<size_t> (_plugInExtension->getInstance ()->plugInExtensionRef));
+        _sender.remoteCallWithoutReply (kIPCDestroyEffect, _remoteRef, reinterpret_cast<size_t> (getARAPlugInExtensionInstance ()->plugInExtensionRef));
+        ARA::IPC::ProxyPlugIn::destroyPlugInExtensionInstance (getARAPlugInExtensionInstance ());
     }
 
     void startRendering (int maxBlockSize, double sampleRate) override
@@ -311,7 +312,6 @@ public:
 private:
     size_t const _remoteRef;
     ARA::ARAIPCMessageSender _sender;
-    std::unique_ptr<ARA::ProxyPlugIn::PlugInExtension> _plugInExtension;
 };
 
 /*******************************************************************************/
@@ -337,16 +337,16 @@ private:
         }
     };
 
-    static ARA::ProxyPlugIn::Factory& defaultGetFactory(IPCPort& hostCommandsPort)
+    static ARA::IPC::ProxyPlugIn::Factory* defaultGetFactory(IPCPort& hostCommandsPort)
     {
-        const auto count { ARA::ProxyPlugIn::Factory::initializeFactories (hostCommandsPort) };
+        const auto count { ARA::IPC::ProxyPlugIn::initializeFactories (hostCommandsPort) };
         ARA_INTERNAL_ASSERT (count > 0);
-        return ARA::ProxyPlugIn::Factory::getFactoryAtIndex (0U);
+        return ARA::IPC::ProxyPlugIn::getFactoryAtIndex (0U);
     }
 
 public:
     IPCPlugInEntry (const std::string& launchArgs, ARA::ARAAssertFunction* assertFunctionAddress,
-                    const std::function<ARA::ProxyPlugIn::Factory& (IPCPort& hostCommandsPort)>& getFactoryFunction = defaultGetFactory)
+                    const std::function<ARA::IPC::ProxyPlugIn::Factory* (IPCPort& hostCommandsPort)>& getFactoryFunction = defaultGetFactory)
     : _hostCommandsPortID { _createPortID () },
       _plugInCallbacksPortID { _createPortID () },
       _remoteLauncher { launchArgs, _hostCommandsPortID, _plugInCallbacksPortID },
@@ -355,7 +355,7 @@ public:
       _proxyFactory { getFactoryFunction (_hostCommandsPort) }
     {
         setUsesIPC ();
-        initializeARA (_proxyFactory.getFactory (), assertFunctionAddress);
+        initializeARA (ARA::IPC::ProxyPlugIn::getFactoryData (_proxyFactory), assertFunctionAddress);
     }
 
     ~IPCPlugInEntry () override
@@ -369,7 +369,7 @@ public:
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
-        return _proxyFactory.createDocumentControllerWithDocument (hostInstance, properties);
+        return ARA::IPC::ProxyPlugIn::createDocumentControllerWithDocument (_proxyFactory, hostInstance, properties);
     }
 
     std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
@@ -377,16 +377,16 @@ public:
         // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
         const ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
 
-        const auto remoteDocumentControllerRef { _proxyFactory.getDocumentControllerRemoteRef (documentControllerRef) };
+        const auto remoteDocumentControllerRef { ARA::IPC::ProxyPlugIn::getDocumentControllerRemoteRef (documentControllerRef) };
         IPCMessage result;
         ARA::ARAIPCMessageSender { _hostCommandsPort }.remoteCallWithReply (result, kIPCCreateARAEffect, remoteDocumentControllerRef, assignedRoles);
         size_t remoteInstanceRef;
         result.readSize (0, remoteInstanceRef);
         size_t remoteExtensionRef;
         result.readSize (1, remoteExtensionRef);
-        auto plugInExtension { _proxyFactory.createPlugInExtension (remoteExtensionRef, _hostCommandsPort, documentControllerRef, knownRoles, assignedRoles) };
-        validatePlugInExtensionInstance (plugInExtension->getInstance (), assignedRoles);
-        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _hostCommandsPort, std::move (plugInExtension));
+        auto plugInExtension { ARA::IPC::ProxyPlugIn::createPlugInExtensionInstance (remoteExtensionRef, _hostCommandsPort, documentControllerRef, knownRoles, assignedRoles) };
+        validatePlugInExtensionInstance (plugInExtension, assignedRoles);
+        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _hostCommandsPort, plugInExtension);
     }
 
 private:
@@ -394,7 +394,7 @@ private:
     {
         // \todo It would be cleaner to create the port in the c'tor from the main thread,
         //       but for some reason reading audio is then much slower compared to creating it here...?
-        _plugInCallbacksPort = IPCPort::createPublishingID (_plugInCallbacksPortID.c_str (), &ARA::ProxyPlugIn::Factory::plugInCallbacksDispatcher);
+        _plugInCallbacksPort = IPCPort::createPublishingID (_plugInCallbacksPortID.c_str (), &ARA::IPC::ProxyPlugIn::plugInCallbacksDispatcher);
 
         while (!_terminateCallbacksThread)
             _plugInCallbacksPort.runReceiveLoop (100);
@@ -411,7 +411,7 @@ private:
     IPCPort _plugInCallbacksPort;
     IPCPort _hostCommandsPort;
 
-    ARA::ProxyPlugIn::Factory& _proxyFactory;
+    ARA::IPC::ProxyPlugIn::Factory* _proxyFactory;
 };
 
 /*******************************************************************************/
@@ -421,23 +421,23 @@ class IPCVST3PlugInEntry : public IPCPlugInEntry
 public:
     IPCVST3PlugInEntry (const std::string& binaryName, const std::string& optionalPlugInName, ARA::ARAAssertFunction* assertFunctionAddress)
     : IPCPlugInEntry { std::string { "-vst3 " } + binaryName + " " + optionalPlugInName, assertFunctionAddress,
-                        [&optionalPlugInName] (IPCPort& hostCommandsPort) -> ARA::ProxyPlugIn::Factory&
+                        [&optionalPlugInName] (IPCPort& hostCommandsPort) -> ARA::IPC::ProxyPlugIn::Factory*
                         {
-                            const auto count { ARA::ProxyPlugIn::Factory::initializeFactories (hostCommandsPort) };
+                            const auto count { ARA::IPC::ProxyPlugIn::initializeFactories (hostCommandsPort) };
                             ARA_INTERNAL_ASSERT (count > 0);
 
                             if (optionalPlugInName.empty ())
-                                return ARA::ProxyPlugIn::Factory::getFactoryAtIndex (0U);
+                                return ARA::IPC::ProxyPlugIn::getFactoryAtIndex (0U);
 
                             for (auto i { 0U }; i < count; ++i)
                             {
-                                auto& factory { ARA::ProxyPlugIn::Factory::getFactoryAtIndex (i) };
-                                if (0 == std::strcmp (factory.getFactory ()->plugInName, optionalPlugInName.c_str ()))
-                                    return factory;
+                                auto proxyFactory { ARA::IPC::ProxyPlugIn::getFactoryAtIndex (i) };
+                                if (0 == std::strcmp (ARA::IPC::ProxyPlugIn::getFactoryData (proxyFactory)->plugInName, optionalPlugInName.c_str ()))
+                                    return proxyFactory;
                             }
                             ARA_INTERNAL_ASSERT (false);
-                            return ARA::ProxyPlugIn::Factory::getFactoryAtIndex (0U);
-                        }}
+                            return ARA::IPC::ProxyPlugIn::getFactoryAtIndex (0U);
+                        } }
     {
         _description = createVST3EntryDescription (binaryName, optionalPlugInName, true);
     }
@@ -472,8 +472,8 @@ IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMe
         ARA::ARAPlugInInstanceRoleFlags assignedRoles;
         ARA::decodeArguments (message, documentControllerRemoteRef, assignedRoles);
 
-        auto plugInInstance { _plugInEntry->createARAPlugInInstanceWithRoles (ARA::ProxyHost::getDocumentControllerRefForRemoteRef (documentControllerRemoteRef), assignedRoles) };
-        auto plugInExtensionRef { ARA::ProxyHost::createPlugInExtension (plugInInstance->getARAPlugInExtensionInstance ()) };
+        auto plugInInstance { _plugInEntry->createARAPlugInInstanceWithRoles (ARA::IPC::ProxyHost::getDocumentControllerRefForRemoteRef (documentControllerRemoteRef), assignedRoles) };
+        auto plugInExtensionRef { ARA::IPC::ProxyHost::createPlugInExtension (plugInInstance->getARAPlugInExtensionInstance ()) };
 
         IPCMessage reply { ARA::encodeArguments (reinterpret_cast<size_t> (plugInInstance.get ()), plugInExtensionRef) };
         plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
@@ -518,7 +518,7 @@ IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMe
         ARA::ARAPlugInExtensionRef plugInExtensionRef;
         ARA::decodeArguments (message, plugInInstanceRef, plugInExtensionRef);
 
-        ARA::ProxyHost::destroyPlugInExtension (plugInExtensionRef);
+        ARA::IPC::ProxyHost::destroyPlugInExtension (plugInExtensionRef);
         delete reinterpret_cast<PlugInInstance*> (plugInInstanceRef);
         return {};
     }
@@ -529,7 +529,7 @@ IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMe
     }
     else
     {
-        return ARA::ProxyHost::hostCommandHandler (messageID, message);
+        return ARA::IPC::ProxyHost::hostCommandHandler (messageID, message);
     }
 }
 
@@ -540,8 +540,8 @@ int RemoteHost::main (std::unique_ptr<PlugInEntry> plugInEntry, const std::strin
     auto hostCommandsPort { IPCPort::createPublishingID (hostCommandsPortID.c_str (), &_hostCommandHandler) };
     auto plugInCallbacksPort { IPCPort::createConnectedToID (plugInCallbacksPortID.c_str ()) };
 
-    ARA::ProxyHost::addFactory (_plugInEntry->getARAFactory ());
-    ARA::ProxyHost::setPlugInCallbacksPort (&plugInCallbacksPort);
+    ARA::IPC::ProxyHost::addFactory (_plugInEntry->getARAFactory ());
+    ARA::IPC::ProxyHost::setPlugInCallbacksPort (&plugInCallbacksPort);
 
     while (!_shutDown)
         hostCommandsPort.runReceiveLoop (100);

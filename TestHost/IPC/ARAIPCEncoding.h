@@ -20,6 +20,7 @@
 
 #include "IPCPort.h"
 
+#include "ARA_Library/Debug/ARADebug.h"
 #include "ARA_Library/Dispatch/ARAContentReader.h"
 
 #include <algorithm>
