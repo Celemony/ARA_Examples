@@ -743,8 +743,7 @@ void DocumentController::requestAudioSourceContentAnalysis (ARAAudioSourceRef au
     const auto audioSource { fromRef (audioSourceRef) };
     ARA_VALIDATE_API_ARGUMENT (audioSource, isValidInstance (audioSource));
 
-    std::vector<ARAContentType> types;
-    types.assign (contentTypes, contentTypes + contentTypesCount);
+    const ArrayArgument<const ARAContentType> types { contentTypes, contentTypesCount };
     remoteCallWithoutReply (PLUGIN_METHOD_ID (ARADocumentControllerInterface, requestAudioSourceContentAnalysis), _remoteRef, audioSource->_remoteRef, types);
 }
 
@@ -805,8 +804,7 @@ bool DocumentController::isLicensedForCapabilities (bool runModalActivationDialo
     ARA_LOG_HOST_ENTRY (this);
     ARA_VALIDATE_API_ARGUMENT (this, isValidInstance (this));
 
-    std::vector<ARAContentType> types;
-    types.assign (contentTypes, contentTypes + contentTypesCount);
+    const ArrayArgument<const ARAContentType> types { contentTypes, contentTypesCount };
     ARABool result;
     remoteCallWithReply (result, PLUGIN_METHOD_ID (ARADocumentControllerInterface, isLicensedForCapabilities),
                         _remoteRef, (runModalActivationDialogIfNeeded) ? kARATrue : kARAFalse, types, transformationFlags);
@@ -896,8 +894,7 @@ void EditorView::notifyHideRegionSequences (ARASize regionSequenceRefsCount, con
     ARA_LOG_HOST_ENTRY (this);
     ARA_VALIDATE_API_ARGUMENT (this, isValidInstance (this));
 
-    std::vector<ARARegionSequenceRef> sequences;
-    sequences.assign (regionSequenceRefs, regionSequenceRefs + regionSequenceRefsCount);
+    const ArrayArgument<const ARARegionSequenceRef> sequences { regionSequenceRefs, regionSequenceRefsCount };
     remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorViewInterface, notifyHideRegionSequences), _remoteRef, sequences);
 }
 
@@ -1005,8 +1002,9 @@ IPCMessage _readAudioSamples (DocumentController* documentController, HostAudioR
     for (auto i { 0 }; i < reader->audioSource->_channelCount; ++i)
         sampleBuffers[i] = bufferData.data () + sizeof (FloatT) * static_cast<size_t> (i * samplesPerChannel);
 
+    BytesEncoder bytesReader { bufferData };
     if (documentController->getHostAudioAccessController ()->readAudioSamples (reader->hostRef, samplePosition, samplesPerChannel, sampleBuffers))
-        return encodeReply (bufferData);
+        return encodeReply (bytesReader);
     else
         return {};
 }
@@ -1091,7 +1089,7 @@ IPCMessage Factory::plugInCallbacksDispatcher (const int32_t messageID, const IP
         bytes.resize (length);
         if (!documentController->getHostArchivingController ()->readBytesFromArchive (archiveReaderHostRef, position, length, bytes.data ()))
             bytes.clear ();
-        return encodeReply (bytes);
+        return encodeReply (BytesEncoder { bytes });
     }
     else if (messageID == HOST_METHOD_ID (ARAArchivingControllerInterface, writeBytesToArchive))
     {
@@ -1099,7 +1097,9 @@ IPCMessage Factory::plugInCallbacksDispatcher (const int32_t messageID, const IP
         ARAArchiveWriterHostRef archiveWriterHostRef;
         ARASize position;
         std::vector<ARAByte> bytes;
-        decodeArguments (message, controllerHostRef, archiveWriterHostRef, position, bytes);
+        BytesDecoder writer { bytes };
+        decodeArguments (message, controllerHostRef, archiveWriterHostRef, position, writer);
+        ARA_INTERNAL_ASSERT (bytes.size () > 0);
 
         auto documentController { fromHostRef (controllerHostRef) };
         ARA_VALIDATE_API_ARGUMENT (controllerHostRef, isValidInstance (documentController));

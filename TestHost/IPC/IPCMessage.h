@@ -19,6 +19,8 @@
 #pragma once
 
 // select underlying implementation: Apple CFDictionary or a generic pugixml-based
+// Note that the pugixml version is much less efficient because it base64-encodes bytes
+// (used for large sample data) which adds encoding overhead and requires additional copies.
 #ifndef IPC_MESSAGE_USE_CFDICTIONARY
     #if defined (__APPLE__)
         #define IPC_MESSAGE_USE_CFDICTIONARY 1
@@ -85,7 +87,7 @@ public:
     void appendFloat (const int32_t argKey, const float argValue);
     void appendDouble (const int32_t argKey, const double argValue);
     void appendString (const int32_t argKey, const char* const argValue);   // UTF8
-    void appendBytes (const int32_t argKey, const std::vector<uint8_t>& argValue);
+    void appendBytes (const int32_t argKey, const uint8_t* argValue, const size_t argSize);
     void appendMessage (const int32_t argKey, const IPCMessage& argValue);
 
     // read keyed argument to the message
@@ -96,7 +98,8 @@ public:
     bool readFloat (const int32_t argKey, float& argValue) const;
     bool readDouble (const int32_t argKey, double& argValue) const;
     bool readString (const int32_t argKey, const char*& argValue) const;    // UTF8
-    bool readBytes (const int32_t argKey, std::vector<uint8_t>& argValue) const;
+    bool readBytesSize (const int32_t argKey, size_t& argSize) const;       // query size and allocate memory, then..
+    bool readBytes (const int32_t argKey, uint8_t* const argValue) const;   // copy bytes to that memory (if key found)
     bool readMessage (const int32_t argKey, IPCMessage& argValue) const;
 
 private:
@@ -122,6 +125,8 @@ private:
 #else
     std::shared_ptr<pugi::xml_document> _dictionary {};
     pugi::xml_node _root {};
+    mutable std::string _bytesCacheData {};
+    mutable int32_t _bytesCacheKey { std::numeric_limits<int32_t>::max () };
 #endif
     bool _isWritable {};
 };

@@ -154,7 +154,8 @@ bool AudioAccessController::readAudioSamples (ARAAudioReaderHostRef audioReaderH
     remoteCallWithReply (replyMsg, HOST_METHOD_ID (ARAAudioAccessControllerInterface, readAudioSamples),
                         _remoteHostRef, remoteAudioReader->mainHostRef, samplePosition, samplesPerChannel);
     std::vector<uint8_t> reply;
-    decodeReply (reply, replyMsg);
+    BytesDecoder writer { reply };
+    decodeReply (writer, replyMsg);
     const auto result { (remoteAudioReader->use64BitSamples != kARAFalse) ?
                         _readAudioSamples<double> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers, !portEndianessMatches ()):
                         _readAudioSamples<float> (reply, samplesPerChannel, remoteAudioReader->audioSource->channelCount, buffers, !portEndianessMatches ()) };
@@ -198,13 +199,12 @@ bool ArchivingController::readBytesFromArchive (ARAArchiveReaderHostRef archiveR
         }
     }
 
-    std::vector<ARAByte> bytes;
-    remoteCallWithReply (bytes, HOST_METHOD_ID (ARAArchivingControllerInterface, readBytesFromArchive),
+    auto resultLength { length };
+    BytesDecoder writer { buffer, resultLength };
+    remoteCallWithReply (writer, HOST_METHOD_ID (ARAArchivingControllerInterface, readBytesFromArchive),
                         _remoteHostRef, archiveReaderHostRef, position, length);
-
-    if (bytes.size () == length)
+    if (resultLength == length)
     {
-        std::memcpy (buffer, bytes.data (), length);
         return true;
     }
     else
@@ -236,7 +236,7 @@ bool ArchivingController::writeBytesToArchive (ARAArchiveWriterHostRef archiveWr
 
     ARABool success;
     remoteCallWithReply (success, HOST_METHOD_ID (ARAArchivingControllerInterface, writeBytesToArchive),
-                        _remoteHostRef, archiveWriterHostRef, position, std::vector<ARAByte> { buffer, buffer + length });
+                        _remoteHostRef, archiveWriterHostRef, position, BytesEncoder { buffer, length });
     return (success != kARAFalse);
 }
 
