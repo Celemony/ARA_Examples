@@ -59,9 +59,9 @@
 #include "TestCases.h"
 
 #include "ARA_Library/Utilities/ARAStdVectorUtilities.h"
+#include "ARA_Library/Debug/ARAContentLogger.h"
 
 #include <cstring>
-
 
 #if ARA_ENABLE_IPC
     #include "IPC/ARAIPCProxyHost.h"
@@ -154,7 +154,8 @@ int main (int argc, const char* argv[])
         return -1;
     }
 
-    if (!plugInEntry->getARAFactory ())
+    const auto factory { plugInEntry->getARAFactory () };
+    if (!factory)
     {
         ARA_LOG ("Requested plug-in %s does not support ARA, aborting.", plugInEntry->getDescription ().c_str ());
         return -1;
@@ -163,7 +164,7 @@ int main (int argc, const char* argv[])
 #if ARA_ENABLE_IPC
     if (isRemoteHost)
     {
-        ARA_LOG ("Remotely hosting ARA plug-in '%s' in %s", plugInEntry->getARAFactory ()->plugInName, plugInEntry->getDescription ().c_str ());
+        ARA_LOG ("Remotely hosting ARA plug-in '%s' in %s", factory->plugInName, plugInEntry->getDescription ().c_str ());
 
         ARA::ProxyHost::runHost (*plugInEntry->getARAFactory (), hostCommandsPortID.c_str (), plugInCallbacksPortID.c_str ());
 
@@ -171,8 +172,31 @@ int main (int argc, const char* argv[])
     }
 #endif
 
+    // debug-output of the factory data
     // when using IPC, set a breakpoint to this line if you want to attach the debugger to the plug-in process
-    ARA_LOG ("Testing ARA plug-in '%s' in %s", plugInEntry->getARAFactory ()->plugInName, plugInEntry->getDescription ().c_str ());
+    ARA_LOG ("Testing ARA plug-in '%s' in %s%s:", factory->plugInName, plugInEntry->getDescription ().c_str (),
+                                                  plugInEntry->usesIPC () ? " (using IPC)" : "");
+
+    ARA_LOG ("    version: %s", factory->version);
+    ARA_LOG ("    manufacturer: %s", factory->manufacturerName);
+    ARA_LOG ("    website: %s", factory->informationURL);
+
+    ARA_LOG ("    documentArchiveID: %s", factory->documentArchiveID);
+    for (auto i { 0U }; i < factory->compatibleDocumentArchiveIDsCount; ++i)
+        ARA_LOG ("    compatibleDocumentArchiveIDs[%i]: %s", i, factory->compatibleDocumentArchiveIDs[i]);
+
+    if (factory->analyzeableContentTypesCount == 0)
+        ARA_LOG ("    plug-in does not support content analysis.");
+    for (auto i { 0U }; i < factory->analyzeableContentTypesCount; ++i)
+        ARA_LOG ("    analyzeableContentTypes[%i]: %s", i, ARA::ContentLogger::getTypeNameForContentType (factory->analyzeableContentTypes[i]));
+
+    ARA_LOG ("    plug-in does%s support time-stretching%s.", ((factory->supportedPlaybackTransformationFlags & ARA::kARAPlaybackTransformationTimestretch) != 0) ? "" : " not",
+                                                              ((factory->supportedPlaybackTransformationFlags & ARA::kARAPlaybackTransformationTimestretchReflectingTempo) != 0) ? "(reflecting tempo)" : "");
+
+    ARA_LOG ("    plug-in does%s support content-based fades.", ((factory->supportedPlaybackTransformationFlags & ARA::kARAPlaybackTransformationContentBasedFades) != 0) ? "" : " not");
+
+    ARA_LOG ("    plug-in does%s support storing audio file chunks.", (factory.implements<ARA_STRUCT_MEMBER (ARAFactory, supportsStoringAudioFileChunks)> () &&
+                                                                      (factory->supportsStoringAudioFileChunks != ARA::kARAFalse)) ? "" : " not");
 
     // parse any optional test cases or audio files
     auto audioFiles { parseAudioFiles (args) };
