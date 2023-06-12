@@ -101,43 +101,43 @@ IPCMessage::IPCMessage (CFDataRef data)
     }
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const int32_t argValue)
+void IPCMessage::appendInt32 (const int32_t argKey, const int32_t argValue)
 {
     _appendEncodedArg (argKey, CFNumberCreate (kCFAllocatorDefault, kCFNumberSInt32Type, &argValue));
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const int64_t argValue)
+void IPCMessage::appendInt64 (const int32_t argKey, const int64_t argValue)
 {
     _appendEncodedArg (argKey, CFNumberCreate (kCFAllocatorDefault, kCFNumberSInt64Type, &argValue));
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const size_t argValue)
+void IPCMessage::appendSize (const int32_t argKey, const size_t argValue)
 {
     static_assert (sizeof (SInt64) == sizeof (size_t), "integer type needs adjustment for this compiler setup");
     _appendEncodedArg (argKey, CFNumberCreate (kCFAllocatorDefault, kCFNumberSInt64Type, &argValue));
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const float argValue)
+void IPCMessage::appendFloat (const int32_t argKey, const float argValue)
 {
     _appendEncodedArg (argKey, CFNumberCreate (kCFAllocatorDefault, kCFNumberFloatType, &argValue));
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const double argValue)
+void IPCMessage::appendDouble (const int32_t argKey, const double argValue)
 {
     _appendEncodedArg (argKey, CFNumberCreate (kCFAllocatorDefault, kCFNumberDoubleType, &argValue));
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const char* const argValue)
+void IPCMessage::appendString (const int32_t argKey, const char* const argValue)
 {
     _appendEncodedArg (argKey, CFStringCreateWithCString (kCFAllocatorDefault, argValue, kCFStringEncodingUTF8));
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const std::vector<uint8_t>& argValue)
+void IPCMessage::appendBytes (const int32_t argKey, const std::vector<uint8_t>& argValue)
 {
     _appendEncodedArg (argKey, CFDataCreate (kCFAllocatorDefault, argValue.data (), (CFIndex) argValue.size ()));
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const IPCMessage& argValue)
+void IPCMessage::appendMessage (const int32_t argKey, const IPCMessage& argValue)
 {
     _appendEncodedArg (argKey, (CFDictionaryRef) CFRetain (argValue._dictionary));  // since _dictionary is immutable after creation, we can reference it instead of copy
 }
@@ -167,80 +167,85 @@ CFDataRef IPCMessage::createEncodedMessage () const
     return result;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, int32_t& argValue, bool* didFindKey) const
+bool IPCMessage::readInt32 (const int32_t argKey, int32_t& argValue) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
-    if (!_checkKeyFound (number != nullptr, didFindKey))
+    if (!number)
     {
         argValue = 0;
-        return;
+        return false;
     }
     ARA_INTERNAL_ASSERT (number && (CFGetTypeID (number) == CFNumberGetTypeID ()));
     CFNumberGetValue (number, kCFNumberSInt32Type, &argValue);
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, int64_t& argValue, bool* didFindKey) const
+bool IPCMessage::readInt64 (const int32_t argKey, int64_t& argValue) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
-    if (!_checkKeyFound (number != nullptr, didFindKey))
+    if (!number)
     {
         argValue = 0;
-        return;
+        return false;
     }
     ARA_INTERNAL_ASSERT (number && (CFGetTypeID (number) == CFNumberGetTypeID ()));
     CFNumberGetValue (number, kCFNumberSInt64Type, &argValue);
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, size_t& argValue, bool* didFindKey) const
+bool IPCMessage::readSize (const int32_t argKey, size_t& argValue) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     static_assert (sizeof (SInt64) == sizeof (size_t), "integer type needs adjustment for this compiler setup");
     auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
-    if (!_checkKeyFound (number != nullptr, didFindKey))
+    if (!number)
     {
         argValue = 0U;
-        return;
+        return false;
     }
     ARA_INTERNAL_ASSERT (number && (CFGetTypeID (number) == CFNumberGetTypeID ()));
     CFNumberGetValue (number, kCFNumberSInt64Type, &argValue);
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, float& argValue, bool* didFindKey) const
+bool IPCMessage::readFloat (const int32_t argKey, float& argValue) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
-    if (!_checkKeyFound (number != nullptr, didFindKey))
+    if (!number)
     {
         argValue = 0.0f;
-        return;
+        return false;
     }
     ARA_INTERNAL_ASSERT (number && (CFGetTypeID (number) == CFNumberGetTypeID ()));
     CFNumberGetValue (number, kCFNumberFloatType, &argValue);
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, double& argValue, bool* didFindKey) const
+bool IPCMessage::readDouble (const int32_t argKey, double& argValue) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto number { (CFNumberRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
-    if (!_checkKeyFound (number != nullptr, didFindKey))
+    if (!number)
     {
         argValue = 0.0;
-        return;
+        return false;
     }
     ARA_INTERNAL_ASSERT (number && (CFGetTypeID (number) == CFNumberGetTypeID ()));
     CFNumberGetValue (number, kCFNumberDoubleType, &argValue);
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, const char*& argValue, bool* didFindKey) const
+bool IPCMessage::readString (const int32_t argKey, const char*& argValue) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto string { (CFStringRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
-    if (!_checkKeyFound (string != nullptr, didFindKey))
+    if (!string)
     {
         argValue = nullptr;
-        return;
+        return false;
     }
     ARA_INTERNAL_ASSERT (string && (CFGetTypeID (string) == CFStringGetTypeID ()));
     argValue = CFStringGetCStringPtr (string, kCFStringEncodingUTF8);
@@ -255,34 +260,37 @@ void IPCMessage::_readArg (const int32_t argKey, const char*& argValue, bool* di
         strings.insert (temp);
         argValue = strings.find (temp)->c_str ();
     }
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, std::vector<uint8_t>& argValue, bool* didFindKey) const
+bool IPCMessage::readBytes (const int32_t argKey, std::vector<uint8_t>& argValue) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto bytes { (CFDataRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
-    if (!_checkKeyFound (bytes != nullptr, didFindKey))
+    if (!bytes)
     {
         argValue.clear ();
-        return;
+        return false;
     }
     ARA_INTERNAL_ASSERT (bytes && (CFGetTypeID (bytes) == CFDataGetTypeID ()));
     const auto length { CFDataGetLength (bytes) };
     argValue.resize (static_cast<size_t> (length));
     CFDataGetBytes (bytes, CFRangeMake (0, length), argValue.data ());
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, IPCMessage& argValue, bool* didFindKey) const
+bool IPCMessage::readMessage (const int32_t argKey, IPCMessage& argValue) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto dictionary { (CFDictionaryRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
-    if (!_checkKeyFound (dictionary != nullptr, didFindKey))
+    if (!dictionary)
     {
         argValue = {};
-        return;
+        return false;
     }
     ARA_INTERNAL_ASSERT (dictionary && (CFGetTypeID (dictionary) == CFDictionaryGetTypeID ()));
     argValue._setup (dictionary, false);
+    return true;
 }
 
 //------------------------------------------------------------------------------
@@ -344,37 +352,37 @@ IPCMessage::IPCMessage (const char* data, const size_t dataSize)
     _isWritable = false;
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const int32_t argValue)
+void IPCMessage::appendInt32 (const int32_t argKey, const int32_t argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const int64_t argValue)
+void IPCMessage::appendInt64 (const int32_t argKey, const int64_t argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const size_t argValue)
+void IPCMessage::appendSize (const int32_t argKey, const size_t argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const float argValue)
+void IPCMessage::appendFloat (const int32_t argKey, const float argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const double argValue)
+void IPCMessage::appendDouble (const int32_t argKey, const double argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const char* const argValue)
+void IPCMessage::appendString (const int32_t argKey, const char* const argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const std::vector<uint8_t>& argValue)
+void IPCMessage::appendBytes (const int32_t argKey, const std::vector<uint8_t>& argValue)
 {
     const auto encodedData { base64_encode (argValue.data (), argValue.size (), false) };
     _appendAttribute (argKey).set_value (encodedData.c_str ());
@@ -386,7 +394,7 @@ pugi::xml_attribute IPCMessage::_appendAttribute (const int32_t argKey)
     return _root.append_attribute (_getEncodedKey (argKey));
 }
 
-void IPCMessage::_appendArg (const int32_t argKey, const IPCMessage& argValue)
+void IPCMessage::appendMessage (const int32_t argKey, const IPCMessage& argValue)
 {
     _makeWritableIfNeeded ();
     _root.append_copy (argValue._root).set_name (_getEncodedKey (argKey));
@@ -443,103 +451,110 @@ std::string IPCMessage::createEncodedMessage () const
 #endif
 }
 
-void IPCMessage::_readArg (const int32_t argKey, int32_t& argValue, bool* didFindKey) const
+bool IPCMessage::readInt32 (const int32_t argKey, int32_t& argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (!_checkKeyFound (!attribute.empty (), didFindKey))
+    if (attribute.empty ())
     {
         argValue = 0;
-        return;
+        return false;
     }
     static_assert (sizeof (int) >= sizeof (int32_t), "integer type needs adjustment for this compiler setup");
     argValue = attribute.as_int ();
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, int64_t& argValue, bool* didFindKey) const
+bool IPCMessage::readInt64 (const int32_t argKey, int64_t& argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (!_checkKeyFound (!attribute.empty (), didFindKey))
+    if (attribute.empty ())
     {
         argValue = 0;
-        return;
+        return false;
     }
     static_assert (sizeof (long long) >= sizeof (int64_t), "integer type needs adjustment for this compiler setup");
     argValue = attribute.as_llong ();
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, size_t& argValue, bool* didFindKey) const
+bool IPCMessage::readSize (const int32_t argKey, size_t& argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (!_checkKeyFound (!attribute.empty (), didFindKey))
+    if (attribute.empty ())
     {
         argValue = 0U;
-        return;
+        return false;
     }
     static_assert (sizeof (unsigned long long) >= sizeof (size_t), "integer type needs adjustment for this compiler setup");
     argValue = attribute.as_ullong ();
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, float& argValue, bool* didFindKey) const
+bool IPCMessage::readFloat (const int32_t argKey, float& argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (!_checkKeyFound (!attribute.empty (), didFindKey))
+    if (attribute.empty ())
     {
         argValue = 0.0f;
-        return;
+        return false;
     }
     argValue = attribute.as_float ();
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, double& argValue, bool* didFindKey) const
+bool IPCMessage::readDouble (const int32_t argKey, double& argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (!_checkKeyFound (!attribute.empty (), didFindKey))
+    if (attribute.empty ())
     {
         argValue = 0.0;
-        return;
+        return false;
     }
     argValue = attribute.as_double ();
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, const char*& argValue, bool* didFindKey) const
+bool IPCMessage::readString (const int32_t argKey, const char*& argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (!_checkKeyFound (!attribute.empty (), didFindKey))
+    if (attribute.empty ())
     {
         argValue = nullptr;
-        return;
+        return false;
     }
     argValue = attribute.as_string ();
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, std::vector<uint8_t>& argValue, bool* didFindKey) const
+bool IPCMessage::readBytes (const int32_t argKey, std::vector<uint8_t>& argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (!_checkKeyFound (!attribute.empty (), didFindKey))
+    if (attribute.empty ())
     {
         argValue.clear ();
-        return;
+        return false;
     }
 
     const auto decodedData { base64_decode (attribute.as_string (), false) };
     argValue.assign ((const uint8_t*) decodedData.c_str (), (const uint8_t*) decodedData.c_str () + decodedData.size ());
+    return true;
 }
 
-void IPCMessage::_readArg (const int32_t argKey, IPCMessage& argValue, bool* didFindKey) const
+bool IPCMessage::readMessage (const int32_t argKey, IPCMessage& argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto child { _root.child (_getEncodedKey (argKey)) };
-    if (!_checkKeyFound (!child.empty (), didFindKey))
+    if (child.empty ())
     {
         argValue = {};
-        return;
+        return false;
     }
 
     if (_isWritable)
@@ -555,6 +570,7 @@ void IPCMessage::_readArg (const int32_t argKey, IPCMessage& argValue, bool* did
         argValue._root = child;
         argValue._isWritable = false;
     }
+    return true;
 }
 
 //------------------------------------------------------------------------------
