@@ -351,10 +351,17 @@ void PlaybackController::requestEnableCycle (bool enable) noexcept
 /*******************************************************************************/
 
 const ARAFactory* _factory {};
-IPCPort _hostCommandsPort {};
-IPCPort _plugInCallbacksPort {};
+IPCPort* _plugInCallbacksPort {};
 
-IPCMessage _hostCommandHandler (const int32_t messageID, const IPCMessage& message)
+void setupHostCommandHandler (const ARAFactory* factory, IPCPort* plugInCallbacksPort)
+{
+    ARA_INTERNAL_ASSERT(factory->highestSupportedApiGeneration >= kARAAPIGeneration_2_0_Final);
+
+    _factory = factory;
+    _plugInCallbacksPort = plugInCallbacksPort;
+}
+
+IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& message)
 {
 //  ARA_LOG ("_hostCommandHandler received message %s", decodePlugInMethodID (messageID));
 
@@ -380,11 +387,11 @@ IPCMessage _hostCommandHandler (const int32_t messageID, const IPCMessage& messa
                                 providePlaybackController, playbackControllerHostRef,
                                 properties);
 
-        const auto audioAccessController { new AudioAccessController { _plugInCallbacksPort, audioAccessControllerHostRef } };
-        const auto archivingController { new ArchivingController { _plugInCallbacksPort, archivingControllerHostRef } };
-        const auto contentAccessController { (provideContentAccessController != kARAFalse) ? new ContentAccessController { _plugInCallbacksPort, contentAccessControllerHostRef } : nullptr };
-        const auto modelUpdateController { (provideModelUpdateController != kARAFalse) ? new ModelUpdateController { _plugInCallbacksPort, modelUpdateControllerHostRef } : nullptr };
-        const auto playbackController { (providePlaybackController != kARAFalse) ? new PlaybackController { _plugInCallbacksPort, playbackControllerHostRef } : nullptr };
+        const auto audioAccessController { new AudioAccessController { *_plugInCallbacksPort, audioAccessControllerHostRef } };
+        const auto archivingController { new ArchivingController { *_plugInCallbacksPort, archivingControllerHostRef } };
+        const auto contentAccessController { (provideContentAccessController != kARAFalse) ? new ContentAccessController { *_plugInCallbacksPort, contentAccessControllerHostRef } : nullptr };
+        const auto modelUpdateController { (provideModelUpdateController != kARAFalse) ? new ModelUpdateController { *_plugInCallbacksPort, modelUpdateControllerHostRef } : nullptr };
+        const auto playbackController { (providePlaybackController != kARAFalse) ? new PlaybackController { *_plugInCallbacksPort, playbackControllerHostRef } : nullptr };
 
         const auto hostInstance { new Host::DocumentControllerHostInstance { audioAccessController, archivingController,
                                                                                 contentAccessController, modelUpdateController, playbackController } };
@@ -411,8 +418,6 @@ IPCMessage _hostCommandHandler (const int32_t messageID, const IPCMessage& messa
         delete documentController->getHostInstance ()->getAudioAccessController ();
         delete documentController->getHostInstance ();
         delete documentController;
-
-        CFRunLoopStop (CFRunLoopGetCurrent ()); // will terminate run loop & shut down
     }
     else if (messageID == PLUGIN_METHOD_ID (ARADocumentControllerInterface, getFactory))
     {
@@ -982,15 +987,6 @@ IPCMessage _hostCommandHandler (const int32_t messageID, const IPCMessage& messa
         ARA_INTERNAL_ASSERT (false && "unhandled message ID");
     }
     return {};
-}
-
-void runHost (const ARAFactory& factory, const char* hostCommandsPortID, const char* plugInCallbacksPortID)
-{
-    _factory = &factory;
-    _hostCommandsPort = IPCPort::createPublishingID (hostCommandsPortID, &_hostCommandHandler);
-    _plugInCallbacksPort = IPCPort::createConnectedToID (plugInCallbacksPortID);
-
-    CFRunLoopRunInMode (kCFRunLoopDefaultMode, DBL_MAX, false);
 }
 
 }   // namespace ProxyHost

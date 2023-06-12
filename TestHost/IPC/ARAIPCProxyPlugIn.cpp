@@ -17,6 +17,7 @@
 //------------------------------------------------------------------------------
 
 #include "ARAIPCProxyPlugIn.h"
+#include "ExamplesCommon/Utilities/StdUniquePtrUtilities.h"
 
 namespace ARA {
 namespace ProxyPlugIn {
@@ -881,6 +882,8 @@ PlugInExtension::PlugInExtension (ARADocumentControllerRef documentControllerRef
               (((knownRoles & kARAEditorViewRole) == 0) || ((assignedRoles & kARAEditorViewRole) != 0)) ?
                     new EditorView (_documentController, reinterpret_cast<ARAEditorViewRef> (remotePlugInExtensionRef)) : nullptr }
 {
+    _instance.plugInExtensionRef = reinterpret_cast<ARAPlugInExtensionRef> (remotePlugInExtensionRef);
+
     ARA_LOG_HOST_ENTRY (this);
     ARA_VALIDATE_API_ARGUMENT (documentControllerRef, isValidInstance (_documentController));
 
@@ -907,9 +910,8 @@ PlugInExtension::~PlugInExtension () noexcept
 
 /*******************************************************************************/
 
-Factory::Factory (const char* hostCommandsPortID, const char* plugInCallbacksPortID)
-: _plugInCallbacksThread { &Factory::_plugInCallbacksThreadFunction, this, plugInCallbacksPortID },
-  _hostCommandsPort { IPCPort::createConnectedToID (hostCommandsPortID) }
+Factory::Factory (IPCPort& hostCommandsPort)
+: _hostCommandsPort { hostCommandsPort }
 {
     // keep local copy of message before decoding it so that all pointer data remains valid until properly copied
     const auto remoteFactoryMsg { ARA::ARAIPCMessageSender (_hostCommandsPort).remoteCallWithReply<IPCMessage> (kGetFactoryMethodID) };
@@ -950,26 +952,16 @@ Factory::Factory (const char* hostCommandsPortID, const char* plugInCallbacksPor
     _factory.analyzeableContentTypes = _factoryAnalyzableTypes.data ();
 }
 
-Factory::~Factory ()
-{
-    _terminateCallbacksThread = true;
-    _plugInCallbacksThread.join ();
-}
-
-void Factory::_plugInCallbacksThreadFunction (const char* plugInCallbacksPortID)
-{
-    // \todo It would be cleaner to create the port in the c'tor from the main thread,
-    //       but for some reason reading audio is then much slower compared to creating it here...?
-    _plugInCallbacksPort = IPCPort::createPublishingID (plugInCallbacksPortID, &Factory::_plugInCallbackDispatcher);
-
-    while (!_terminateCallbacksThread)
-        CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.05, false);
-}
-
 const ARADocumentControllerInstance* Factory::createDocumentControllerWithDocument (const ARADocumentControllerHostInstance* hostInstance, const ARADocumentProperties* properties)
 {
     auto result { new DocumentController { _hostCommandsPort, &_factory, hostInstance, properties } };
     return result->getInstance ();
+}
+
+std::unique_ptr<PlugInExtension> Factory::createPlugInExtension (size_t remoteExtensionRef, ARADocumentControllerRef documentControllerRef,
+                                                                 ARAPlugInInstanceRoleFlags knownRoles, ARAPlugInInstanceRoleFlags assignedRoles)
+{
+    return std::make_unique<PlugInExtension> (documentControllerRef, knownRoles, assignedRoles, remoteExtensionRef);
 }
 
 template<typename FloatT>
@@ -991,7 +983,7 @@ IPCMessage _readAudioSamples (DocumentController* documentController, HostAudioR
                                                        (endian == CFByteOrderLittleEndian) ? kARATrue : kARAFalse });
 }
 
-IPCMessage Factory::_plugInCallbackDispatcher (const int32_t messageID, const IPCMessage& message)
+IPCMessage Factory::plugInCallbacksDispatcher (const int32_t messageID, const IPCMessage& message)
 {
 //  ARA_LOG ("_plugInCallbackDispatcher received message %s", decodeHostMethodID (messageID));
 

@@ -26,6 +26,7 @@
 #include "IPCPort.h"
 #include "ARAIPCEncoding.h"
 
+#include <memory>
 #include <set>
 #include <string>
 #include <thread>
@@ -305,7 +306,7 @@ public:
 
 private:
     DocumentController* const _documentController;
-    PlugIn::PlugInExtensionInstance const _instance;
+    PlugIn::PlugInExtensionInstance _instance;
 
     ARA_HOST_MANAGED_OBJECT (PlugInExtension)
 };
@@ -315,25 +316,27 @@ private:
 class Factory
 {
 public:
-    Factory (const char* hostCommandsPortID, const char* plugInCallbacksPortID);
-    ~Factory ();
+    Factory (IPCPort& hostCommandsPort);
 
     // proxy document controller creation call, to be used instead of getFactory ()->createDocumentControllerWithDocument ()
     const ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARADocumentControllerHostInstance* hostInstance,
                                                                                const ARADocumentProperties* properties);
 
     // copy of the remote factory data, but with all function calls removed
-    const ARAFactory* getFactory () { return &_factory; }
+    const ARAFactory* getFactory () const { return &_factory; }
+
+    // handler of received messages
+    static IPCMessage plugInCallbacksDispatcher (const int32_t messageID, const IPCMessage& message);
+
+    // \todo to perform the binding, the host needs access to this translation...
+    static ARADocumentControllerRef getDocumentControllerRemoteRef (ARADocumentControllerRef documentControllerRef)
+    { return static_cast<DocumentController*> (PlugIn::fromRef (documentControllerRef))->getRemoteRef (); }
+
+    static std::unique_ptr<PlugInExtension> createPlugInExtension (size_t remoteExtensionRef, ARADocumentControllerRef documentControllerRef,
+                                                                   ARAPlugInInstanceRoleFlags knownRoles, ARAPlugInInstanceRoleFlags assignedRoles);
 
 private:
-    void _plugInCallbacksThreadFunction (const char* plugInCallbacksPortID);
-    static IPCMessage _plugInCallbackDispatcher (const int32_t messageID, const IPCMessage& message);
-
-private:
-    std::thread _plugInCallbacksThread;
-    bool _terminateCallbacksThread { false };
-    IPCPort _plugInCallbacksPort;
-    IPCPort _hostCommandsPort;
+    IPCPort& _hostCommandsPort;
 
     ARAFactory _factory;
     struct

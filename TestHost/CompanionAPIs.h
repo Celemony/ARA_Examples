@@ -40,6 +40,10 @@
     #define ARA_ENABLE_IPC 0
 #endif
 
+#if ARA_ENABLE_IPC
+    #include "IPC/IPCMessage.h"
+#endif
+
 
 /*******************************************************************************/
 // Wrapper class for a companion API plug-in instance
@@ -47,7 +51,11 @@ class PlugInInstance
 {
 protected:
     explicit PlugInInstance (const ARA::ARAPlugInExtensionInstance* instance)
-    : _playbackRenderer { instance },
+    :
+#if ARA_ENABLE_IPC
+      _instance { instance },
+#endif
+      _playbackRenderer { instance },
       _editorRenderer { instance },
       _editorView { instance }
     {}
@@ -66,7 +74,14 @@ public:
     ARA::Host::EditorRenderer* getEditorRenderer () { return &_editorRenderer; }
     ARA::Host::EditorView* getEditorView () { return &_editorView; }
 
+#if ARA_ENABLE_IPC
+    const ARA::ARAPlugInExtensionInstance* getARAPlugInExtensionInstance () { return _instance; }
+#endif
+
 private:
+#if ARA_ENABLE_IPC
+    const ARA::ARAPlugInExtensionInstance* _instance;
+#endif
     ARA::Host::PlaybackRenderer _playbackRenderer;
     ARA::Host::EditorRenderer _editorRenderer;
     ARA::Host::EditorView _editorView;
@@ -119,3 +134,19 @@ private:
     const ARA::ARAFactory* _factory { nullptr };
     bool _usesIPC { false };
 };
+
+#if ARA_ENABLE_IPC
+/*******************************************************************************/
+// Wrapper class for the remote process main().
+class RemoteHost
+{
+public:
+    static int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& hostCommandsPortID, const std::string& plugInCallbacksPortID);
+
+private:
+    static IPCMessage _hostCommandHandler (const int32_t messageID, const IPCMessage& message);
+
+private:
+    static std::unique_ptr<PlugInEntry> _plugInEntry;
+};
+#endif

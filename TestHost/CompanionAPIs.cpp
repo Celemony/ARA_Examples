@@ -40,9 +40,38 @@
 /*******************************************************************************/
 
 #if ARA_ENABLE_IPC
-    #include "IPC/ARAIPCEncoding.h"
-    #include "IPC/ARAIPCProxyPlugIn.h"
-#endif
+
+#include "IPC/ARAIPCProxyHost.h"
+#include "IPC/ARAIPCProxyPlugIn.h"
+
+// minimal set of commands to run a companion API plug-in through IPC
+enum
+{
+    // \todo to ease conflict-free sharing of the IPC channels, should we limit the message IDs used by
+    //       the generic ARA IPC to a well-defined range (e.g. non-negative, or at least not 0 and -1)
+    //       the channel can then transform the ARA IPC IDs to occupy some range not used by non-ARA messages
+    kIPCCreateARAEffect = -1,
+    kIPCStartRendering = -2,
+    kIPCRenderSamples = -3,
+    kIPCStopRendering = -4,
+    kIPCDestroyEffect = -5,
+    kIPCTerminate = -6
+};
+
+// helper function to create unique port IDs for each run
+static const std::string _createPortID ()
+{
+    CFUUIDRef uuid { CFUUIDCreate (kCFAllocatorDefault) };
+    CFStringRef asString { CFUUIDCreateString(kCFAllocatorDefault, uuid) };
+    const auto result { std::string { "com.arademocompany.TestHost.IPC." } + CFStringGetCStringPtr (asString, kCFStringEncodingMacRoman) };
+    CFRelease (asString);
+    CFRelease (uuid);
+    return result;
+}
+
+#endif // ARA_ENABLE_IPC
+
+/*******************************************************************************/
 
 #if defined (__APPLE__)
 
@@ -204,67 +233,85 @@ private:
 
 #if ARA_ENABLE_IPC
 
-#if defined (__APPLE__)
-
-class IPCAUPlugInInstance : public PlugInInstance
+class IPCPlugInInstance : public PlugInInstance
 {
 public:
-    IPCAUPlugInInstance (const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance)
-    : PlugInInstance { plugInExtensionInstance }
+    IPCPlugInInstance (size_t remoteRef, IPCPort& port, std::unique_ptr<ARA::ProxyPlugIn::PlugInExtension> plugInExtension)
+    : PlugInInstance { plugInExtension->getInstance () },
+      _remoteRef { remoteRef },
+      _sender { port },
+      _plugInExtension { std::move (plugInExtension) }
     {}
 
-    ~IPCAUPlugInInstance () override
+    ~IPCPlugInInstance () override
     {
+        _sender.remoteCallWithoutReply (kIPCDestroyEffect, _remoteRef, reinterpret_cast<size_t> (_plugInExtension->getInstance ()->plugInExtensionRef));
     }
 
-    void startRendering (int /*maxBlockSize*/, double /*sampleRate*/) override
+    void startRendering (int maxBlockSize, double sampleRate) override
     {
-        // \todo dummy
+        _sender.remoteCallWithoutReply (kIPCStartRendering, _remoteRef, maxBlockSize, sampleRate);
     }
 
-    void renderSamples (int /*blockSize*/, int64_t /*samplePosition*/, float* /*buffer*/) override
+    void renderSamples (int blockSize, int64_t samplePosition, float* buffer) override
     {
-        // \todo dummy
+        // \todo we're copying twice here: msg -> vector, vector -> buffer
+        //       we should change the IPCMessage API to directly decode to buffers, or to return
+        //       an arrayview-like object (same problem for strings - albeit these are much much smaller)
+        const auto reply { _sender.remoteCallWithReply<std::vector<uint8_t>> (kIPCRenderSamples, _remoteRef, samplePosition,
+                                            std::vector<uint8_t> { reinterpret_cast<const uint8_t*> (buffer), reinterpret_cast<const uint8_t*> (buffer + blockSize) }) };
+        std::memcpy (buffer, reply.data (), static_cast<size_t> (blockSize) * sizeof (*buffer));
     }
 
     void stopRendering () override
     {
-        // \todo dummy
+        _sender.remoteCallWithoutReply (kIPCStopRendering, _remoteRef);
     }
 
 private:
+    size_t const _remoteRef;
+    ARA::ARAIPCMessageSender _sender;
+    std::unique_ptr<ARA::ProxyPlugIn::PlugInExtension> _plugInExtension;
 };
 
-class IPCAUPlugInEntry : public PlugInEntry
+/*******************************************************************************/
+
+class IPCPlugInEntry : public PlugInEntry
 {
 private:
-    static const std::string _createPortID ()
+
+    // helper class to launch remote before initializing related port members
+    struct RemoteLauncher
     {
-        CFUUIDRef uuid { CFUUIDCreate (kCFAllocatorDefault) };
-        CFStringRef asString { CFUUIDCreateString(kCFAllocatorDefault, uuid) };
-        const auto result { std::string { "com.arademocompany.TestHost.IPC." } + CFStringGetCStringPtr (asString, kCFStringEncodingMacRoman) };
-        CFRelease (asString);
-        CFRelease (uuid);
-        return result;
-    }
+        explicit RemoteLauncher (const std::string& launchArgs, const std::string& hostCommandsPortID, const std::string& plugInCallbacksPortID)
+        {
+            ARA_LOG ("launching remote plug-in process.");
+            const auto commandLine { std:: string { "./ARATestHost " + launchArgs +
+                                                    " -_ipcRemote " + hostCommandsPortID + " " + plugInCallbacksPortID + " &" } };
+            const auto launchResult { system (commandLine.c_str ()) };
+            ARA_INTERNAL_ASSERT (launchResult == 0);
+        }
+    };
 
 public:
-    IPCAUPlugInEntry (const std::string& type, const std::string& subType, const std::string& manufacturer, ARA::ARAAssertFunction* assertFunctionAddress)
+    IPCPlugInEntry (const std::string& launchArgs, ARA::ARAAssertFunction* assertFunctionAddress)
     : _hostCommandsPortID { _createPortID () },
-      _plugInCallbacksPortID { _createPortID () }
+      _plugInCallbacksPortID { _createPortID () },
+      _remoteLauncher { launchArgs, _hostCommandsPortID, _plugInCallbacksPortID },
+      _plugInCallbacksThread { &IPCPlugInEntry::_plugInCallbacksThreadFunction, this },
+      _hostCommandsPort { IPCPort::createConnectedToID (_hostCommandsPortID.c_str ()) },
+      _proxyFactory { std::make_unique<ARA::ProxyPlugIn::Factory> (_hostCommandsPort) }
     {
-        ARA_LOG ("launching remote plug-in process.");
-        const auto commandLine { std:: string { "./ARATestHost -au " + type + " " + subType + " " + manufacturer +
-                                                " -_ipcRemote " + _hostCommandsPortID + " " + _plugInCallbacksPortID + " &" } };
-        const auto launchResult = system (commandLine.c_str ());
-        ARA_INTERNAL_ASSERT (launchResult == 0);
-
-        _proxyFactory = std::make_unique<ARA::ProxyPlugIn::Factory> (_hostCommandsPortID.c_str (), _plugInCallbacksPortID.c_str ());
-
         setUsesIPC ();
         initializeARA (_proxyFactory->getFactory (), assertFunctionAddress);
+    }
 
-        _description = createAUEntryDescription (type, subType, manufacturer, true);
+    ~IPCPlugInEntry () override
+    {
+        ARA::ARAIPCMessageSender (_hostCommandsPort).remoteCallWithoutReply (kIPCTerminate);
+
+        _terminateCallbacksThread = true;
+        _plugInCallbacksThread.join ();
     }
 
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
@@ -273,19 +320,146 @@ public:
         return _proxyFactory->createDocumentControllerWithDocument (hostInstance, properties);
     }
 
-    std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef /*documentControllerRef*/, ARA::ARAPlugInInstanceRoleFlags /*assignedRoles*/) override
+    std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
     {
-        // \todo dummy
-        return nullptr;
+        // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
+        const ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
+
+        const auto remoteDocumentControllerRef { _proxyFactory->getDocumentControllerRemoteRef (documentControllerRef) };
+        const auto result { ARA::ARAIPCMessageSender { _hostCommandsPort }.remoteCallWithReply<IPCMessage> (kIPCCreateARAEffect, remoteDocumentControllerRef, assignedRoles) };
+        const auto remoteInstanceRef { result.getArgValue<size_t> (0) };
+        const auto remoteExtensionRef { result.getArgValue<size_t> (1) };
+        auto plugInExtension { _proxyFactory->createPlugInExtension (remoteExtensionRef, documentControllerRef, knownRoles, assignedRoles) };
+        validatePlugInExtensionInstance (plugInExtension->getInstance (), assignedRoles);
+        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _hostCommandsPort, std::move (plugInExtension));
+    }
+
+private:
+    void _plugInCallbacksThreadFunction ()
+    {
+        // \todo It would be cleaner to create the port in the c'tor from the main thread,
+        //       but for some reason reading audio is then much slower compared to creating it here...?
+        _plugInCallbacksPort = IPCPort::createPublishingID (_plugInCallbacksPortID.c_str (), &ARA::ProxyPlugIn::Factory::plugInCallbacksDispatcher);
+
+        while (!_terminateCallbacksThread)
+            CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.05, false);
     }
 
 private:
     const std::string _hostCommandsPortID;
     const std::string _plugInCallbacksPortID;
+
+    RemoteLauncher _remoteLauncher;
+
+    std::thread _plugInCallbacksThread;
+    bool _terminateCallbacksThread { false };
+    IPCPort _plugInCallbacksPort;
+    IPCPort _hostCommandsPort;
+
     std::unique_ptr<ARA::ProxyPlugIn::Factory> _proxyFactory;
 };
 
+/*******************************************************************************/
+
+#if defined (__APPLE__)
+
+class IPCAUPlugInEntry : public IPCPlugInEntry
+{
+public:
+    IPCAUPlugInEntry (const std::string& type, const std::string& subType, const std::string& manufacturer, ARA::ARAAssertFunction* assertFunctionAddress)
+    : IPCPlugInEntry { std::string { "-au " } + type + " " + subType + " " + manufacturer, assertFunctionAddress }
+    {
+        _description = createAUEntryDescription (type, subType, manufacturer, true);
+    }
+};
+
 #endif // defined (__APPLE__)
+
+/*******************************************************************************/
+
+std::unique_ptr<PlugInEntry> RemoteHost::_plugInEntry {};
+
+IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMessage& message)
+{
+    if (messageID == kIPCCreateARAEffect)
+    {
+        ARA::ARADocumentControllerRef documentControllerRemoteRef;
+        ARA::ARAPlugInInstanceRoleFlags assignedRoles;
+        ARA::decodeArguments (message, documentControllerRemoteRef, assignedRoles);
+
+        auto plugInInstance { _plugInEntry->createARAPlugInInstanceWithRoles (ARA::ProxyHost::getDocumentControllerRefForRemoteRef (documentControllerRemoteRef), assignedRoles) };
+        auto plugInExtensionRef { ARA::ProxyHost::createPlugInExtension (plugInInstance->getARAPlugInExtensionInstance ()) };
+
+        IPCMessage reply { ARA::encodeArguments (reinterpret_cast<size_t> (plugInInstance.get ()), plugInExtensionRef) };
+        plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
+        return reply;
+    }
+    else if (messageID == kIPCStartRendering)
+    {
+        size_t plugInInstanceRef;
+        int32_t maxBlockSize;
+        double sampleRate;
+        ARA::decodeArguments (message, plugInInstanceRef, maxBlockSize, sampleRate);
+
+        reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->startRendering (maxBlockSize, sampleRate);
+        return {};
+    }
+    else if (messageID == kIPCRenderSamples)
+    {
+        size_t plugInInstanceRef;
+        int64_t samplePosition;
+        std::vector<uint8_t> buffer;
+        ARA::decodeArguments (message, plugInInstanceRef, samplePosition, buffer);
+
+        // \todo this ignores potential float data alignment or byte order issues...
+        reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->renderSamples (static_cast<int> (buffer.size () / sizeof(float)),
+                                                                        samplePosition, reinterpret_cast<float*> (buffer.data ()));
+        return ARA::encodeArguments (buffer);
+    }
+    else if (messageID == kIPCStopRendering)
+    {
+        size_t plugInInstanceRef;
+        ARA::decodeArguments (message, plugInInstanceRef);
+
+        reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->stopRendering ();
+        return {};
+    }
+    else if (messageID == kIPCDestroyEffect)
+    {
+        size_t plugInInstanceRef;
+        ARA::ARAPlugInExtensionRef plugInExtensionRef;
+        ARA::decodeArguments (message, plugInInstanceRef, plugInExtensionRef);
+
+        ARA::ProxyHost::destroyPlugInExtension (plugInExtensionRef);
+        delete reinterpret_cast<PlugInInstance*> (plugInInstanceRef);
+        return {};
+    }
+    else if (messageID == kIPCTerminate)
+    {
+        CFRunLoopStop (CFRunLoopGetCurrent ()); // will terminate run loop & shut down
+        return {};
+    }
+    else
+    {
+        return ARA::ProxyHost::hostCommandHandler (messageID, message);
+    }
+}
+
+int RemoteHost::main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& hostCommandsPortID, const std::string& plugInCallbacksPortID)
+{
+    _plugInEntry = std::move (plugInEntry);
+
+    auto hostCommandsPort { IPCPort::createPublishingID (hostCommandsPortID.c_str (), &_hostCommandHandler) };
+    auto plugInCallbacksPort { IPCPort::createConnectedToID (plugInCallbacksPortID.c_str ()) };
+
+    ARA::ProxyHost::setupHostCommandHandler (_plugInEntry->getARAFactory (), &plugInCallbacksPort);
+
+    CFRunLoopRunInMode (kCFRunLoopDefaultMode, DBL_MAX, false);
+
+    _plugInEntry.reset ();
+
+    return 0;
+}
 
 #endif // ARA_ENABLE_IPC
 
