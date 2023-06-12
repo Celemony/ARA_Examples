@@ -97,7 +97,7 @@ struct HostAudioReader
 {
     AudioSource* audioSource;
     ARAAudioReaderHostRef hostRef;
-    ARABool use64BitSamples;
+    size_t sampleSize;
 };
 ARA_MAP_HOST_REF (HostAudioReader, ARAAudioReaderHostRef)
 
@@ -991,24 +991,6 @@ std::unique_ptr<PlugInExtension> Factory::createPlugInExtension (size_t remoteEx
     return std::make_unique<PlugInExtension> (port, documentControllerRef, knownRoles, assignedRoles, remoteExtensionRef);
 }
 
-template<typename FloatT>
-IPCMessage _readAudioSamples (DocumentController* documentController, HostAudioReader* reader,
-                                 ARASamplePosition samplePosition, ARASampleCount samplesPerChannel)
-{
-    std::vector<ARAByte> bufferData;
-    bufferData.resize (sizeof (FloatT) * static_cast<size_t> (reader->audioSource->_channelCount * samplesPerChannel));
-    void* sampleBuffers[32];
-    ARA_INTERNAL_ASSERT(reader->audioSource->_channelCount < 32);
-    for (auto i { 0 }; i < reader->audioSource->_channelCount; ++i)
-        sampleBuffers[i] = bufferData.data () + sizeof (FloatT) * static_cast<size_t> (i * samplesPerChannel);
-
-    BytesEncoder bytesReader { bufferData };
-    if (documentController->getHostAudioAccessController ()->readAudioSamples (reader->hostRef, samplePosition, samplesPerChannel, sampleBuffers))
-        return encodeReply (bytesReader);
-    else
-        return {};
-}
-
 IPCMessage Factory::plugInCallbacksDispatcher (const int32_t messageID, const IPCMessage& message)
 {
 //  ARA_LOG ("_plugInCallbackDispatcher received message %s", decodeHostMethodID (messageID));
@@ -1026,7 +1008,7 @@ IPCMessage Factory::plugInCallbacksDispatcher (const int32_t messageID, const IP
         auto audioSource { fromHostRef (audioSourceHostRef) };
         ARA_VALIDATE_API_ARGUMENT (audioSourceHostRef, isValidInstance (audioSource));
 
-        auto reader { new HostAudioReader { audioSource, nullptr, use64BitSamples } };
+        auto reader { new HostAudioReader { audioSource, nullptr, (use64BitSamples != kARAFalse) ? sizeof (double) : sizeof (float) } };
         reader->hostRef = documentController->getHostAudioAccessController ()->createAudioReaderForSource (audioSource->_hostRef, (use64BitSamples) ? kARATrue : kARAFalse);
         ARAAudioReaderHostRef audioReaderHostRef { toHostRef (reader) };
         return encodeReply (audioReaderHostRef);
@@ -1043,10 +1025,32 @@ IPCMessage Factory::plugInCallbacksDispatcher (const int32_t messageID, const IP
         ARA_VALIDATE_API_ARGUMENT (controllerHostRef, isValidInstance (documentController));
 
         auto reader { fromHostRef (audioReaderHostRef) };
-        if (reader->use64BitSamples)
-            return _readAudioSamples<double> (documentController, reader, samplePosition, samplesPerChannel);
+
+        // \todo using static here assumes single-threaded callbacks, but currently this is a valid requirement
+        static std::vector<ARAByte> bufferData;
+        const auto channelCount { static_cast<size_t> (reader->audioSource->_channelCount) };
+        const auto bufferSize { reader->sampleSize * static_cast<size_t> (samplesPerChannel) };
+        const auto allBuffersSize { channelCount * bufferSize };
+        if (bufferData.size () < allBuffersSize)
+            bufferData.resize (allBuffersSize);
+
+        static std::vector<void *> sampleBuffers;
+        static std::vector<BytesEncoder> encoders;
+        if (sampleBuffers.size () < channelCount)
+            sampleBuffers.resize (channelCount, nullptr);
+        if (encoders.size () < channelCount)
+            encoders.resize (channelCount, { nullptr, 0 });
+        for (auto i { 0U }; i < channelCount; ++i)
+        {
+            const auto buffer { bufferData.data () + i * bufferSize };
+            sampleBuffers[i] = buffer;
+            encoders[i] = { buffer, bufferSize };
+        }
+
+        if (documentController->getHostAudioAccessController ()->readAudioSamples (reader->hostRef, samplePosition, samplesPerChannel, sampleBuffers.data ()))
+            return encodeReply (ArrayArgument<const BytesEncoder> { encoders.data (), encoders.size () });
         else
-            return _readAudioSamples<float> (documentController, reader, samplePosition, samplesPerChannel);
+            return {};
     }
     else if (messageID == HOST_METHOD_ID (ARAAudioAccessControllerInterface, destroyAudioReader))
     {
