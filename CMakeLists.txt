@@ -1622,6 +1622,8 @@ if(APPLE)
 
     add_executable(ARAIPCDemoPlugInProcess
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCEncoding.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCProxyHost.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCProxyHost.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCPort.h"
@@ -1664,6 +1666,8 @@ if(APPLE)
 
     add_executable(ARAIPCDemoMainProcess
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCEncoding.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCProxyPlugIn.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/ARAIPCProxyPlugIn.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCMessage.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/IPCDemo/IPCPort.h"
@@ -1681,6 +1685,11 @@ if(APPLE)
 
     target_link_libraries(ARAIPCDemoMainProcess PRIVATE
         ARAPlugInHosting
+        # \todo Linking the plug-in library (used in the IPC proxy) results in some duplicate symbols
+        #       with host libs - however these should be identical since we use the same compiler
+        #       setup for both libs. Actual host might rather not use the libraries and directly
+        #       compile the required files within their target.
+        ARA_PlugIn_Library
     )
 
     configure_ARA_Examples_target(ARAIPCDemoMainProcess)
