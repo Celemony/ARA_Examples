@@ -1026,7 +1026,7 @@ IPCMessage Factory::plugInCallbacksDispatcher (const int32_t messageID, const IP
 
         auto reader { fromHostRef (audioReaderHostRef) };
 
-        // \todo using static here assumes single-threaded callbacks, but currently this is a valid requirement
+        // \todo using static (plus not copy bytes) here assumes single-threaded callbacks, but currently this is a valid requirement
         static std::vector<ARAByte> bufferData;
         const auto channelCount { static_cast<size_t> (reader->audioSource->_channelCount) };
         const auto bufferSize { reader->sampleSize * static_cast<size_t> (samplesPerChannel) };
@@ -1039,12 +1039,12 @@ IPCMessage Factory::plugInCallbacksDispatcher (const int32_t messageID, const IP
         if (sampleBuffers.size () < channelCount)
             sampleBuffers.resize (channelCount, nullptr);
         if (encoders.size () < channelCount)
-            encoders.resize (channelCount, { nullptr, 0 });
+            encoders.resize (channelCount, { nullptr, 0, false });
         for (auto i { 0U }; i < channelCount; ++i)
         {
             const auto buffer { bufferData.data () + i * bufferSize };
             sampleBuffers[i] = buffer;
-            encoders[i] = { buffer, bufferSize };
+            encoders[i] = { buffer, bufferSize, false };
         }
 
         if (documentController->getHostAudioAccessController ()->readAudioSamples (reader->hostRef, samplePosition, samplesPerChannel, sampleBuffers.data ()))
@@ -1089,11 +1089,12 @@ IPCMessage Factory::plugInCallbacksDispatcher (const int32_t messageID, const IP
         auto documentController { fromHostRef (controllerHostRef) };
         ARA_VALIDATE_API_ARGUMENT (controllerHostRef, isValidInstance (documentController));
 
-        std::vector<ARAByte> bytes;
+        // \todo using static here assumes single-threaded callbacks, but currently this is a valid requirement
+        static std::vector<ARAByte> bytes;
         bytes.resize (length);
         if (!documentController->getHostArchivingController ()->readBytesFromArchive (archiveReaderHostRef, position, length, bytes.data ()))
             bytes.clear ();
-        return encodeReply (BytesEncoder { bytes });
+        return encodeReply (BytesEncoder { bytes, false });
     }
     else if (messageID == HOST_METHOD_ID (ARAArchivingControllerInterface, writeBytesToArchive))
     {

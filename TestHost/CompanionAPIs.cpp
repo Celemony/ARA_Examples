@@ -299,7 +299,7 @@ public:
         const auto byteSize { static_cast<size_t> (blockSize) * sizeof (float) };
         auto resultSize { byteSize };
         ARA::BytesDecoder reply { reinterpret_cast<uint8_t*> (buffer), resultSize };
-        _sender.remoteCallWithReply (reply, kIPCRenderSamples, _remoteRef, samplePosition, ARA::BytesEncoder { reinterpret_cast<const uint8_t*> (buffer), byteSize });
+        _sender.remoteCallWithReply (reply, kIPCRenderSamples, _remoteRef, samplePosition, ARA::BytesEncoder { reinterpret_cast<const uint8_t*> (buffer), byteSize, false });
         ARA_INTERNAL_ASSERT (resultSize == byteSize);
     }
 
@@ -469,7 +469,8 @@ IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMe
     {
         size_t plugInInstanceRef;
         int64_t samplePosition;
-        std::vector<uint8_t> buffer;
+        // \todo using static (plus not copy bytes) here assumes single-threaded callbacks, but currently this is a valid requirement
+        static std::vector<uint8_t> buffer;
         ARA::BytesDecoder writer { buffer };
         ARA::decodeArguments (message, plugInInstanceRef, samplePosition, writer);
         ARA_INTERNAL_ASSERT (buffer.size () > 0);
@@ -477,7 +478,7 @@ IPCMessage RemoteHost::_hostCommandHandler (const int32_t messageID, const IPCMe
         // \todo this ignores potential float data alignment or byte order issues...
         reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->renderSamples (static_cast<int> (buffer.size () / sizeof(float)),
                                                                         samplePosition, reinterpret_cast<float*> (buffer.data ()));
-        return ARA::encodeArguments (ARA::BytesEncoder { buffer });
+        return ARA::encodeReply (ARA::BytesEncoder { buffer, false });
     }
     else if (messageID == kIPCStopRendering)
     {

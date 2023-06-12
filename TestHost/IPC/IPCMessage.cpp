@@ -132,9 +132,12 @@ void IPCMessage::appendString (const int32_t argKey, const char* const argValue)
     _appendEncodedArg (argKey, CFStringCreateWithCString (kCFAllocatorDefault, argValue, kCFStringEncodingUTF8));
 }
 
-void IPCMessage::appendBytes (const int32_t argKey, const uint8_t* argValue, const size_t argSize)
+void IPCMessage::appendBytes (const int32_t argKey, const uint8_t* argValue, const size_t argSize, const bool copy)
 {
-    _appendEncodedArg (argKey, CFDataCreate (kCFAllocatorDefault, argValue, (CFIndex) argSize));
+    if (copy)
+        _appendEncodedArg (argKey, CFDataCreate (kCFAllocatorDefault, argValue, (CFIndex) argSize));
+    else
+        _appendEncodedArg (argKey, CFDataCreateWithBytesNoCopy (kCFAllocatorDefault, argValue, (CFIndex) argSize, kCFAllocatorNull));
 }
 
 void IPCMessage::appendMessage (const int32_t argKey, const IPCMessage& argValue)
@@ -392,7 +395,7 @@ void IPCMessage::appendString (const int32_t argKey, const char* const argValue)
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCMessage::appendBytes (const int32_t argKey, const uint8_t* argValue, const size_t argSize)
+void IPCMessage::appendBytes (const int32_t argKey, const uint8_t* argValue, const size_t argSize, const bool /*copy*/)
 {
     const auto encodedData { base64_encode (argValue, argSize, false) };
     _appendAttribute (argKey).set_value (encodedData.c_str ());

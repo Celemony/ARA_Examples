@@ -40,19 +40,23 @@ namespace ARA
 
 // a read function based on a ptr+size pair or std::vector
 // it returns pointer to read bytes from and byte count via reference
-class BytesEncoder : public std::function<void (const uint8_t*&, size_t&)>
+// copy should be set to false if the bytes are guaranteed to remain valid
+// until the message has been sent - this is the case for all blocking sends,
+// but not for non-blocking sends and depends on context for replies
+class BytesEncoder : public std::function<void (const uint8_t*&, size_t&, bool&)>
 {
 public:
-    BytesEncoder (const uint8_t* const bytes, const size_t size)
-    : std::function<void (const uint8_t*&, size_t&)> {
-        [bytes, size] (const uint8_t*& bytesPtr, size_t& bytesSize) -> void
+    BytesEncoder (const uint8_t* const bytes, const size_t size, const bool copy)
+    : std::function<void (const uint8_t*&, size_t&, bool&)> {
+        [bytes, size, copy] (const uint8_t*& bytesPtr, size_t& bytesSize, bool& bytesCopy) -> void
         {
             bytesPtr = bytes;
             bytesSize = size;
+            bytesCopy = copy;
         }}
     {}
-    BytesEncoder (const std::vector<uint8_t>& bytes)
-    : BytesEncoder { bytes.data (), bytes.size () }
+    BytesEncoder (const std::vector<uint8_t>& bytes, const bool copy)
+    : BytesEncoder { bytes.data (), bytes.size (), copy }
     {}
 };
 
@@ -191,11 +195,11 @@ inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const c
 }
 inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const BytesEncoder& argValue)
 {
-    // \todo we should enable "noCopy" for all call arguments (but leave it off for all replies)
     const uint8_t* bytes;
     size_t size;
-    argValue (bytes, size);
-    message.appendBytes (argKey, bytes, size);
+    bool copy;
+    argValue (bytes, size, copy);
+    message.appendBytes (argKey, bytes, size, copy);
 }
 inline void _appendToMessage (IPCMessage& message, const int32_t argKey, const IPCMessage& argValue)
 {
@@ -399,7 +403,7 @@ inline IPCMessage _encodeValue (const StructT& data)                            
 #define _ARA_ENCODE_MEMBER(member)                                                              \
     _appendToMessage (result, offsetof (StructType, member), _encodeValue (data.member));
 #define _ARA_ENCODE_EMBEDDED_BYTES(member)                                                      \
-    const BytesEncoder tmp_##member { reinterpret_cast<const uint8_t*> (data.member), sizeof (data.member) }; \
+    const BytesEncoder tmp_##member { reinterpret_cast<const uint8_t*> (data.member), sizeof (data.member), true }; \
     _appendToMessage (result, offsetof (StructType, member), _encodeValue (tmp_##member));
 #define _ARA_ENCODE_EMBEDDED_ARRAY(member)                                                      \
     const ArrayArgument<const std::remove_extent<decltype (data.member)>::type> tmp_##member { data.member, std::extent<decltype (data.member)>::value }; \
