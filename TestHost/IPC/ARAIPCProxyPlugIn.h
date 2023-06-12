@@ -89,7 +89,7 @@ private:
 
 /*******************************************************************************/
 //! Implementation of DocumentControllerInterface that channels all calls through IPC
-class DocumentController : public PlugIn::DocumentControllerInterface, public ARAIPCMessageSender, public InstanceValidator<DocumentController>
+class DocumentController : public PlugIn::DocumentControllerInterface, protected ARAIPCMessageSender, public InstanceValidator<DocumentController>
 {
 public:
     DocumentController (IPCPort& port, const ARAFactory* factory, const ARADocumentControllerHostInstance* instance, const ARADocumentProperties* properties) noexcept;
@@ -229,17 +229,16 @@ ARA_MAP_HOST_REF (DocumentController, ARAAudioAccessControllerHostRef, ARAArchiv
 
 /*******************************************************************************/
 //! Extensible plug-in instance role class implementing an ARA \ref Playback_Renderer_Interface.
-class PlaybackRenderer : public PlugIn::PlaybackRendererInterface, public InstanceValidator<PlaybackRenderer>
+class PlaybackRenderer : public PlugIn::PlaybackRendererInterface, protected ARAIPCMessageSender, public InstanceValidator<PlaybackRenderer>
 {
 public:
-    explicit PlaybackRenderer (DocumentController* documentController, ARAPlaybackRendererRef remoteRef) noexcept;
+    explicit PlaybackRenderer (IPCPort& port, ARAPlaybackRendererRef remoteRef) noexcept;
 
     // Inherited public interface used by the C++ dispatcher, to be called by the ARAPlugInDispatch code exclusively.
     void addPlaybackRegion (ARAPlaybackRegionRef playbackRegionRef) noexcept override;
     void removePlaybackRegion (ARAPlaybackRegionRef playbackRegionRef) noexcept override;
 
 private:
-    DocumentController* const _documentController;
     ARAPlaybackRendererRef const _remoteRef;
 
     ARA_HOST_MANAGED_OBJECT (PlaybackRenderer)
@@ -248,10 +247,10 @@ private:
 
 /*******************************************************************************/
 //! Extensible plug-in instance role class implementing an ARA \ref Editor_Renderer_Interface.
-class EditorRenderer : public PlugIn::EditorRendererInterface, public InstanceValidator<EditorRenderer>
+class EditorRenderer : public PlugIn::EditorRendererInterface, protected ARAIPCMessageSender, public InstanceValidator<EditorRenderer>
 {
 public:
-    explicit EditorRenderer (DocumentController* documentController, ARAEditorRendererRef remoteRef) noexcept;
+    explicit EditorRenderer (IPCPort& port, ARAEditorRendererRef remoteRef) noexcept;
 
     // Inherited public interface used by the C++ dispatcher, to be called by the ARAPlugInDispatch code exclusively.
     void addPlaybackRegion (ARAPlaybackRegionRef playbackRegionRef) noexcept override;
@@ -261,7 +260,6 @@ public:
     void removeRegionSequence (ARARegionSequenceRef regionSequenceRef) noexcept override;
 
 private:
-    DocumentController* const _documentController;
     ARAEditorRendererRef const _remoteRef;
 
     ARA_HOST_MANAGED_OBJECT (EditorRenderer)
@@ -270,17 +268,16 @@ private:
 
 /*******************************************************************************/
 //! Extensible plug-in instance role class implementing an ARA \ref Editor_View_Interface.
-class EditorView : public PlugIn::EditorViewInterface, public InstanceValidator<EditorView>
+class EditorView : public PlugIn::EditorViewInterface, protected ARAIPCMessageSender, public InstanceValidator<EditorView>
 {
 public:
-    explicit EditorView (DocumentController* documentController, ARAEditorViewRef remoteRef) noexcept;
+    explicit EditorView (IPCPort& port, ARAEditorViewRef remoteRef) noexcept;
 
     // Inherited public interface used by the C++ dispatcher, to be called by the ARAPlugInDispatch code exclusively.
     void notifySelection (SizedStructPtr<ARAViewSelection> selection) noexcept override;
     void notifyHideRegionSequences (ARASize regionSequenceRefsCount, const ARARegionSequenceRef regionSequenceRefs[]) noexcept override;
 
 private:
-    DocumentController* const _documentController;
     ARAEditorViewRef const _remoteRef;
 
     ARA_HOST_MANAGED_OBJECT (EditorView)
@@ -293,7 +290,7 @@ private:
 class PlugInExtension
 {
 public:
-    PlugInExtension (ARADocumentControllerRef documentControllerRef,
+    PlugInExtension (IPCPort& port, ARADocumentControllerRef documentControllerRef,
                      ARAPlugInInstanceRoleFlags knownRoles, ARAPlugInInstanceRoleFlags assignedRoles,
                      size_t remotePlugInExtensionRef) noexcept;
     ~PlugInExtension () noexcept;
@@ -332,7 +329,7 @@ public:
     static ARADocumentControllerRef getDocumentControllerRemoteRef (ARADocumentControllerRef documentControllerRef)
     { return static_cast<DocumentController*> (PlugIn::fromRef (documentControllerRef))->getRemoteRef (); }
 
-    static std::unique_ptr<PlugInExtension> createPlugInExtension (size_t remoteExtensionRef, ARADocumentControllerRef documentControllerRef,
+    static std::unique_ptr<PlugInExtension> createPlugInExtension (size_t remoteExtensionRef, IPCPort& port, ARADocumentControllerRef documentControllerRef,
                                                                    ARAPlugInInstanceRoleFlags knownRoles, ARAPlugInInstanceRoleFlags assignedRoles);
 
 private:

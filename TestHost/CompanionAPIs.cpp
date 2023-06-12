@@ -329,7 +329,7 @@ public:
         const auto result { ARA::ARAIPCMessageSender { _hostCommandsPort }.remoteCallWithReply<IPCMessage> (kIPCCreateARAEffect, remoteDocumentControllerRef, assignedRoles) };
         const auto remoteInstanceRef { result.getArgValue<size_t> (0) };
         const auto remoteExtensionRef { result.getArgValue<size_t> (1) };
-        auto plugInExtension { _proxyFactory->createPlugInExtension (remoteExtensionRef, documentControllerRef, knownRoles, assignedRoles) };
+        auto plugInExtension { _proxyFactory->createPlugInExtension (remoteExtensionRef, _hostCommandsPort, documentControllerRef, knownRoles, assignedRoles) };
         validatePlugInExtensionInstance (plugInExtension->getInstance (), assignedRoles);
         return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _hostCommandsPort, std::move (plugInExtension));
     }

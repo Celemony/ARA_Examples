@@ -783,8 +783,8 @@ bool DocumentController::isLicensedForCapabilities (bool runModalActivationDialo
 
 /*******************************************************************************/
 
-PlaybackRenderer::PlaybackRenderer (DocumentController* documentController, ARAPlaybackRendererRef remoteRef) noexcept
-: _documentController { documentController },
+PlaybackRenderer::PlaybackRenderer (IPCPort& port, ARAPlaybackRendererRef remoteRef) noexcept
+: ARAIPCMessageSender { port },
   _remoteRef { remoteRef }
 {}
 
@@ -793,7 +793,7 @@ void PlaybackRenderer::addPlaybackRegion (ARAPlaybackRegionRef playbackRegionRef
     ARA_LOG_HOST_ENTRY (this);
     ARA_VALIDATE_API_ARGUMENT (this, isValidInstance (this));
 
-    _documentController->remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAPlaybackRendererInterface, addPlaybackRegion), _remoteRef, playbackRegionRef);
+    remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAPlaybackRendererInterface, addPlaybackRegion), _remoteRef, playbackRegionRef);
 }
 
 void PlaybackRenderer::removePlaybackRegion (ARAPlaybackRegionRef playbackRegionRef) noexcept
@@ -801,13 +801,13 @@ void PlaybackRenderer::removePlaybackRegion (ARAPlaybackRegionRef playbackRegion
     ARA_LOG_HOST_ENTRY (this);
     ARA_VALIDATE_API_ARGUMENT (this, isValidInstance (this));
 
-    _documentController->remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAPlaybackRendererInterface, removePlaybackRegion), _remoteRef, playbackRegionRef);
+    remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAPlaybackRendererInterface, removePlaybackRegion), _remoteRef, playbackRegionRef);
 }
 
 /*******************************************************************************/
 
-EditorRenderer::EditorRenderer (DocumentController* documentController, ARAEditorRendererRef remoteRef) noexcept
-: _documentController { documentController },
+EditorRenderer::EditorRenderer (IPCPort& port, ARAEditorRendererRef remoteRef) noexcept
+: ARAIPCMessageSender { port },
   _remoteRef { remoteRef }
 {}
 
@@ -816,7 +816,7 @@ void EditorRenderer::addPlaybackRegion (ARAPlaybackRegionRef playbackRegionRef) 
     ARA_LOG_HOST_ENTRY (this);
     ARA_VALIDATE_API_ARGUMENT (this, isValidInstance (this));
 
-    _documentController->remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorRendererInterface, addPlaybackRegion), _remoteRef, playbackRegionRef);
+    remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorRendererInterface, addPlaybackRegion), _remoteRef, playbackRegionRef);
 }
 
 void EditorRenderer::removePlaybackRegion (ARAPlaybackRegionRef playbackRegionRef) noexcept
@@ -824,7 +824,7 @@ void EditorRenderer::removePlaybackRegion (ARAPlaybackRegionRef playbackRegionRe
     ARA_LOG_HOST_ENTRY (this);
     ARA_VALIDATE_API_ARGUMENT (this, isValidInstance (this));
 
-    _documentController->remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorRendererInterface, removePlaybackRegion), _remoteRef, playbackRegionRef);
+    remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorRendererInterface, removePlaybackRegion), _remoteRef, playbackRegionRef);
 }
 
 void EditorRenderer::addRegionSequence (ARARegionSequenceRef regionSequenceRef) noexcept
@@ -832,7 +832,7 @@ void EditorRenderer::addRegionSequence (ARARegionSequenceRef regionSequenceRef) 
     ARA_LOG_HOST_ENTRY (this);
     ARA_VALIDATE_API_ARGUMENT (this, isValidInstance (this));
 
-    _documentController->remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorRendererInterface, addRegionSequence), _remoteRef, regionSequenceRef);
+    remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorRendererInterface, addRegionSequence), _remoteRef, regionSequenceRef);
 }
 
 void EditorRenderer::removeRegionSequence (ARARegionSequenceRef regionSequenceRef) noexcept
@@ -840,13 +840,13 @@ void EditorRenderer::removeRegionSequence (ARARegionSequenceRef regionSequenceRe
     ARA_LOG_HOST_ENTRY (this);
     ARA_VALIDATE_API_ARGUMENT (this, isValidInstance (this));
 
-    _documentController->remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorRendererInterface, removeRegionSequence), _remoteRef, regionSequenceRef);
+    remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorRendererInterface, removeRegionSequence), _remoteRef, regionSequenceRef);
 }
 
 /*******************************************************************************/
 
-EditorView::EditorView (DocumentController* documentController, ARAEditorViewRef remoteRef) noexcept
-: _documentController { documentController },
+EditorView::EditorView (IPCPort& port, ARAEditorViewRef remoteRef) noexcept
+: ARAIPCMessageSender { port },
   _remoteRef { remoteRef }
 {}
 
@@ -856,7 +856,7 @@ void EditorView::notifySelection (SizedStructPtr<ARAViewSelection> selection) no
     ARA_VALIDATE_API_ARGUMENT (this, isValidInstance (this));
     ARA_VALIDATE_API_STRUCT_PTR (selection, ARAViewSelection);
 
-    _documentController->remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorViewInterface, notifySelection), _remoteRef, *selection);
+    remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorViewInterface, notifySelection), _remoteRef, *selection);
 }
 
 void EditorView::notifyHideRegionSequences (ARASize regionSequenceRefsCount, const ARARegionSequenceRef regionSequenceRefs[]) noexcept
@@ -866,21 +866,21 @@ void EditorView::notifyHideRegionSequences (ARASize regionSequenceRefsCount, con
 
     std::vector<ARARegionSequenceRef> sequences;
     sequences.assign (regionSequenceRefs, regionSequenceRefs + regionSequenceRefsCount);
-    _documentController->remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorViewInterface, notifyHideRegionSequences), _remoteRef, sequences);
+    remoteCallWithoutReply (PLUGIN_METHOD_ID (ARAEditorViewInterface, notifyHideRegionSequences), _remoteRef, sequences);
 }
 
 /*******************************************************************************/
 
-PlugInExtension::PlugInExtension (ARADocumentControllerRef documentControllerRef,
+PlugInExtension::PlugInExtension (IPCPort& port, ARADocumentControllerRef documentControllerRef,
                                   ARAPlugInInstanceRoleFlags knownRoles, ARAPlugInInstanceRoleFlags assignedRoles,
                                   size_t remotePlugInExtensionRef) noexcept
 : _documentController { PlugIn::fromRef<DocumentController> (documentControllerRef) },
   _instance { (((knownRoles & kARAPlaybackRendererRole) == 0) || ((assignedRoles & kARAPlaybackRendererRole) != 0)) ?
-                    new PlaybackRenderer (_documentController, reinterpret_cast<ARAPlaybackRendererRef> (remotePlugInExtensionRef)) : nullptr,
+                    new PlaybackRenderer (port, reinterpret_cast<ARAPlaybackRendererRef> (remotePlugInExtensionRef)) : nullptr,
               (((knownRoles & kARAEditorRendererRole) == 0) || ((assignedRoles & kARAEditorRendererRole) != 0)) ?
-                    new EditorRenderer (_documentController, reinterpret_cast<ARAEditorRendererRef> (remotePlugInExtensionRef)) : nullptr,
+                    new EditorRenderer (port, reinterpret_cast<ARAEditorRendererRef> (remotePlugInExtensionRef)) : nullptr,
               (((knownRoles & kARAEditorViewRole) == 0) || ((assignedRoles & kARAEditorViewRole) != 0)) ?
-                    new EditorView (_documentController, reinterpret_cast<ARAEditorViewRef> (remotePlugInExtensionRef)) : nullptr }
+                    new EditorView (port, reinterpret_cast<ARAEditorViewRef> (remotePlugInExtensionRef)) : nullptr }
 {
     _instance.plugInExtensionRef = reinterpret_cast<ARAPlugInExtensionRef> (remotePlugInExtensionRef);
 
@@ -958,10 +958,10 @@ const ARADocumentControllerInstance* Factory::createDocumentControllerWithDocume
     return result->getInstance ();
 }
 
-std::unique_ptr<PlugInExtension> Factory::createPlugInExtension (size_t remoteExtensionRef, ARADocumentControllerRef documentControllerRef,
+std::unique_ptr<PlugInExtension> Factory::createPlugInExtension (size_t remoteExtensionRef, IPCPort& port, ARADocumentControllerRef documentControllerRef,
                                                                  ARAPlugInInstanceRoleFlags knownRoles, ARAPlugInInstanceRoleFlags assignedRoles)
 {
-    return std::make_unique<PlugInExtension> (documentControllerRef, knownRoles, assignedRoles, remoteExtensionRef);
+    return std::make_unique<PlugInExtension> (port, documentControllerRef, knownRoles, assignedRoles, remoteExtensionRef);
 }
 
 template<typename FloatT>
