@@ -18,12 +18,26 @@
 
 #pragma once
 
+// select underlying implementation: Apple CFDictionary or a generic pugixml-based
+#ifndef IPC_MESSAGE_USE_CFDICTIONARY
+    #if defined (__APPLE__)
+        #define IPC_MESSAGE_USE_CFDICTIONARY 1
+    #else
+        #define IPC_MESSAGE_USE_CFDICTIONARY 0
+    #endif
+#endif
+
+#include <memory>
+#include <type_traits>
 #include <vector>
 
 #if defined (__APPLE__)
     #include <CoreFoundation/CoreFoundation.h>
-#else
-    #error "only implemented for macOS at this point"
+#endif
+
+#if !IPC_MESSAGE_USE_CFDICTIONARY
+    #include "3rdParty/pugixml/src/pugixml.hpp"
+    #include "3rdParty/cpp-base64/base64.h"
 #endif
 
 
@@ -41,15 +55,25 @@
 class IPCMessage
 {
 public:
-    IPCMessage (const IPCMessage& other);
-    IPCMessage (IPCMessage&& other) noexcept;
+    // C++ "rule of five" standard methods
+    IPCMessage (const IPCMessage& other) { *this = other; }
+    IPCMessage (IPCMessage&& other) noexcept { *this = std::move (other); }
     IPCMessage& operator= (const IPCMessage& other);
     IPCMessage& operator= (IPCMessage&& other)  noexcept;
+#if IPC_MESSAGE_USE_CFDICTIONARY
     ~IPCMessage ();
+#else
+    ~IPCMessage () = default;
+#endif
 
     // to be used by IPCPort only: encoding from/to port-internal datas format
+#if defined (__APPLE__)
     explicit IPCMessage (CFDataRef data);
     CFDataRef createEncodedMessage () const;
+#else
+    IPCMessage (const char* data, size_t dataSize);
+    std::string createEncodedMessage () const;
+#endif
 
     // default construction, creating empty message
     IPCMessage () = default;
@@ -80,11 +104,15 @@ public:
     }
 
 private:
+#if IPC_MESSAGE_USE_CFDICTIONARY
     // internal primitive - dictionary will be retained or copied, depending on isWritable
     void _setup (CFDictionaryRef dictionary, bool isWritable);
 
     // wrap key value into CFString (no reference count transferred to caller)
     static CFStringRef _getEncodedKey (size_t argKey);
+#else
+    static const char* _getEncodedKey (size_t argKey);
+#endif
 
     // helpers for construction for sending code
     void _appendArg (size_t argKey, int32_t argValue);
@@ -95,7 +123,13 @@ private:
     void _appendArg (size_t argKey, const char* argValue);
     void _appendArg (size_t argKey, const std::vector<uint8_t>& argValue);
     void _appendArg (size_t argKey, const IPCMessage& argValue);
-    void _appendEncodedArg (size_t argKey, CFTypeRef argObject);   // ownership of the arg is transferred
+
+#if IPC_MESSAGE_USE_CFDICTIONARY
+    void _appendEncodedArg (size_t argKey, __attribute__((cf_consumed)) CFTypeRef argObject);
+#else
+    void _makeWritableIfNeeded ();
+    pugi::xml_attribute _appendAttribute (size_t argKey);
+#endif
 
     // helpers for getters for receiving code
     // since we cannot overload by return type, we are returning via reference argument
@@ -107,9 +141,23 @@ private:
     void _readArg (size_t argKey, const char*& argValue, bool* didFindKey = nullptr) const;
     void _readArg (size_t argKey, std::vector<uint8_t>& argValue, bool* didFindKey = nullptr) const;
     void _readArg (size_t argKey, IPCMessage& argValue, bool* didFindKey = nullptr) const;
-    static bool _checkKeyFound (bool found, bool* didFindKey);
+
+    static bool _checkKeyFound (bool found, bool* didFindKey)
+    {
+        if (didFindKey)
+        {
+            *didFindKey = found;
+            return found;
+        }
+        return true;
+    }
 
 private:
-    CFDictionaryRef _dictionary {};   // if constructed for sending, actually a CFMutableDictionaryRef
+#if IPC_MESSAGE_USE_CFDICTIONARY
+    CFDictionaryRef _dictionary {};     // if modified, actually converted to a CFMutableDictionaryRef
+#else
+    std::shared_ptr<pugi::xml_document> _dictionary {};
+    pugi::xml_node _root {};
+#endif
     bool _isWritable {};
 };
