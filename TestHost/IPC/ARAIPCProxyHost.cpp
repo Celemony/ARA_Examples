@@ -394,14 +394,19 @@ void PlaybackController::requestEnableCycle (bool enable) noexcept
 
 /*******************************************************************************/
 
-const ARAFactory* _factory {};
+std::vector<const ARAFactory*> _factories {};
 IPCPort* _plugInCallbacksPort {};
 
-void setupHostCommandHandler (const ARAFactory* factory, IPCPort* plugInCallbacksPort)
+void addFactory (const ARAFactory* factory)
 {
     ARA_INTERNAL_ASSERT(factory->highestSupportedApiGeneration >= kARAAPIGeneration_2_0_Final);
+    ARA_INTERNAL_ASSERT(!ARA::contains (_factories, factory));
 
-    _factory = factory;
+    _factories.emplace_back (factory);
+}
+
+void setPlugInCallbacksPort (IPCPort* plugInCallbacksPort)
+{
     _plugInCallbacksPort = plugInCallbacksPort;
 }
 
@@ -410,12 +415,20 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
 //  ARA_LOG ("_hostCommandHandler received message %s", decodePlugInMethodID (messageID));
 
     // ARAFactory
-    if (messageID == kGetFactoryMethodID)
+    if (messageID == kGetFactoriesCountMethodID)
     {
-        return encodeReply (*_factory);
+        return encodeReply (_factories.size ());
+    }
+    else if (messageID == kGetFactoryMethodID)
+    {
+        ARASize index;
+        decodeArguments (message, index);
+        ARA_INTERNAL_ASSERT (index < _factories.size ());
+        return encodeReply (*_factories[index]);
     }
     else if (messageID == kCreateDocumentControllerMethodID)
     {
+        ARAPersistentID factoryID;
         ARAAudioAccessControllerHostRef audioAccessControllerHostRef;
         ARAArchivingControllerHostRef archivingControllerHostRef;
         ARABool provideContentAccessController;
@@ -425,26 +438,40 @@ IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& messag
         ARABool providePlaybackController;
         ARAPlaybackControllerHostRef playbackControllerHostRef;
         ARADocumentProperties properties;
-        decodeArguments (message, audioAccessControllerHostRef, archivingControllerHostRef,
+        decodeArguments (message, factoryID,
+                                audioAccessControllerHostRef, archivingControllerHostRef,
                                 provideContentAccessController, contentAccessControllerHostRef,
                                 provideModelUpdateController, modelUpdateControllerHostRef,
                                 providePlaybackController, playbackControllerHostRef,
                                 properties);
 
-        const auto audioAccessController { new AudioAccessController { *_plugInCallbacksPort, audioAccessControllerHostRef } };
-        const auto archivingController { new ArchivingController { *_plugInCallbacksPort, archivingControllerHostRef } };
-        const auto contentAccessController { (provideContentAccessController != kARAFalse) ? new ContentAccessController { *_plugInCallbacksPort, contentAccessControllerHostRef } : nullptr };
-        const auto modelUpdateController { (provideModelUpdateController != kARAFalse) ? new ModelUpdateController { *_plugInCallbacksPort, modelUpdateControllerHostRef } : nullptr };
-        const auto playbackController { (providePlaybackController != kARAFalse) ? new PlaybackController { *_plugInCallbacksPort, playbackControllerHostRef } : nullptr };
+        const ARAFactory* factory {};
+        for (const auto& f : _factories)
+        {
+            if (0 == std::strcmp (f->factoryID, factoryID))
+            {
+                factory = f;
+                break;
+            }
+        }
+        ARA_INTERNAL_ASSERT (factory != nullptr);
+        if (factory != nullptr)
+        {
+            const auto audioAccessController { new AudioAccessController { *_plugInCallbacksPort, audioAccessControllerHostRef } };
+            const auto archivingController { new ArchivingController { *_plugInCallbacksPort, archivingControllerHostRef } };
+            const auto contentAccessController { (provideContentAccessController != kARAFalse) ? new ContentAccessController { *_plugInCallbacksPort, contentAccessControllerHostRef } : nullptr };
+            const auto modelUpdateController { (provideModelUpdateController != kARAFalse) ? new ModelUpdateController { *_plugInCallbacksPort, modelUpdateControllerHostRef } : nullptr };
+            const auto playbackController { (providePlaybackController != kARAFalse) ? new PlaybackController { *_plugInCallbacksPort, playbackControllerHostRef } : nullptr };
 
-        const auto hostInstance { new Host::DocumentControllerHostInstance { audioAccessController, archivingController,
-                                                                                contentAccessController, modelUpdateController, playbackController } };
+            const auto hostInstance { new Host::DocumentControllerHostInstance { audioAccessController, archivingController,
+                                                                                    contentAccessController, modelUpdateController, playbackController } };
 
-        auto documentControllerInstance { _factory->createDocumentControllerWithDocument (hostInstance, &properties) };
-        ARA_VALIDATE_API_CONDITION (documentControllerInstance != nullptr);
-        ARA_VALIDATE_API_INTERFACE (documentControllerInstance->documentControllerInterface, ARADocumentControllerInterface);
-        auto documentController { new DocumentController (hostInstance, documentControllerInstance) };
-        return encodeReply (ARADocumentControllerRef { toRef (documentController) });
+            auto documentControllerInstance { factory->createDocumentControllerWithDocument (hostInstance, &properties) };
+            ARA_VALIDATE_API_CONDITION (documentControllerInstance != nullptr);
+            ARA_VALIDATE_API_INTERFACE (documentControllerInstance->documentControllerInterface, ARADocumentControllerInterface);
+            auto documentController { new DocumentController (hostInstance, documentControllerInstance) };
+            return encodeReply (ARADocumentControllerRef { toRef (documentController) });
+        }
     }
 
     //ARADocumentControllerInterface

@@ -131,7 +131,7 @@ DocumentController::DocumentController (IPCPort& port, const ARAFactory* factory
     ARAContentAccessControllerHostRef contentAccessControllerHostRef { toHostRef (this) };
     ARAModelUpdateControllerHostRef modelUpdateControllerHostRef { toHostRef (this) };
     ARAPlaybackControllerHostRef playbackControllerHostRef { toHostRef (this) };
-    remoteCallWithReply (_remoteRef, kCreateDocumentControllerMethodID,
+    remoteCallWithReply (_remoteRef, kCreateDocumentControllerMethodID, _factory->factoryID,
                           audioAccessControllerHostRef, archivingControllerHostRef,
                           (_hostContentAccessController.isProvided ()) ? kARATrue : kARAFalse, contentAccessControllerHostRef,
                           (_hostModelUpdateController.isProvided ()) ? kARATrue : kARAFalse, modelUpdateControllerHostRef,
@@ -939,12 +939,26 @@ PlugInExtension::~PlugInExtension () noexcept
 
 /*******************************************************************************/
 
-Factory::Factory (IPCPort& hostCommandsPort)
+std::vector<Factory> Factory::_factories {};
+
+size_t Factory::initializeFactories (IPCPort& hostCommandsPort)
+{
+    size_t count;
+    ARA::ARAIPCMessageSender (hostCommandsPort).remoteCallWithReply (count, kGetFactoriesCountMethodID);
+    ARA_INTERNAL_ASSERT (count > 0);
+
+    _factories.reserve (count);
+    for (auto i { 0U }; i < count; ++i)
+        _factories.emplace_back (hostCommandsPort, i);
+    return _factories.size ();
+}
+
+Factory::Factory (IPCPort& hostCommandsPort, size_t index)
 : _hostCommandsPort { hostCommandsPort }
 {
     // keep local copy of message before decoding it so that all pointer data remains valid until properly copied
     IPCMessage reply;
-    ARA::ARAIPCMessageSender (_hostCommandsPort).remoteCallWithReply (reply, kGetFactoryMethodID);
+    ARA::ARAIPCMessageSender (_hostCommandsPort).remoteCallWithReply (reply, kGetFactoryMethodID, index);
     decodeReply (_factory, reply);
 
     ARA_VALIDATE_API_ARGUMENT(&_factory, _factory.highestSupportedApiGeneration >= kARAAPIGeneration_2_0_Final);
@@ -977,6 +991,43 @@ Factory::Factory (IPCPort& hostCommandsPort)
     for (auto i { 0U }; i < _factory.analyzeableContentTypesCount; ++i)
         _factoryAnalyzableTypes.emplace_back (_factory.analyzeableContentTypes[i]);
     _factory.analyzeableContentTypes = _factoryAnalyzableTypes.data ();
+}
+
+Factory::Factory (Factory&& other) noexcept
+: _hostCommandsPort { other._hostCommandsPort }
+{
+    *this = std::move (other);
+}
+
+Factory& Factory::operator= (Factory&& other) noexcept
+{
+    _hostCommandsPort = other._hostCommandsPort;
+
+    _factoryStrings.factoryID = std::move (other._factoryStrings.factoryID);
+    _factory.factoryID = _factoryStrings.factoryID.c_str ();
+
+    _factoryStrings.plugInName = std::move (other._factoryStrings.plugInName);
+    _factory.plugInName = _factoryStrings.plugInName.c_str ();
+    _factoryStrings.manufacturerName = std::move (other._factoryStrings.manufacturerName);
+    _factory.manufacturerName = _factoryStrings.manufacturerName.c_str ();
+    _factoryStrings.informationURL = std::move (other._factoryStrings.informationURL);
+    _factory.informationURL = _factoryStrings.informationURL.c_str ();
+    _factoryStrings.version = std::move (other._factoryStrings.version);
+    _factory.version = _factoryStrings.version.c_str ();
+
+    _factoryStrings.documentArchiveID = std::move (other._factoryStrings.documentArchiveID);
+    _factory.documentArchiveID = _factoryStrings.documentArchiveID.c_str ();
+
+    _factoryCompatibleIDStrings = std::move (other._factoryCompatibleIDStrings);
+    _factoryCompatibleIDs.reserve (_factoryCompatibleIDStrings.size ());
+    for (auto i { 0U }; i < _factoryCompatibleIDStrings.size (); ++i)
+        _factoryCompatibleIDs.emplace_back (_factoryCompatibleIDStrings[i].c_str ());
+    _factory.compatibleDocumentArchiveIDs = _factoryCompatibleIDs.data ();
+
+    _factoryAnalyzableTypes = std::move (other._factoryAnalyzableTypes);
+    _factory.analyzeableContentTypes = _factoryAnalyzableTypes.data ();
+
+    return *this;
 }
 
 const ARADocumentControllerInstance* Factory::createDocumentControllerWithDocument (const ARADocumentControllerHostInstance* hostInstance, const ARADocumentProperties* properties)

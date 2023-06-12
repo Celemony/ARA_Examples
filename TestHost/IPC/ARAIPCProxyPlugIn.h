@@ -313,7 +313,8 @@ private:
 class Factory
 {
 public:
-    Factory (IPCPort& hostCommandsPort);
+    static size_t initializeFactories (IPCPort& hostCommandsPort);
+    static Factory& getFactoryAtIndex (size_t index) { return _factories[index]; }
 
     // proxy document controller creation call, to be used instead of getFactory ()->createDocumentControllerWithDocument ()
     const ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARADocumentControllerHostInstance* hostInstance,
@@ -332,8 +333,19 @@ public:
     static std::unique_ptr<PlugInExtension> createPlugInExtension (size_t remoteExtensionRef, IPCPort& port, ARADocumentControllerRef documentControllerRef,
                                                                    ARAPlugInInstanceRoleFlags knownRoles, ARAPlugInInstanceRoleFlags assignedRoles);
 
+// private:
+// this c'tor is only to be called from initializeFactories(), but needs to be public for std::vector::emplace_back ()
+public:
+    Factory (IPCPort& hostCommandsPort, size_t index);
+
+    Factory (const Factory& other) = delete;
+    Factory& operator= (const Factory& other) = delete;
+
+    Factory (Factory&& other) noexcept;
+    Factory& operator= (Factory&& other) noexcept;
+
 private:
-    IPCPort& _hostCommandsPort;
+    std::reference_wrapper<IPCPort> _hostCommandsPort;
 
     ARAFactory _factory;
     struct
@@ -346,8 +358,10 @@ private:
         std::string documentArchiveID;
     } _factoryStrings;
     std::vector<std::string> _factoryCompatibleIDStrings;
-    std::vector<const char*> _factoryCompatibleIDs;
+    std::vector<ARAUtf8String> _factoryCompatibleIDs;
     std::vector<ARAContentType> _factoryAnalyzableTypes;
+
+    static std::vector<Factory> _factories;
 };
 
 

@@ -188,18 +188,25 @@ ARA_MAP_REF (PlugInExtension, ARAPlugInExtensionRef, ARAPlaybackRendererRef, ARA
 
 /*******************************************************************************/
 //! Handler for all incoming IPC calls.
-void setupHostCommandHandler (const ARAFactory* factory, IPCPort* plugInCallbacksPort);
+
+// static configuration: add the ARA factories that the proxy host will wrap
+void addFactory (const ARAFactory* factory);
+
+// static configuration: set the callback port that the proxy host will use
+void setPlugInCallbacksPort (IPCPort* plugInCallbacksPort);
+
+// static dispatcher: the host command handler that controls the proxy host
 IPCMessage hostCommandHandler (const int32_t messageID, const IPCMessage& message);
 
+// translation needed when establishing the binding to the remote documentController
 inline ARADocumentControllerRef getDocumentControllerRefForRemoteRef (ARADocumentControllerRef remoteRef)
 { return fromRef (remoteRef)->getRef (); }
 
+// creating and deleting plug-in extension instances associated with the proxy host
 inline ARAPlugInExtensionRef createPlugInExtension (const ARAPlugInExtensionInstance* instance)
 { return toRef (new PlugInExtension { instance }); }
-
 inline void destroyPlugInExtension (ARAPlugInExtensionRef plugInExtensionRef)
 { delete fromRef (plugInExtensionRef); }
-
 
 }   // namespace ProxyHost
 }   // namespace ARA
