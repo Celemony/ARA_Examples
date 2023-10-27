@@ -270,6 +270,7 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, s
 const ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnitInstance, ARADocumentControllerRef controllerRef, ARAPlugInInstanceRoleFlags assignedRoles)
 {
     const ARAPlugInInstanceRoleFlags knownRoles = kARAPlaybackRendererRole | kARAEditorRendererRole | kARAEditorViewRole;
+    ARA_INTERNAL_ASSERT((assignedRoles | knownRoles) == knownRoles);
     if (audioUnitInstance->isAUv2)
     {
         UInt32 propertySize = sizeof(ARAAudioUnitPlugInExtensionBinding);

@@ -319,6 +319,7 @@ const ARA::ARAPlugInExtensionInstance* VST3BindToARADocumentController (VST3Effe
 #endif
 
     constexpr ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
+    ARA_INTERNAL_ASSERT ((assignedRoles | knownRoles) == knownRoles);
     if (FUnknownPtr<ARA::IPlugInEntryPoint2> entry2 { vst3Effect->component })
     {
         if (auto result = entry2->bindToDocumentControllerWithRoles (controllerRef, knownRoles, assignedRoles))
