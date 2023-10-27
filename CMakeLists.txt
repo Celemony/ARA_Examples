@@ -882,7 +882,9 @@ function(configure_ARA_Examples_target target)
         $<$<NOT:$<CONFIG:Debug>>: -DNDEBUG>
         # for these examples, we want to always enable validation, assertions and logging (also for release)
         # actual products would not do this, and let the ARA SDK enable these for debug builds only per default
-        -DARA_VALIDATE_API_CALLS=1 -DARA_ENABLE_INTERNAL_ASSERTS=1 -DARA_ENABLE_DEBUG_OUTPUT=1
+        -DARA_VALIDATE_API_CALLS=1
+        -DARA_ENABLE_INTERNAL_ASSERTS=1
+        -DARA_ENABLE_DEBUG_OUTPUT=1
     )
 
     # platform-specific settings
@@ -1698,6 +1700,10 @@ if(ARA_ENABLE_VST3)
     target_compile_definitions(ARATestHost PRIVATE
         -DARA_ENABLE_VST3=1
     )
+else()
+    target_compile_definitions(ARATestHost PRIVATE
+        -DARA_ENABLE_VST3=0
+    )
 endif()
 
 if(ARA_ENABLE_CLAP)
@@ -1706,6 +1712,10 @@ if(ARA_ENABLE_CLAP)
     )
     target_link_libraries(ARATestHost PRIVATE
         clap
+    )
+else()
+    target_compile_definitions(ARATestHost PRIVATE
+        -DARA_ENABLE_CLAP=0
     )
 endif()
 
