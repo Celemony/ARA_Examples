@@ -74,15 +74,14 @@
 
 
 // minimal set of commands to run a companion API plug-in through IPC
-enum
+enum : ARA::IPC::ARAIPCMessageID
 {
     kIPCCreateEffect = -1,
-    kIPCBindEffectToARA = -2,
-    kIPCStartRendering = -3,
-    kIPCRenderSamples = -4,
-    kIPCStopRendering = -5,
-    kIPCDestroyEffect = -6,
-    kIPCTerminate = -7
+    kIPCStartRendering = -2,
+    kIPCRenderSamples = -3,
+    kIPCStopRendering = -4,
+    kIPCDestroyEffect = -5,
+    kIPCTerminate = -6
 };
 static_assert (kIPCCreateEffect < ARA::IPC::kARAIPCMessageIDRangeStart, "conflicting message IDs");
 
@@ -534,23 +533,16 @@ public:
 
     ~IPCPlugInInstance () override
     {
-        ARA::IPC::RemoteCaller { _sender }.remoteCallWithoutReply (false, kIPCDestroyEffect, _remoteRef, reinterpret_cast<size_t> (getARAPlugInExtensionInstance ()->plugInExtensionRef));
-        ARA::IPC::ARAIPCProxyPlugInDestroyPlugInExtension (getARAPlugInExtensionInstance ());
+        ARA::IPC::RemoteCaller { _sender }.remoteCallWithoutReply (false, kIPCDestroyEffect, _remoteRef);
+        if (getARAPlugInExtensionInstance ())
+            ARA::IPC::ARAIPCProxyPlugInCleanupBinding (getARAPlugInExtensionInstance ());
     }
 
     void bindToDocumentControllerWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
     {
         // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
         const ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
-
-        const auto remoteDocumentControllerRef { ARA::IPC::ARAIPCProxyPlugInTranslateDocumentControllerRef (documentControllerRef) };
-        size_t remoteExtensionRef {};
-        ARA::IPC::RemoteCaller::CustomDecodeFunction customDecode { [&remoteExtensionRef] (const ARA::IPC::ARAIPCMessageDecoder& decoder) -> void
-            {
-                decoder.methods->readSize (decoder.ref, 0, &remoteExtensionRef);
-            } };
-        ARA::IPC::RemoteCaller { _sender }.remoteCallWithReply (customDecode, false, kIPCBindEffectToARA, _remoteRef, remoteDocumentControllerRef, assignedRoles);
-        auto plugInExtension { ARA::IPC::ARAIPCProxyPlugInCreatePlugInExtension (remoteExtensionRef, _sender, documentControllerRef, knownRoles, assignedRoles) };
+        auto plugInExtension { ARA::IPC::ARAIPCProxyPlugInBindToDocumentController (_remoteRef, _sender, documentControllerRef, knownRoles, assignedRoles) };
         validateAndSetPlugInExtensionInstance (plugInExtension, assignedRoles);
     }
 
@@ -797,28 +789,6 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
 #endif
         replyEncoder.methods->destroyEncoder (replyEncoder.ref);
     }
-    else if (messageID == kIPCBindEffectToARA)
-    {
-        size_t plugInInstanceRef;
-        ARA::ARADocumentControllerRef documentControllerRemoteRef;
-        ARA::ARAPlugInInstanceRoleFlags assignedRoles;
-        ARA::IPC::decodeArguments (&messageDecoder, plugInInstanceRef, documentControllerRemoteRef, assignedRoles);
-        
-        reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->bindToDocumentControllerWithRoles (ARA::IPC::ARAIPCProxyHostTranslateDocumentControllerRef (documentControllerRemoteRef), assignedRoles);
-        auto plugInExtensionRef { ARA::IPC::ARAIPCProxyHostCreatePlugInExtension (reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->getARAPlugInExtensionInstance ()) };
-        
-#if USE_ARA_CF_ENCODING
-        auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
-        ARA::IPC::encodeArguments (replyEncoder, plugInExtensionRef);
-        result = ARAIPCCFCreateMessageEncoderData (replyEncoder.ref);
-#else
-        IPCXMLMessage reply;
-        auto replyEncoder { createMessageEncoder (&reply) };
-        ARA::IPC::encodeArguments (replyEncoder, plugInExtensionRef);
-        result = reply.createEncodedMessage ();
-#endif
-        replyEncoder.methods->destroyEncoder (replyEncoder.ref);
-    }
     else if (messageID == kIPCStartRendering)
     {
         size_t plugInInstanceRef;
@@ -863,10 +833,9 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
     else if (messageID == kIPCDestroyEffect)
     {
         size_t plugInInstanceRef;
-        ARA::ARAPlugInExtensionRef plugInExtensionRef;
-        ARA::IPC::decodeArguments (&messageDecoder, plugInInstanceRef, plugInExtensionRef);
+        ARA::IPC::decodeArguments (&messageDecoder, plugInInstanceRef);
 
-        ARA::IPC::ARAIPCProxyHostDestroyPlugInExtension (plugInExtensionRef);
+        ARA::IPC::ARAIPCProxyHostCleanupBinding (reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->getARAPlugInExtensionInstance ());
         delete reinterpret_cast<PlugInInstance*> (plugInInstanceRef);
     }
     else if (messageID == kIPCTerminate)
@@ -914,6 +883,16 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& hostComma
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
     ARA::IPC::ARAIPCProxyHostSetPlugInCallbacksSender (plugInCallbacksSender);
+    ARA::IPC::ARAIPCBindingHandler bindingHandler { [] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef, ARA::ARADocumentControllerRef controllerRef,
+                                                        ARA::ARAPlugInInstanceRoleFlags knownRoles, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
+                                                        -> const ARA::ARAPlugInExtensionInstance*
+        {
+            // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
+            ARA_INTERNAL_ASSERT (knownRoles == (ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole) );
+            reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->bindToDocumentControllerWithRoles (controllerRef, assignedRoles);
+            return reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->getARAPlugInExtensionInstance ();
+        } };
+    ARA::IPC::ARAIPCProxyHostSetBindingHandler (bindingHandler);
 
     while (!_shutDown)
         hostCommandsPort.runReceiveLoop (100);
