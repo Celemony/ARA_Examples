@@ -149,6 +149,7 @@ void IPCPort::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPC
     }
 
     _sendRequest (messageID, messageData);
+    delete encoder;
 
     const auto previousAwaitsReply { _awaitsReply };
     const auto previousReplyHandler { _replyHandler };
@@ -426,6 +427,7 @@ void IPCPort::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPC
 
     if (messageData)
         CFRelease (messageData);
+    delete encoder;
 
     const auto previousAwaitsReply { _awaitsReply };
     const auto previousReplyHandler { _replyHandler };
