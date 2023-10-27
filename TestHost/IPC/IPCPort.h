@@ -22,12 +22,15 @@
 #if defined (_WIN32)
     #include <Windows.h>
     #include <string>
+    #include <utility>
 #elif defined (__APPLE__)
     #include <CoreFoundation/CoreFoundation.h>
     #include <os/lock.h>
 #else
     #error "IPC not yet implemented for this platform"
 #endif
+
+#include <functional>
 
 
 // A simple proof-of-concept wrapper for an IPC communication channel.
@@ -39,7 +42,7 @@ public:
     using MessageID = int32_t;
 #if defined (_WIN32)
     using DataToSend = std::string;
-    using ReceivedData = std::string;
+    using ReceivedData = std::pair <const char*, size_t>;
 #elif defined (__APPLE__)
     // the ownership of DataToSend is transferred both when passing it into sendMessage(),
     // or when returning it from a ReceiveCallback.
@@ -59,24 +62,22 @@ public:
 
     // factory functions for send and receive ports
 #if defined (__APPLE__)
-    using Callback = __attribute__((cf_returns_retained)) DataToSend (*) (const MessageID messageID, ReceivedData const messageData);
+    using ReceiveCallback = std::function</*__attribute__((cf_returns_retained))*/ DataToSend (const MessageID messageID, ReceivedData const messageData)>;
 #else
-    using Callback = DataToSend (*) (const MessageID messageID, ReceivedData const messageData);
+    using ReceiveCallback = std::function<DataToSend (const MessageID messageID, ReceivedData const messageData)>;
 #endif
-    static IPCPort createPublishingID (const char* remotePortID, Callback callback);
+    static IPCPort createPublishingID (const char* remotePortID, const ReceiveCallback& callback);
     static IPCPort createConnectedToID (const char* remotePortID);
 
     // message sending
-    // If no reply is desired, blocking is still necessary in many cases to ensure consistent call order,
-    // e.g. if the message potentially triggers any synchronous callbacks from the other side.
+    // The messageData will be sent to the receiver, blocking the sending thread until the receiver
+    // has processed the message and returned a (potentially empty) reply, which will be forwarded
+    // to the optional replyHandler (can be nullptr if reply should be ignored)
+    using ReplyHandler = std::function<void (ReceivedData)>;
 #if defined (__APPLE__)
-    void sendNonblocking (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData);
-    void sendBlocking (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData);
-    __attribute__((cf_returns_retained)) ReceivedData sendAndAwaitReply (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData);
+    void sendMessage (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData, ReplyHandler* replyHandler);
 #else
-    void sendNonblocking (const MessageID messageID, DataToSend const messageData);
-    void sendBlocking (const MessageID messageID, DataToSend const messageData);
-    ReceivedData sendAndAwaitReply (const MessageID messageID, DataToSend const messageData);
+    void sendMessage (const MessageID messageID, DataToSend const messageData, ReplyHandler* replyHandler);
 #endif
 
     // message receiving
@@ -90,11 +91,9 @@ public:
 
 private:
 #if defined (_WIN32)
-    IPCPort (const char* remotePortID);
-    void _sendMessage (bool blocking, const MessageID messageID, DataToSend const messageData, ReceivedData* const result);
+    explicit IPCPort (const char* remotePortID);
 #elif defined (__APPLE__)
     explicit IPCPort (CFMessagePortRef __attribute__((cf_consumed)) port);
-    __attribute__((cf_returns_retained)) ReceivedData _sendBlocking (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData);
 #endif
 
 private:
@@ -108,7 +107,7 @@ private:
         char messageData[maxMessageSize];
     };
 
-    Callback _handler {};
+    const ReceiveCallback* _receiveCallback {};
     HANDLE _hSendMutex {};
     HANDLE _hWriteMutex {};
     HANDLE _hRequest {};

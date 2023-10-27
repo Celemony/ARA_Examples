@@ -37,7 +37,7 @@ IPCPort::IPCPort (IPCPort&& other) noexcept
 
 IPCPort& IPCPort::operator= (IPCPort&& other) noexcept
 {
-    std::swap (_handler, other._handler);
+    std::swap (_receiveCallback, other._receiveCallback);
     std::swap (_hSendMutex, other._hSendMutex);
     std::swap (_hWriteMutex, other._hWriteMutex);
     std::swap (_hRequest, other._hRequest);
@@ -73,11 +73,10 @@ IPCPort::IPCPort (const char* remotePortID)
     ARA_INTERNAL_ASSERT (_hResult != nullptr);
 }
 
-IPCPort IPCPort::createPublishingID (const char* remotePortID, Callback callback)
+IPCPort IPCPort::createPublishingID (const char* remotePortID, const ReceiveCallback& callback)
 {
     IPCPort port { remotePortID };
-
-    port._handler = callback;
+    port._receiveCallback = &callback;
 
     const auto mapKey { std::string { "Map" } + remotePortID };
     port._hMap = ::CreateFileMappingA (INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof (SharedMemory), mapKey.c_str ());
@@ -107,9 +106,9 @@ IPCPort IPCPort::createConnectedToID (const char* remotePortID)
     return port;
 }
 
-void IPCPort::_sendMessage (bool blocking, const MessageID messageID, DataToSend const messageData, ReceivedData* result)
+void IPCPort::sendMessage (const MessageID messageID, DataToSend const messageData, ReplyHandler* replyHandler)
 {
-    ARA_INTERNAL_ASSERT (blocking || result == nullptr);
+//  ARA_LOG ("IPCPort::sendMessage %i", messageID);
 
     ARA_INTERNAL_ASSERT (messageData.size () < SharedMemory::maxMessageSize);
 
@@ -127,41 +126,12 @@ void IPCPort::_sendMessage (bool blocking, const MessageID messageID, DataToSend
     ::SetEvent (_hRequest);
     ::ReleaseMutex (_hWriteMutex);
 
-    if (blocking)
-    {
-        const auto waitResult { ::WaitForSingleObject (_hResult, messageTimeout) };
-        ARA_INTERNAL_ASSERT (waitResult == WAIT_OBJECT_0);
-        if (result)
-        {
-            result->clear ();
-            result->insert (0, _sharedMemory->messageData, _sharedMemory->messageSize);
-        }
-    }
+    const auto waitResult { ::WaitForSingleObject (_hResult, messageTimeout) };
+    ARA_INTERNAL_ASSERT (waitResult == WAIT_OBJECT_0);
+    if (replyHandler)
+        (*replyHandler) ({ _sharedMemory->messageData, _sharedMemory->messageSize });
 
     ::ReleaseMutex (_hSendMutex);
-}
-
-void IPCPort::sendNonblocking (const MessageID messageID, DataToSend const messageData)
-{
-//  ARA_LOG ("IPCPort::sendNonblocking %i", messageID);
-
-    _sendMessage (false, messageID, messageData, nullptr);
-}
-
-void IPCPort::sendBlocking (const MessageID messageID, DataToSend const messageData)
-{
-//  ARA_LOG ("IPCPort::sendBlocking %i", messageID);
-
-    _sendMessage (true, messageID, messageData, nullptr);
-}
-
-IPCPort::ReceivedData IPCPort::sendAndAwaitReply (const MessageID messageID, DataToSend const messageData)
-{
-//  ARA_LOG ("IPCPort::sendAndAwaitReply %i", messageID);
-
-    ReceivedData reply {};
-    _sendMessage (true, messageID, messageData, &reply);
-    return reply;
 }
 
 void IPCPort::runReceiveLoop (int32_t milliseconds)
@@ -173,7 +143,7 @@ void IPCPort::runReceiveLoop (int32_t milliseconds)
 
     const ReceivedData messageData { _sharedMemory->messageData, _sharedMemory->messageSize };
 
-    const auto replyData { (_handler)(_sharedMemory->messageID, messageData) };
+    const auto replyData { (*_receiveCallback)(_sharedMemory->messageID, messageData) };
 
     ARA_INTERNAL_ASSERT (replyData.size () < SharedMemory::maxMessageSize);
 
@@ -223,13 +193,13 @@ CFDataRef IPCPortCallBack (CFMessagePortRef /*port*/, SInt32 msgid, CFDataRef cf
 {
 //  ARA_LOG ("IPCPortCallBack %i", msgid);
 
-    return ((IPCPort::Callback) info) (msgid, cfData);
+    return (*(const IPCPort::ReceiveCallback*) info) (msgid, cfData);
 }
 
-IPCPort IPCPort::createPublishingID (const char* remotePortID, Callback callback)
+IPCPort IPCPort::createPublishingID (const char* remotePortID, const ReceiveCallback& callback)
 {
-    auto portID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, remotePortID, kCFStringEncodingASCII,  kCFAllocatorNull) };
-    CFMessagePortContext portContext { 0, (void*) callback, nullptr, nullptr, nullptr };
+    auto portID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, remotePortID, kCFStringEncodingASCII, kCFAllocatorNull) };
+    CFMessagePortContext portContext { 0, (void*) &callback, nullptr, nullptr, nullptr };
     auto port { CFMessagePortCreateLocal (kCFAllocatorDefault, portID, &IPCPortCallBack, &portContext, nullptr) };
     CFRelease (portID);
     CFRunLoopSourceRef runLoopSource { CFMessagePortCreateRunLoopSource (kCFAllocatorDefault, port, 0) };
@@ -246,7 +216,7 @@ IPCPort IPCPort::createConnectedToID (const char* remotePortID)
 
     while (timeout > 0.0)
     {
-        auto portID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, remotePortID, kCFStringEncodingASCII,  kCFAllocatorNull) };
+        auto portID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, remotePortID, kCFStringEncodingASCII, kCFAllocatorNull) };
         port = CFMessagePortCreateRemote (kCFAllocatorDefault, portID);
         CFRelease (portID);
         if (port)
@@ -261,41 +231,20 @@ IPCPort IPCPort::createConnectedToID (const char* remotePortID)
     return IPCPort { port };
 }
 
-void IPCPort::sendNonblocking (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData)
+void IPCPort::sendMessage (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData, ReplyHandler* replyHandler)
 {
-//  ARA_LOG ("IPCPort::sendNonblocking %i", messageID);
+//  ARA_LOG ("IPCPort::sendMessage %i", messageID);
 
-    os_unfair_lock_lock (&_sendLock);
-    const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (_port, messageID, messageData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
-    os_unfair_lock_unlock (&_sendLock);
-    ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
-}
-
-void IPCPort::sendBlocking (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData)
-{
-//  ARA_LOG ("IPCPort::sendBlocking %i", messageID);
-
-    auto incomingData { _sendBlocking (messageID, messageData) };
-    CFRelease (incomingData);
-}
-
-__attribute__((cf_returns_retained)) IPCPort::ReceivedData IPCPort::sendAndAwaitReply (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData)
-{
-//  ARA_LOG ("IPCPort::sendAndAwaitReply %i", messageID);
-
-    return _sendBlocking (messageID, messageData);
-}
-
-__attribute__((cf_returns_retained)) IPCPort::ReceivedData IPCPort::_sendBlocking (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData)
-{
-    CFDataRef incomingData {};
+    ReceivedData incomingData {};
     os_unfair_lock_lock (&_sendLock);
     const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (_port, messageID, messageData, 0.001 * messageTimeout, 0.001 * messageTimeout, kCFRunLoopDefaultMode, &incomingData) };
     os_unfair_lock_unlock (&_sendLock);
     ARA_INTERNAL_ASSERT (incomingData && (portSendResult == kCFMessagePortSuccess));
     if (messageData)
         CFRelease (messageData);
-    return incomingData;
+    if (replyHandler)
+        (*replyHandler) (incomingData);
+    CFRelease (incomingData);
 }
 
 void IPCPort::runReceiveLoop (int32_t milliseconds)
