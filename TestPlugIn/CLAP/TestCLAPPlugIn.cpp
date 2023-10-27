@@ -26,6 +26,10 @@
 #include "ARA_Library/Utilities/ARASamplePositionConversion.h"
 
 
+// audio port configs have been replaced by configurable audio ports in recent CLAP drafts
+#define ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG 0
+
+
 // since we're actually using C++ not plain C, replace NULL with nullptr
 #if defined(NULL)
     #undef NULL
@@ -63,9 +67,11 @@ typedef struct my_plug {
    const clap_host_log_t          *host_log;
    const clap_host_thread_check_t *host_thread_check;
    const clap_host_state_t        *host_state;
+#if ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
    const clap_host_audio_ports_t  *host_audio_ports_config;
 
    clap_id  selected_audio_config_id = 0;
+#endif
    uint32_t channel_count = 1;
    double   sample_rate = 44100.0;
    uint32_t max_frames_count = 0;
@@ -106,6 +112,8 @@ static const clap_plugin_audio_ports_t s_my_plug_audio_ports = {
 ////////////////////////////////////
 // clap_plugin_audio_ports_config //
 ////////////////////////////////////
+
+#if ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
 
 static const clap_audio_ports_config_t audio_port_config[] = {
    { 0, "Mono", 1, 1, true, 1, CLAP_PORT_MONO, true, 1, CLAP_PORT_MONO },
@@ -152,6 +160,64 @@ static clap_plugin_audio_ports_config_t s_my_plug_audio_ports_config =
    .get = my_plug_audio_ports_config_get,
    .select = my_plug_audio_ports_config_select
 };
+
+#else   // ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
+
+//////////////////////////////////////////
+// clap_plugin_configurable_audio_ports //
+//////////////////////////////////////////
+
+bool my_plug_configurable_audio_ports_apply_configuration(const clap_plugin_t                                *plugin,
+                                                          const struct clap_audio_port_configuration_request *requests,
+                                                          uint32_t request_count,
+                                                          bool     is_dry_run) {
+   my_plug_t *plug = (my_plug_t *)plugin->plugin_data;
+   if (request_count > 2)
+      return false;
+   uint32_t input_channel_count = 0;
+   uint32_t output_channel_count = 0;
+   for (uint32_t i = 0; i < request_count; ++i) {
+      if (requests[i].port_index != 0)
+         return false;
+
+      if (!strcmp(requests[i].port_type, CLAP_PORT_MONO)) {
+         if (requests[i].channel_count != 1)
+            return false;
+         if (requests[i].port_details != nullptr)
+            return false;
+      } else if (!strcmp(requests[i].port_type, CLAP_PORT_STEREO)) {
+         if (requests[i].channel_count != 2)
+            return false;
+         if (requests[i].port_details != nullptr)
+            return false;
+      }
+
+      if (requests[i].is_input) {
+         if (input_channel_count != 0)
+            return false;
+         input_channel_count = requests[i].channel_count;
+      }
+      else {
+         if (output_channel_count != 0)
+            return false;
+         output_channel_count = requests[i].channel_count;
+      }
+   }
+
+   if (input_channel_count != output_channel_count)
+     return false;
+
+   if (!is_dry_run)
+      plug->channel_count = output_channel_count;
+   return true;
+}
+
+static clap_plugin_configurable_audio_ports_t s_my_plug_configurable_audio_ports =
+{
+   .apply_configuration = my_plug_configurable_audio_ports_apply_configuration,
+};
+
+#endif  // !ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
 
 //////////////////
 // clap_latency //
@@ -200,7 +266,9 @@ static bool my_plug_init(const struct clap_plugin *plugin) {
    plug->host_thread_check = (const clap_host_thread_check_t *)plug->host->get_extension(plug->host, CLAP_EXT_THREAD_CHECK);
    plug->host_latency = (const clap_host_latency_t *)plug->host->get_extension(plug->host, CLAP_EXT_LATENCY);
    plug->host_state = (const clap_host_state_t *)plug->host->get_extension(plug->host, CLAP_EXT_STATE);
+#if ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
    plug->host_audio_ports_config = (const clap_host_audio_ports_t *)plug->host->get_extension(plug->host, CLAP_EXT_AUDIO_PORTS);
+#endif
    return true;
 }
 
@@ -265,8 +333,13 @@ static const void *my_plug_get_extension(const struct clap_plugin *plugin, const
       return &s_my_plug_latency;
    if (!strcmp(id, CLAP_EXT_AUDIO_PORTS))
       return &s_my_plug_audio_ports;
+#if ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
    if (!strcmp(id, CLAP_EXT_AUDIO_PORTS_CONFIG))
       return &s_my_plug_audio_ports_config;
+#else
+   if (!strcmp(id, CLAP_EXT_CONFIGURABLE_AUDIO_PORTS))
+      return &s_my_plug_configurable_audio_ports;
+#endif
    if (!strcmp(id, CLAP_EXT_ARA_PLUGINEXTENSION))
       return &ara_plugin_extension;
    return NULL;

@@ -266,30 +266,44 @@ void CLAPStartRendering(CLAPPlugIn clapPlugIn, uint32_t maxBlockSize, double sam
     bool ARA_MAYBE_UNUSED_VAR(success);
 
     // we require that ARA plug-ins are capable of handling mono and stereo
-    const clap_plugin_audio_ports_config_t * audio_ports_config = clapPlugIn->plugin->get_extension(clapPlugIn->plugin, CLAP_EXT_AUDIO_PORTS_CONFIG);
-    ARA_INTERNAL_ASSERT(audio_ports_config);
-    uint32_t count = audio_ports_config->count(clapPlugIn->plugin);
-    ARA_INTERNAL_ASSERT(count >= 2);
-    // this simple loader always uses mono, pick appropriate config
-    bool ARA_MAYBE_UNUSED_VAR(foundMonoConfig);
-    foundMonoConfig = false;
-    for (uint32_t i = 0; i < count; ++i)
+    const clap_plugin_configurable_audio_ports_t * configurable_audio_ports = clapPlugIn->plugin->get_extension(clapPlugIn->plugin, CLAP_EXT_CONFIGURABLE_AUDIO_PORTS);
+    if (configurable_audio_ports)
     {
-        clap_audio_ports_config_t config;
-        success = audio_ports_config->get(clapPlugIn->plugin, i, &config);
+        clap_audio_port_configuration_request_t requests[] = { { true, 0, 1, CLAP_PORT_MONO, NULL },
+                                                               { false, 0, 1, CLAP_PORT_MONO, NULL } };
+
+        success = configurable_audio_ports->apply_configuration(clapPlugIn->plugin, requests, (uint32_t) sizeof(requests) / sizeof(requests[0]), false);
         ARA_INTERNAL_ASSERT(success);
-        if (config.has_main_input &&
-            config.has_main_output &&
-            config.main_input_channel_count == 1 &&
-            config.main_output_channel_count == 1)
+    }
+    else
+    {
+        const clap_plugin_audio_ports_config_t * audio_ports_config = clapPlugIn->plugin->get_extension(clapPlugIn->plugin, CLAP_EXT_AUDIO_PORTS_CONFIG);
+        if (audio_ports_config)
         {
-            success = audio_ports_config->select(clapPlugIn->plugin, config.id);
-            ARA_INTERNAL_ASSERT(success);
-            foundMonoConfig = true;
-            break;
+            uint32_t count = audio_ports_config->count(clapPlugIn->plugin);
+            ARA_INTERNAL_ASSERT(count >= 2);
+            // this simple loader always uses mono, pick appropriate config
+            bool ARA_MAYBE_UNUSED_VAR(foundMonoConfig);
+            foundMonoConfig = false;
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                clap_audio_ports_config_t config;
+                success = audio_ports_config->get(clapPlugIn->plugin, i, &config);
+                ARA_INTERNAL_ASSERT(success);
+                if (config.has_main_input &&
+                    config.has_main_output &&
+                    config.main_input_channel_count == 1 &&
+                    config.main_output_channel_count == 1)
+                {
+                    success = audio_ports_config->select(clapPlugIn->plugin, config.id);
+                    ARA_INTERNAL_ASSERT(success);
+                    foundMonoConfig = true;
+                    break;
+                }
+            }
+            ARA_INTERNAL_ASSERT(foundMonoConfig);
         }
     }
-    ARA_INTERNAL_ASSERT(foundMonoConfig);
 
     // validate audio port info
     const clap_plugin_audio_ports_t * audio_ports = clapPlugIn->plugin->get_extension(clapPlugIn->plugin, CLAP_EXT_AUDIO_PORTS);
