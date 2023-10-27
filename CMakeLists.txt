@@ -1084,6 +1084,15 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/AudioUnitLoader.m"
     )
 endif()
+if(ARA_ENABLE_CLAP)
+    target_sources(ARAExamplesCommon PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/CLAPLoader.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/CLAPLoader.c"
+    )
+    target_link_libraries(ARAExamplesCommon PRIVATE
+        clap
+    )
+endif()
 
 set_target_properties(ARAExamplesCommon PROPERTIES
     FOLDER "Examples"
