@@ -456,8 +456,6 @@ void AudioUnitStartRendering(AudioUnitInstance audioUnitInstance, UInt32 maxBloc
         ConfigureBussesArray(audioUnitInstance->v3AudioUnit.inputBusses, sampleRate);
         ConfigureBussesArray(audioUnitInstance->v3AudioUnit.outputBusses, sampleRate);
 
-        audioUnitInstance->v3RenderBlock = [[audioUnitInstance->v3AudioUnit renderBlock] retain];
-
         audioUnitInstance->v3AudioUnit.transportStateBlock =
             ^BOOL (AUHostTransportStateFlags * _Nullable transportStateFlags, double * _Nullable currentSamplePosition,
                    double * _Nullable cycleStartBeatPosition, double * _Nullable cycleEndBeatPosition)
@@ -477,6 +475,8 @@ void AudioUnitStartRendering(AudioUnitInstance audioUnitInstance, UInt32 maxBloc
 
         ARA_MAYBE_UNUSED_VAR(BOOL) success = [audioUnitInstance->v3AudioUnit allocateRenderResourcesAndReturnError:nil];
         ARA_INTERNAL_ASSERT(success == YES);
+
+        audioUnitInstance->v3RenderBlock = [[audioUnitInstance->v3AudioUnit renderBlock] retain];
     }
 }
 
