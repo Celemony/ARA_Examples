@@ -829,11 +829,7 @@ public:
     std::unique_ptr<PlugInInstance> createPlugInInstance () override
     {
         size_t remoteInstanceRef {};
-        ARA::IPC::RemoteCaller::CustomDecodeFunction customDecode { [&remoteInstanceRef] (const ARA::IPC::ARAIPCMessageDecoder* decoder) -> void
-            {
-                decoder->readSize (0, &remoteInstanceRef);
-            } };
-        ARA::IPC::RemoteCaller { _hostCommandsSender }.remoteCall (customDecode, kIPCCreateEffectMethodID);
+        ARA::IPC::RemoteCaller { _hostCommandsSender }.remoteCall (remoteInstanceRef, kIPCCreateEffectMethodID);
         return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _port);
     }
 
