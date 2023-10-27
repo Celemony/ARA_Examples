@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------
 //! \file       IPCPort.h
-//!             messaging used for IPC in SDK IPC demo example
+//!             communication channel used for IPC in SDK IPC demo example
 //! \project    ARA SDK Examples
 //! \copyright  Copyright (c) 2012-2022, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,14 +18,15 @@
 
 #pragma once
 
-#include "IPCMessage.h"
 
 #if defined (_WIN32)
     #include <Windows.h>
+    #include <string>
 #elif defined (__APPLE__)
+    #include <CoreFoundation/CoreFoundation.h>
     #include <os/lock.h>
-#elif defined (__linux__)
-    #error "IPC not yet implemented for Linux"
+#else
+    #error "IPC not yet implemented for this platform"
 #endif
 
 
@@ -36,6 +37,15 @@ class IPCPort
 public:
     // ID type for messages
     using MessageID = int32_t;
+#if defined (_WIN32)
+    using DataToSend = std::string;
+    using ReceivedData = std::string;
+#elif defined (__APPLE__)
+    // the ownership of DataToSend is transferred both when passing it into sendMessage(),
+    // or when returning it from a ReceiveCallback.
+    using DataToSend = CFDataRef;
+    using ReceivedData = CFDataRef;
+#endif
 
     // C++ "rule of five" standard methods - copying is not allowed, only move
     IPCPort (const IPCPort& other) = delete;
@@ -48,16 +58,26 @@ public:
     IPCPort () = default;
 
     // factory functions for send and receive ports
-    using Callback = IPCMessage (*) (const MessageID messageID, const IPCMessage& message);
+#if defined (__APPLE__)
+    using Callback = __attribute__((cf_returns_retained)) DataToSend (*) (const MessageID messageID, ReceivedData const messageData);
+#else
+    using Callback = DataToSend (*) (const MessageID messageID, ReceivedData const messageData);
+#endif
     static IPCPort createPublishingID (const char* remotePortID, Callback callback);
     static IPCPort createConnectedToID (const char* remotePortID);
 
     // message sending
     // If no reply is desired, blocking is still necessary in many cases to ensure consistent call order,
     // e.g. if the message potentially triggers any synchronous callbacks from the other side.
-    void sendNonblocking (const MessageID messageID, const IPCMessage& message);
-    void sendBlocking (const MessageID messageID, const IPCMessage& message);
-    IPCMessage sendAndAwaitReply (const MessageID messageID, const IPCMessage& message);
+#if defined (__APPLE__)
+    void sendNonblocking (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData);
+    void sendBlocking (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData);
+    __attribute__((cf_returns_retained)) ReceivedData sendAndAwaitReply (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData);
+#else
+    void sendNonblocking (const MessageID messageID, DataToSend const messageData);
+    void sendBlocking (const MessageID messageID, DataToSend const messageData);
+    ReceivedData sendAndAwaitReply (const MessageID messageID, DataToSend const messageData);
+#endif
 
     // message receiving
     // waits up to the specified amount of milliseconds for an incoming event and processes it
@@ -71,10 +91,10 @@ public:
 private:
 #if defined (_WIN32)
     IPCPort (const char* remotePortID);
-    void _sendMessage (bool blocking, const MessageID messageID, const IPCMessage& message, std::string* result);
+    void _sendMessage (bool blocking, const MessageID messageID, DataToSend const messageData, ReceivedData* const result);
 #elif defined (__APPLE__)
     explicit IPCPort (CFMessagePortRef __attribute__((cf_consumed)) port);
-    __attribute__((cf_returns_retained)) CFDataRef _sendBlocking (const MessageID messageID, const IPCMessage& message);
+    __attribute__((cf_returns_retained)) ReceivedData _sendBlocking (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData);
 #endif
 
 private:
