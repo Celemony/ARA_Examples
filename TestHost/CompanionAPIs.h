@@ -40,19 +40,14 @@
 class PlugInInstance
 {
 protected:
-    explicit PlugInInstance (const ARA::ARAPlugInExtensionInstance* instance)
-    :
-#if ARA_ENABLE_IPC
-      _instance { instance },
-#endif
-      _playbackRenderer { instance },
-      _editorRenderer { instance },
-      _editorView { instance }
-    {}
+    PlugInInstance () {}
 
 public:
-    // Instances will be created through the factory PlugInEntry::createARAPlugInInstanceWithRoles()
+    // Instances will be created through the factory PlugInEntry::createPlugInInstance()
     virtual ~PlugInInstance () = default;
+
+    // Execute the ARA binding
+    virtual void bindToDocumentControllerWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) = 0;
 
     // Companion API specific implementations
     virtual void startRendering (int maxBlockSize, double sampleRate) = 0;
@@ -60,21 +55,19 @@ public:
     virtual void stopRendering () = 0;
 
     // Getters for ARA specific plug-in role interfaces
-    ARA::Host::PlaybackRenderer* getPlaybackRenderer () { return &_playbackRenderer; }
-    ARA::Host::EditorRenderer* getEditorRenderer () { return &_editorRenderer; }
-    ARA::Host::EditorView* getEditorView () { return &_editorView; }
+    ARA::Host::PlaybackRenderer getPlaybackRenderer () { return ARA::Host::PlaybackRenderer { _instance }; }
+    ARA::Host::EditorRenderer getEditorRenderer () { return ARA::Host::EditorRenderer { _instance }; }
+    ARA::Host::EditorView getEditorView () { return ARA::Host::EditorView { _instance }; }
 
 #if ARA_ENABLE_IPC
     const ARA::ARAPlugInExtensionInstance* getARAPlugInExtensionInstance () { return _instance; }
 #endif
 
+protected:
+    void validateAndSetPlugInExtensionInstance (const ARA::ARAPlugInExtensionInstance* instance, ARA::ARAPlugInInstanceRoleFlags assignedRoles);
+
 private:
-#if ARA_ENABLE_IPC
-    const ARA::ARAPlugInExtensionInstance* _instance;
-#endif
-    ARA::Host::PlaybackRenderer _playbackRenderer;
-    ARA::Host::EditorRenderer _editorRenderer;
-    ARA::Host::EditorView _editorView;
+    const ARA::ARAPlugInExtensionInstance* _instance {};
 };
 
 /*******************************************************************************/
@@ -102,8 +95,8 @@ public:
     virtual const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                             const ARA::ARADocumentProperties* properties);
 
-    // Factory function for new ARA plug-in instances with the desired roles
-    virtual std::unique_ptr<PlugInInstance> createARAPlugInInstanceWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) = 0;
+    // Factory function for new plug-in instances
+    virtual std::unique_ptr<PlugInInstance> createPlugInInstance () = 0;
 
     // Test if IPC is used
     bool usesIPC () const { return _usesIPC; }
@@ -115,7 +108,6 @@ protected:
 #endif
     void initializeARA (const ARA::ARAFactory* factory, ARA::ARAAssertFunction* assertFunctionAddress);
     void uninitializeARA ();
-    void validatePlugInExtensionInstance (const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance, ARA::ARAPlugInInstanceRoleFlags assignedRoles);
 
 protected:
     std::string _description {};
