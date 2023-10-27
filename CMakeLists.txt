@@ -1023,7 +1023,7 @@ endfunction()
 # ARA_Library (including ARA_API)
 message(STATUS "Importing ARA_Library (including ARA_API)")
 add_subdirectory("${ARA_LIBRARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/ARA_Library.build" EXCLUDE_FROM_ALL)
-set_target_properties(ARA_Host_Library ARA_PlugIn_Library PROPERTIES
+set_target_properties(ARA_Host_Library ARA_PlugIn_Library ARA_IPC_Library PROPERTIES
     FOLDER "ARA_Library"
     XCODE_GENERATE_SCHEME OFF
     XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
@@ -1031,7 +1031,7 @@ set_target_properties(ARA_Host_Library ARA_PlugIn_Library PROPERTIES
 
 # for debug builds, these are enabled automatically by the ARA SDK, as is appropriate for actual products
 # - but for our examples/tests here, we want to enable these also for release builds
-foreach(target ARA_Host_Library ARA_PlugIn_Library)
+foreach(target ARA_Host_Library ARA_PlugIn_Library ARA_IPC_Library)
     target_compile_definitions(${target} PUBLIC
         -DARA_VALIDATE_API_CALLS=1
         -DARA_ENABLE_INTERNAL_ASSERTS=1
@@ -1125,6 +1125,13 @@ target_link_libraries(ARATestPlugInCommon PUBLIC
     ARA_PlugIn_Library
     ARAExamplesCommon
 )
+
+# \todo add IPC implementation for Linux
+if(APPLE OR WIN32)
+    target_link_libraries(ARATestPlugInCommon PUBLIC
+        ARA_IPC_Library
+    )
+endif()
 
 target_include_directories(ARATestPlugInCommon PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn"
@@ -1451,6 +1458,7 @@ target_link_libraries(ARAMiniHost PRIVATE
     ARA_API
     ARAExamplesCommon
     ARA_Host_Library
+    ARA_IPC_Library
 )
 
 target_compile_definitions(ARAMiniHost PRIVATE
@@ -1538,11 +1546,6 @@ endif()
 # \todo add IPC implementation for Linux
 if(APPLE OR WIN32)
     target_sources(ARATestHost PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCEncoding.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCProxyHost.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCProxyHost.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCProxyPlugIn.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/ARAIPCProxyPlugIn.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCMessage.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCMessage.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCPort.h"
@@ -1550,11 +1553,7 @@ if(APPLE OR WIN32)
     )
 
     target_link_libraries(ARATestHost PRIVATE
-        # \todo Linking the plug-in library (used in the IPC proxy) results in some duplicate symbols
-        #       with host libs - however these should be identical since we use the same compiler
-        #       setup for both libs. Actual host might rather not use the libraries and directly
-        #       compile the required files within their target.
-        ARA_PlugIn_Library
+        ARA_IPC_Library
     )
 endif()
 

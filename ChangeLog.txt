@@ -5,7 +5,8 @@ This is a development build of the ARA Examples 2.3.
 Changes since previous releases:
 - initial draft of Audio Unit version 3 support (App Extension)
 - various related refactorings and cleanups in plug-in hosting code
-- IPCDemo refactored and merged into ARATestHost, drafting a generic ARA IPC implementation
+- initial draft of generic ARA IPC implementation in ARA_Library
+- IPCDemo refactored and merged into ARATestHost, utilizing new ARA_IPC library draft
 - IPC now also supports using VST3 (was previously limited to Audio Units)
 - IPC now also works on Windows (was previously limited to macOS)
 - IPC now also supports using pugixml as encoder (was previously limited to the macOS-only CFDictionary)

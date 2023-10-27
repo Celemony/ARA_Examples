@@ -29,21 +29,13 @@
 #include "ARA_Library/Debug/ARADebug.h"
 #include "ARA_Library/Dispatch/ARAHostDispatch.h"
 
-#include <string>
-#include <vector>
-
-
-/*******************************************************************************/
-#if defined (__APPLE__) || defined (_WIN32)
-    #define ARA_ENABLE_IPC 1
-#else
-    #define ARA_ENABLE_IPC 0
-#endif
-
+#include "ARA_Library/IPC/ARAIPC.h"
 #if ARA_ENABLE_IPC
     #include "IPC/IPCMessage.h"
-    #include "IPC/ARAIPCEncoding.h"
 #endif
+
+#include <string>
+#include <vector>
 
 
 /*******************************************************************************/

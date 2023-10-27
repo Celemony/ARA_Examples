@@ -29,15 +29,14 @@
 #endif
 
 
-// ID type for messages
-using MessageID = int32_t;
-
-
 // A simple proof-of-concept wrapper for an IPC communication channel.
 // Error handling is limited to assertions.
 class IPCPort
 {
 public:
+    // ID type for messages
+    using MessageID = int32_t;
+
     // C++ "rule of five" standard methods - copying is not allowed, only move
     IPCPort (const IPCPort& other) = delete;
     IPCPort& operator= (const IPCPort& other) = delete;

@@ -64,7 +64,7 @@
 #include <cstring>
 
 #if ARA_ENABLE_IPC
-    #include "IPC/ARAIPCProxyHost.h"
+    #include "ARA_Library/IPC/ARAIPCProxyHost.h"
 #endif
 
 
