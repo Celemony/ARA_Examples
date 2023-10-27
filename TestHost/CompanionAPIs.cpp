@@ -234,11 +234,6 @@ public:
             delete _message;
     }
 
-    bool isEmpty () const override
-    {
-        return _message->isEmpty ();
-    }
-
     bool readInt32 (ARA::IPC::ARAIPCMessageKey argKey, int32_t* argValue) const override
     {
         return _message->readInt32 (argKey, *argValue);

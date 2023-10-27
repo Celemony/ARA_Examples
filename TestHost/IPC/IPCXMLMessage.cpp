@@ -198,11 +198,6 @@ std::string IPCXMLMessage::createEncodedMessage () const
 #endif
 }
 
-bool IPCXMLMessage::isEmpty () const
-{
-    return _root.empty ();
-}
-
 bool IPCXMLMessage::readInt32 (const MessageKey argKey, int32_t& argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
