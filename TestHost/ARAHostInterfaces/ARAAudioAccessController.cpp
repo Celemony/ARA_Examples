@@ -25,13 +25,34 @@
 
 #include "ARAAudioAccessController.h"
 
-// The audio sample data read by the plug-in is a pulsed sine wave signal
+#include <thread>
+
+/*******************************************************************************/
+
 bool AudioSourceReader::readSamples (ARA::ARASamplePosition samplePosition, ARA::ARASampleCount samplesPerChannel, void* const buffers[]) const noexcept
 {
     return _audioSource->getAudioFile ()->readSamples (samplePosition, samplesPerChannel, buffers, _use64BitSamples);
 }
 
 /*******************************************************************************/
+
+#if ARA_VALIDATE_API_CALLS
+std::mutex _renderThreadMutex;
+std::vector<std::thread::id> _renderThreadIDs;
+
+void ARAAudioAccessController::registerRenderThread ()
+{
+    std::lock_guard<std::mutex> guard (_renderThreadMutex);
+    _renderThreadIDs.push_back (std::this_thread::get_id ());
+}
+
+void ARAAudioAccessController::unregisterRenderThread ()
+{
+    std::lock_guard<std::mutex> guard (_renderThreadMutex);
+    const bool success { ARA::find_erase (_renderThreadIDs, std::this_thread::get_id ()) };
+    ARA_INTERNAL_ASSERT (success);
+}
+#endif
 
 // Create an audio reader for the given audio source - because we have no real audio reader object, we instead
 // treat the reference this function returns as a "key" that we'll use when reading this audio source
@@ -40,7 +61,7 @@ ARA::ARAAudioReaderHostRef ARAAudioAccessController::createAudioReaderForSource 
     const auto audioSource = fromHostRef (audioSourceHostRef);
     ARA_VALIDATE_API_ARGUMENT (audioSourceHostRef, ARA::contains (getDocument ()->getAudioSources (), audioSource));
 #if ARA_VALIDATE_API_CALLS
-    std::lock_guard<std::mutex> lg (_audioSourceReadersMutex);
+    std::lock_guard<std::mutex> guard (_audioSourceReadersMutex);
 #endif
     _audioSourceReaders.emplace_back (std::make_unique<AudioSourceReader> (audioSource, use64BitSamples));
     return toHostRef (_audioSourceReaders.back ().get ());
@@ -53,7 +74,11 @@ bool ARAAudioAccessController::readAudioSamples (ARA::ARAAudioReaderHostRef audi
     const auto audioSourceReader = fromHostRef (audioReaderHostRef);
 #if ARA_VALIDATE_API_CALLS
     {
-        std::lock_guard<std::mutex> lg (_audioSourceReadersMutex);
+        std::lock_guard<std::mutex> guard (_renderThreadMutex);
+        ARA_VALIDATE_API_THREAD (!ARA::contains (_renderThreadIDs, std::this_thread::get_id ()));
+    }
+    {
+        std::lock_guard<std::mutex> guard (_audioSourceReadersMutex);
         ARA_VALIDATE_API_ARGUMENT (audioReaderHostRef, ARA::contains (_audioSourceReaders, audioSourceReader));
     }
 #endif
@@ -70,7 +95,7 @@ void ARAAudioAccessController::destroyAudioReader (ARA::ARAAudioReaderHostRef au
 {
     const auto audioSourceReader = fromHostRef (audioReaderHostRef);
 #if ARA_VALIDATE_API_CALLS
-    std::lock_guard<std::mutex> lg (_audioSourceReadersMutex);
+    std::lock_guard<std::mutex> guard (_audioSourceReadersMutex);
 #endif
     ARA_VALIDATE_API_ARGUMENT (audioReaderHostRef, ARA::contains (_audioSourceReaders, audioSourceReader));
     ARA::find_erase (_audioSourceReaders, audioSourceReader);

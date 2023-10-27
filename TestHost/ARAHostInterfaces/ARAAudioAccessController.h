@@ -76,6 +76,11 @@ public:
 
     Document* getDocument () const noexcept { return _araDocumentController->getDocument (); }
 
+#if ARA_VALIDATE_API_CALLS
+    static void registerRenderThread ();
+    static void unregisterRenderThread ();
+#endif
+
 private:
     ARADocumentController* _araDocumentController;
     std::vector<std::unique_ptr<AudioSourceReader>> _audioSourceReaders;

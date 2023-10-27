@@ -25,6 +25,7 @@
 
 #include "TestCases.h"
 #include "TestHost.h"
+#include "ARAHostInterfaces/ARAAudioAccessController.h"
 
 #include "ARA_Library/Utilities/ARASamplePositionConversion.h"
 #include "ARA_Library/Utilities/ARAStdVectorUtilities.h"
@@ -34,6 +35,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdio>
+#include <thread>
 
 
 // in this test application, we want assertions and logging to be always enabled, even in release builds.
@@ -632,18 +634,25 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
         // render all playback region samples
         plugInInstance->startRendering (renderBlockSize, renderSampleRate);
 
-        for (auto samplePosition { startOfPlaybackRegionSamples }; samplePosition < endOfPlaybackRegionSamples; samplePosition += renderBlockSize)
-        {
-            const auto samplesToRender { std::min (renderBlockSize, static_cast<int> (endOfPlaybackRegionSamples - samplePosition)) };
-            const auto outputPosition { samplePosition - startOfPlaybackRegionSamples };
-            plugInInstance->renderSamples (samplesToRender, samplePosition, &outputData[static_cast<size_t> (outputPosition)]);
-        }
+        auto renderOnOtherThread = [&] () {
+            std::thread renderthread { [&] () {
+                ARAAudioAccessController::registerRenderThread();
+                for (auto samplePosition { startOfPlaybackRegionSamples }; samplePosition < endOfPlaybackRegionSamples; samplePosition += renderBlockSize)
+                {
+                    const auto samplesToRender { std::min (renderBlockSize, static_cast<int> (endOfPlaybackRegionSamples - samplePosition)) };
+                    const auto outputPosition { samplePosition - startOfPlaybackRegionSamples };
+                    plugInInstance->renderSamples (samplesToRender, samplePosition, &outputData[static_cast<size_t> (outputPosition)]);
+                }
+                ARAAudioAccessController::unregisterRenderThread();
+            } };
+            renderthread.join ();
+        };
 
-        plugInInstance->stopRendering ();
+        renderOnOtherThread ();
 
+        // optionally perform the render again if the plug-in supports time stretching
         if (enableTimeStretchingIfSupported)
         {
-            // optionally perform the render again if the plug-in supports time stretching
             const auto supportedTransformationFlags { plugInEntry->getARAFactory ()->supportedPlaybackTransformationFlags };
             if ((supportedTransformationFlags & ARA::kARAPlaybackTransformationTimestretch) != 0)
             {
@@ -664,23 +673,15 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
 
                 ARA_LOG ("Rendering %lu region(s) assigned to playback renderer %p with sample rate %lgHz", playbackRegions.size (), playbackRenderer.getRef (), renderSampleRate);
 
-                // render all playback region samples
-                plugInInstance->startRendering (renderBlockSize, renderSampleRate);
-
-                for (auto samplePosition { startOfPlaybackRegionSamples }; samplePosition < endOfPlaybackRegionSamples; samplePosition += renderBlockSize)
-                {
-                    const auto samplesToRender { std::min (renderBlockSize, static_cast<int> (endOfPlaybackRegionSamples - samplePosition)) };
-                    const auto outputPosition { samplePosition - startOfPlaybackRegionSamples };
-                    plugInInstance->renderSamples (samplesToRender, samplePosition, &outputData[static_cast<size_t> (outputPosition)]);
-                }
-
-                plugInInstance->stopRendering ();
+                renderOnOtherThread ();
             }
             else
             {
                 ARA_LOG ("Time stretching requested, but plug-in doesn't support kARAPlaybackTransformationTimestretch");
             }
         }
+
+        plugInInstance->stopRendering ();
     }
 }
 
