@@ -90,7 +90,7 @@ void ARADocumentController::endEditing ()
 }
 
 /*******************************************************************************/
-const DocumentProperties ARADocumentController::getDocumentProperties () const
+const DocumentProperties ARADocumentController::getDocumentProperties () const noexcept
 {
     return {
         _document->getName ().c_str ()
@@ -106,7 +106,7 @@ void ARADocumentController::updateDocumentProperties ()
 
 /*******************************************************************************/
 
-const MusicalContextProperties ARADocumentController::getMusicalContextProperties (const MusicalContext* musicalContext) const
+const MusicalContextProperties ARADocumentController::getMusicalContextProperties (const MusicalContext* musicalContext) const noexcept
 {
     return {
         musicalContext->getName ().c_str (),
@@ -144,7 +144,7 @@ void ARADocumentController::updateMusicalContextContent (MusicalContext* musical
 
 /*******************************************************************************/
 
-const RegionSequenceProperties ARADocumentController::getRegionSequenceProperties (const RegionSequence* regionSequence) const
+const RegionSequenceProperties ARADocumentController::getRegionSequenceProperties (const RegionSequence* regionSequence) const noexcept
 {
     return {
         regionSequence->getName ().c_str (),
@@ -177,7 +177,7 @@ void ARADocumentController::updateRegionSequenceProperties (RegionSequence* regi
 
 /*******************************************************************************/
 
-const AudioSourceProperties ARADocumentController::getAudioSourceProperties (const AudioSource* audioSource) const
+const AudioSourceProperties ARADocumentController::getAudioSourceProperties (const AudioSource* audioSource) const noexcept
 {
     return {
         audioSource->getName ().c_str (),
@@ -220,7 +220,7 @@ void ARADocumentController::updateAudioSourceContent (AudioSource* audioSource, 
 
 /*******************************************************************************/
 
-const AudioModificationProperties ARADocumentController::getAudioModificationProperties (const AudioModification* audioModification) const
+const AudioModificationProperties ARADocumentController::getAudioModificationProperties (const AudioModification* audioModification) const noexcept
 {
     return {
         audioModification->getName ().c_str (),
@@ -258,7 +258,7 @@ void ARADocumentController::updateAudioModificationProperties (AudioModification
 
 /*******************************************************************************/
 
-const PlaybackRegionProperties ARADocumentController::getPlaybackRegionProperties (const PlaybackRegion* playbackRegion) const
+const PlaybackRegionProperties ARADocumentController::getPlaybackRegionProperties (const PlaybackRegion* playbackRegion) const noexcept
 {
     return {
         playbackRegion->getTransformationFlags (),

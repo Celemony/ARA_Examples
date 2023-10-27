@@ -45,7 +45,7 @@ ARA_MAP_HOST_REF (PlaybackRegion, ARA::ARAPlaybackRegionHostRef)
 
 ARA_MAP_HOST_REF (ArchiveBase, ARA::ARAArchiveReaderHostRef, ARA::ARAArchiveWriterHostRef)
 
-// These property typedefs implicity version our properties structs according to the last member
+// These property typedefs implicitly version our properties structs according to the last member
 using DocumentProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARADocumentProperties, name)>;
 using MusicalContextProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAMusicalContextProperties, color)>;
 using RegionSequenceProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARARegionSequenceProperties, color)>;
@@ -169,19 +169,19 @@ public:
 
     // If the host and plug-in documents are in sync then each document object
     // will have a reference to its plug-in side representation, accessible here
-    ARA::ARAMusicalContextRef getRef (MusicalContext* musicalContext) const { return _musicalContextRefs.at (musicalContext); }
-    ARA::ARARegionSequenceRef getRef (RegionSequence* regionSequence) const { return _regionSequenceRefs.at (regionSequence); }
-    ARA::ARAAudioSourceRef getRef (AudioSource* audioSource) const { return _audioSourceRefs.at (audioSource); }
-    ARA::ARAAudioModificationRef getRef (AudioModification* audioModification) const { return _audioModificationRefs.at (audioModification); }
-    ARA::ARAPlaybackRegionRef getRef (PlaybackRegion* playbackRegion) const { return _playbackRegionRefs.at (playbackRegion); }
+    ARA::ARAMusicalContextRef getRef (MusicalContext* musicalContext) const noexcept { return _musicalContextRefs.at (musicalContext); }
+    ARA::ARARegionSequenceRef getRef (RegionSequence* regionSequence) const noexcept { return _regionSequenceRefs.at (regionSequence); }
+    ARA::ARAAudioSourceRef getRef (AudioSource* audioSource) const noexcept { return _audioSourceRefs.at (audioSource); }
+    ARA::ARAAudioModificationRef getRef (AudioModification* audioModification) const noexcept { return _audioModificationRefs.at (audioModification); }
+    ARA::ARAPlaybackRegionRef getRef (PlaybackRegion* playbackRegion) const noexcept { return _playbackRegionRefs.at (playbackRegion); }
 
 private:
-    const DocumentProperties getDocumentProperties () const;
-    const MusicalContextProperties getMusicalContextProperties (const MusicalContext* musicalContext) const;
-    const RegionSequenceProperties getRegionSequenceProperties (const RegionSequence* regionSequence) const;
-    const AudioSourceProperties getAudioSourceProperties (const AudioSource* audioSource) const;
-    const AudioModificationProperties getAudioModificationProperties (const AudioModification* audioModification) const;
-    const PlaybackRegionProperties getPlaybackRegionProperties (const PlaybackRegion* playbackRegion) const;
+    const DocumentProperties getDocumentProperties () const noexcept;
+    const MusicalContextProperties getMusicalContextProperties (const MusicalContext* musicalContext) const noexcept;
+    const RegionSequenceProperties getRegionSequenceProperties (const RegionSequence* regionSequence) const noexcept;
+    const AudioSourceProperties getAudioSourceProperties (const AudioSource* audioSource) const noexcept;
+    const AudioModificationProperties getAudioModificationProperties (const AudioModification* audioModification) const noexcept;
+    const PlaybackRegionProperties getPlaybackRegionProperties (const PlaybackRegion* playbackRegion) const noexcept;
 
     ARAAudioAccessController* getAudioAccessController () const noexcept;
     ARAArchivingController* getArchivingController () const noexcept;
