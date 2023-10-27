@@ -43,12 +43,18 @@ IPCPort::IPCPort (IPCPort&& other) noexcept
 
 IPCPort& IPCPort::operator= (IPCPort&& other) noexcept
 {
-    std::swap (_receiveCallback, other._receiveCallback);
-    std::swap (_hWriteMutex, other._hWriteMutex);
-    std::swap (_hRequest, other._hRequest);
-    std::swap (_hResult, other._hResult);
-    std::swap (_hMap, other._hMap);
+    std::swap (_writeLock, other._writeLock);
+    std::swap (_dataAvailable, other._dataAvailable);
+    std::swap (_dataReceived, other._dataReceived);
+    std::swap (_fileMapping, other._fileMapping);
     std::swap (_sharedMemory, other._sharedMemory);
+//  ARA_INTERNAL_ASSERT (!_readLock.is_locked ());
+
+    std::swap (_creationThreadID, other._creationThreadID);
+    std::swap (_receiveCallback, other._receiveCallback);
+    std::swap (_callbackLevel, other._callbackLevel);
+    std::swap (_awaitsReply, other._awaitsReply);
+    std::swap (_replyHandler, other._replyHandler);
     return *this;
 }
 
@@ -56,35 +62,40 @@ IPCPort::~IPCPort ()
 {
     if (_sharedMemory)
         ::UnmapViewOfFile (_sharedMemory);
-    if (_hMap)
-        ::CloseHandle (_hMap);
-    if (_hResult)
-        ::CloseHandle (_hResult);
-    if (_hRequest)
-        ::CloseHandle (_hRequest);
-    if (_hWriteMutex)
-        ::CloseHandle (_hWriteMutex);
+    if (_fileMapping)
+        ::CloseHandle (_fileMapping);
+    if (_dataReceived)
+        ::CloseHandle (_dataReceived);
+    if (_dataAvailable)
+        ::CloseHandle (_dataAvailable);
+    if (_writeLock)
+        ::CloseHandle (_writeLock);
+
+    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _creationThreadID);
+    ARA_INTERNAL_ASSERT (_callbackLevel == 0);
+    ARA_INTERNAL_ASSERT (!_awaitsReply);
+    ARA_INTERNAL_ASSERT (_replyHandler == nullptr);
 }
 
 IPCPort::IPCPort (const std::string& portID)
 {
-    _hWriteMutex = ::CreateMutexA (NULL, FALSE, (std::string { "Write" } + portID).c_str ());
-    ARA_INTERNAL_ASSERT (_hWriteMutex != nullptr);
-    _hRequest = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Request" } + portID).c_str ());
-    ARA_INTERNAL_ASSERT (_hRequest != nullptr);
-    _hResult = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Result" } + portID).c_str ());
-    ARA_INTERNAL_ASSERT (_hResult != nullptr);
+    _writeLock = ::CreateMutexA (NULL, FALSE, (std::string { "Write" } + portID).c_str ());
+    ARA_INTERNAL_ASSERT (_writeLock != nullptr);
+    _dataAvailable = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Available" } + portID).c_str ());
+    ARA_INTERNAL_ASSERT (_dataAvailable != nullptr);
+    _dataReceived = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Received" } + portID).c_str ());
+    ARA_INTERNAL_ASSERT (_dataReceived != nullptr);
 }
 
 IPCPort IPCPort::createPublishingID (const std::string& portID, const ReceiveCallback& callback)
 {
     IPCPort port { portID };
-    port._receiveCallback = std::move (callback);
+    port._receiveCallback = callback;
 
     const auto mapKey { std::string { "Map" } + portID };
-    port._hMap = ::CreateFileMappingA (INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof (SharedMemory), mapKey.c_str ());
-    ARA_INTERNAL_ASSERT (port._hMap != nullptr);
-    port._sharedMemory = (SharedMemory*) ::MapViewOfFile (port._hMap, FILE_MAP_WRITE, 0, 0, sizeof (SharedMemory));
+    port._fileMapping = ::CreateFileMappingA (INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof (SharedMemory), mapKey.c_str ());
+    ARA_INTERNAL_ASSERT (port._fileMapping != nullptr);
+    port._sharedMemory = (SharedMemory*) ::MapViewOfFile (port._fileMapping, FILE_MAP_WRITE, 0, 0, sizeof (SharedMemory));
     ARA_INTERNAL_ASSERT (port._sharedMemory != nullptr);
 
     return port;
@@ -93,65 +104,124 @@ IPCPort IPCPort::createPublishingID (const std::string& portID, const ReceiveCal
 IPCPort IPCPort::createConnectedToID (const std::string& portID, const ReceiveCallback& callback)
 {
     IPCPort port { portID };
+    port._receiveCallback = callback;
 
     const auto mapKey { std::string { "Map" } + portID };
-    while (!port._hMap)
+    while (!port._fileMapping)
     {
-        Sleep(100);
-        port._hMap = ::OpenFileMappingA(FILE_MAP_WRITE, FALSE, mapKey.c_str());
+        ::Sleep (100);
+        port._fileMapping = ::OpenFileMappingA (FILE_MAP_WRITE, FALSE, mapKey.c_str ());
     }
-    port._sharedMemory = (SharedMemory*) ::MapViewOfFile (port._hMap, FILE_MAP_WRITE, 0, 0, 0);
+    port._sharedMemory = (SharedMemory*) ::MapViewOfFile (port._fileMapping, FILE_MAP_WRITE, 0, 0, 0);
     ARA_INTERNAL_ASSERT (port._sharedMemory != nullptr);
 
     return port;
 }
 
-void IPCPort::sendMessage (const MessageID messageID, DataToSend const messageData, ReplyHandler* replyHandler)
+void IPCPort::_sendRequest (const MessageID messageID, const DataToSend& messageData)
 {
-//  ARA_LOG ("IPCPort::sendMessage %i", messageID);
-
-    ARA_INTERNAL_ASSERT (messageData.size () < SharedMemory::maxMessageSize);
-
-    const auto waitWriteMutex { ::WaitForSingleObject (_hWriteMutex, messageTimeout) };
-    ARA_INTERNAL_ASSERT (waitWriteMutex == WAIT_OBJECT_0);
-
-    _sharedMemory->messageSize = messageData.size ();
+    _readLock.lock ();
     _sharedMemory->messageID = messageID;
+    _sharedMemory->messageSize = messageData.size ();
     std::memcpy (_sharedMemory->messageData, messageData.c_str (), messageData.size ());
 
-    ::ResetEvent (_hResult);
-    ::SetEvent (_hRequest);
-    ::ReleaseMutex (_hWriteMutex);
-
-    const auto waitResult { ::WaitForSingleObject (_hResult, messageTimeout) };
+    ::SetEvent (_dataAvailable);
+    const auto waitResult { ::WaitForSingleObject (_dataReceived, messageTimeout) };
     ARA_INTERNAL_ASSERT (waitResult == WAIT_OBJECT_0);
-    if (replyHandler)
-        (*replyHandler) ({ _sharedMemory->messageData, _sharedMemory->messageSize });
+    _readLock.unlock ();
+}
+
+void IPCPort::sendMessage (const MessageID messageID, const DataToSend& messageData, ReplyHandler* replyHandler)
+{
+    ARA_INTERNAL_ASSERT (messageData.size () <= SharedMemory::maxMessageSize);
+
+    const bool isOnCreationThread { std::this_thread::get_id () == _creationThreadID };
+    const bool needsLock { !isOnCreationThread || (_callbackLevel == 0) };
+//  ARA_LOG ("IPCPort sends message %i%s%s", messageID, (!isOnCreationThread) ? " from other thread" : "",
+//                                           (needsLock) ? " starting new transaction" : (_callbackLevel > 0) ? " while handling message" : "");
+    if (needsLock)
+    {
+        if (isOnCreationThread)
+        {
+            while (true)
+            {
+                const auto waitWriteMutex { ::WaitForSingleObject (_writeLock, 0) };
+                if (waitWriteMutex == WAIT_OBJECT_0)
+                    break;
+
+                ARA_INTERNAL_ASSERT (waitWriteMutex == WAIT_TIMEOUT);
+                runReceiveLoop (1);
+            }
+        }
+        else
+        {
+            const auto waitWriteMutex { ::WaitForSingleObject (_writeLock, messageTimeout) };
+            ARA_INTERNAL_ASSERT (waitWriteMutex == WAIT_OBJECT_0);
+        }
+    }
+
+    _sendRequest (messageID, messageData);
+
+    const auto previousAwaitsReply { _awaitsReply };
+    const auto previousReplyHandler { _replyHandler };
+    _awaitsReply = true;
+    _replyHandler = replyHandler;
+    do
+    {
+        if (isOnCreationThread)
+            runReceiveLoop (messageTimeout);
+        else
+            std::this_thread::yield (); // \todo maybe it would be better to sleep for some longer interval here instead of simply yielding?
+    } while (_awaitsReply);
+    _awaitsReply = previousAwaitsReply;
+    _replyHandler = previousReplyHandler;
+//  ARA_LOG ("IPCPort received reply to message %i%s", messageID, (needsLock) ? " ending transaction" : "");
+
+    if (needsLock)
+        ::ReleaseMutex (_writeLock);
 }
 
 void IPCPort::runReceiveLoop (int32_t milliseconds)
 {
-    const auto waitRequest { ::WaitForSingleObject (_hRequest, milliseconds) };
+    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _creationThreadID);
+
+    const auto waitRequest { ::WaitForSingleObject (_dataAvailable, milliseconds) };
     if (waitRequest == WAIT_TIMEOUT)
         return;
     ARA_INTERNAL_ASSERT (waitRequest == WAIT_OBJECT_0);
 
+    if (!_readLock.try_lock ())    // if we're concurrently sending from another thread, back out and re-set _dataAvailable
+    {
+        ::SetEvent (_dataAvailable);
+        return;
+    }
+
+    const auto messageID { _sharedMemory->messageID };
     const ReceivedData messageData { _sharedMemory->messageData, _sharedMemory->messageSize };
+    ::SetEvent (_dataReceived);
 
-//  ARA_LOG ("IPCPort received message with ID %i", _sharedMemory->messageID);
-    const auto replyData { _receiveCallback (_sharedMemory->messageID, messageData) };
+    if (messageID != 0)
+    {
+        ++_callbackLevel;
 
-    ARA_INTERNAL_ASSERT (replyData.size () < SharedMemory::maxMessageSize);
+//      ARA_LOG ("IPCPort received message with ID %i%s", messageID, (_awaitsReply) ? " while awaiting reply" : "");
+        const auto replyData { _receiveCallback (messageID, messageData) };
+        ARA_INTERNAL_ASSERT (replyData.size () <= SharedMemory::maxMessageSize);
 
-    const auto waitWriteMutex { ::WaitForSingleObject (_hWriteMutex, messageTimeout) };
-    ARA_INTERNAL_ASSERT (waitWriteMutex == WAIT_OBJECT_0);
+//      ARA_LOG ("IPCPort replies to message with ID %i", messageID);
+        _sendRequest (0, replyData);
 
-    _sharedMemory->messageSize = replyData.size ();
-    std::memcpy (_sharedMemory->messageData, replyData.c_str (), replyData.size ());
-
-    ::ResetEvent (_hRequest);
-    ::SetEvent (_hResult);
-    ::ReleaseMutex (_hWriteMutex);
+        --_callbackLevel;
+    }
+    else
+    {
+        ARA_INTERNAL_ASSERT (_awaitsReply);
+        if (_replyHandler)
+            (*_replyHandler) (messageData);
+        _awaitsReply = false;
+    }
+    
+    _readLock.unlock ();
 }
 
 //------------------------------------------------------------------------------
@@ -168,16 +238,18 @@ IPCPort::IPCPort (IPCPort&& other) noexcept
 
 IPCPort& IPCPort::operator= (IPCPort&& other) noexcept
 {
-    std::swap (_creationThreadID, other._creationThreadID);
     std::swap (_writeSemaphore, other._writeSemaphore);
     std::swap (_sendPort, other._sendPort);
     std::swap (_receivePort, other._receivePort);
-    std::swap (_receiveCallback, other._receiveCallback);
     std::swap (_callbackHandle, other._callbackHandle);
     if (_callbackHandle)
         *_callbackHandle = this;
     if (other._callbackHandle)
         *other._callbackHandle = &other;
+
+    std::swap (_creationThreadID, other._creationThreadID);
+    std::swap (_receiveCallback, other._receiveCallback);
+    std::swap (_callbackLevel, other._callbackLevel);
     std::swap (_awaitsReply, other._awaitsReply);
     std::swap (_replyHandler, other._replyHandler);
     return *this;
@@ -199,6 +271,9 @@ IPCPort::~IPCPort ()
         sem_close (_writeSemaphore);
     if (_callbackHandle)
         delete _callbackHandle;
+
+    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _creationThreadID);
+    ARA_INTERNAL_ASSERT (_callbackLevel == 0);
     ARA_INTERNAL_ASSERT (!_awaitsReply);
     ARA_INTERNAL_ASSERT (_replyHandler == nullptr);
 }
@@ -210,13 +285,18 @@ CFDataRef IPCPort::_portCallback (CFMessagePortRef /*port*/, SInt32 messageID, C
 
     if (messageID != 0)
     {
-//      ARA_LOG ("IPCPort received message with ID %i", messageID);
+        ++port->_callbackLevel;
+
+//      ARA_LOG ("IPCPort received message with ID %i%s", messageID, (port->_awaitsReply) ? " while awaiting reply" : "");
         const auto replyData { port->_receiveCallback (messageID, messageData) };
 
+//      ARA_LOG ("IPCPort replies to message with ID %i", messageID);
         const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (port->_sendPort, 0, replyData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
         ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
         if (replyData)
             CFRelease (replyData);
+
+        --port->_callbackLevel;
     }
     else
     {
@@ -292,7 +372,7 @@ CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCPort::_createMessagePo
 IPCPort IPCPort::createPublishingID (const std::string& portID, const ReceiveCallback& callback)
 {
     IPCPort port;
-    port._receiveCallback = std::move (callback);
+    port._receiveCallback = callback;
     port._writeSemaphore = _openSemaphore (portID, true);
     port._callbackHandle = new IPCPort* { &port };
     port._sendPort = _createMessagePortConnectedToID (portID + ".from_server");
@@ -303,7 +383,7 @@ IPCPort IPCPort::createPublishingID (const std::string& portID, const ReceiveCal
 IPCPort IPCPort::createConnectedToID (const std::string& portID, const ReceiveCallback& callback)
 {
     IPCPort port;
-    port._receiveCallback = std::move (callback);
+    port._receiveCallback = callback;
     port._callbackHandle = new IPCPort* { &port };
     port._receivePort = _createMessagePortPublishingID (portID + ".from_server", port._callbackHandle);
     port._sendPort = _createMessagePortConnectedToID (portID + ".to_server");
@@ -312,23 +392,31 @@ IPCPort IPCPort::createConnectedToID (const std::string& portID, const ReceiveCa
     return port;
 }
 
-void IPCPort::sendMessage (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData, ReplyHandler* replyHandler)
+void IPCPort::sendMessage (const MessageID messageID, const DataToSend __attribute__((cf_consumed)) messageData, ReplyHandler* replyHandler)
 {
-//  ARA_LOG ("IPCPort::sendMessage %i", messageID);
-
     const bool isOnCreationThread { std::this_thread::get_id () == _creationThreadID };
-    while (sem_trywait (_writeSemaphore) != 0)
+    const bool needsLock { !isOnCreationThread || (_callbackLevel == 0) };
+//  ARA_LOG ("IPCPort sends message %i%s%s", messageID, (!isOnCreationThread) ? " from other thread" : "",
+//                                           (needsLock) ? " starting new transaction" : (_callbackLevel > 0) ? " while handling message" : "");
+    if (needsLock)
     {
         if (isOnCreationThread)
-            runReceiveLoop (1);
+        {
+            while (sem_trywait (_writeSemaphore) != 0)
+            {
+                if (errno != EINTR)
+                    runReceiveLoop (1);
+            }
+        }
         else
-            std::this_thread::yield (); // \todo maybe it would be better to sleep for some longer interval here instead of simply yielding?
+        {
+            while (sem_wait (_writeSemaphore) != 0)
+                ARA_INTERNAL_ASSERT (errno == EINTR);
+        }
     }
 
     const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (_sendPort, messageID, messageData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
     ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
-
-    sem_post (_writeSemaphore);
 
     if (messageData)
         CFRelease (messageData);
@@ -346,6 +434,10 @@ void IPCPort::sendMessage (const MessageID messageID, DataToSend const __attribu
     } while (_awaitsReply);
     _awaitsReply = previousAwaitsReply;
     _replyHandler = previousReplyHandler;
+//  ARA_LOG ("IPCPort received reply to message %i%s", messageID, (needsLock) ? " ending transaction" : "");
+
+    if (needsLock)
+        sem_post (_writeSemaphore);
 }
 
 void IPCPort::runReceiveLoop (int32_t milliseconds)

@@ -21,10 +21,10 @@
 
 #if defined (_WIN32)
     #include <Windows.h>
+    #include <mutex>
     #include <utility>
 #elif defined (__APPLE__)
     #include <CoreFoundation/CoreFoundation.h>
-    #include <thread>
     #include <semaphore.h>
 #else
     #error "IPC not yet implemented for this platform"
@@ -32,6 +32,7 @@
 
 #include <functional>
 #include <string>
+#include <thread>
 
 
 // A simple proof-of-concept wrapper for an IPC communication channel.
@@ -76,9 +77,9 @@ public:
     // to the optional replyHandler (can be nullptr if reply should be ignored)
     using ReplyHandler = std::function<void (ReceivedData)>;
 #if defined (__APPLE__)
-    void sendMessage (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData, ReplyHandler* replyHandler);
+    void sendMessage (const MessageID messageID, const DataToSend __attribute__((cf_consumed)) messageData, ReplyHandler* replyHandler);
 #else
-    void sendMessage (const MessageID messageID, DataToSend const messageData, ReplyHandler* replyHandler);
+    void sendMessage (const MessageID messageID, const DataToSend& messageData, ReplyHandler* replyHandler);
 #endif
 
     // message receiving
@@ -93,6 +94,7 @@ public:
 private:
 #if defined (_WIN32)
     explicit IPCPort (const std::string& portID);
+    void _sendRequest (const MessageID messageID, const DataToSend& messageData);
 #elif defined (__APPLE__)
     static CFDataRef _portCallback (CFMessagePortRef port, SInt32 messageID, CFDataRef messageData, void* info);
     static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortPublishingID (const std::string& portID, IPCPort** callbackHandle);
@@ -110,21 +112,23 @@ private:
         char messageData[maxMessageSize];
     };
 
-    ReceiveCallback _receiveCallback {};
-    HANDLE _hWriteMutex {};
-    HANDLE _hRequest {};
-    HANDLE _hResult {};
-    HANDLE _hMap {};
+    HANDLE _writeLock {};               // global lock shared between both processes, taken when starting a new transaction
+    HANDLE _dataAvailable {};           // signal set by the sending side indicating new data has been placed in shared memory
+    HANDLE _dataReceived {};            // signal set by the receiving side when evaluating the shared memory
+    HANDLE _fileMapping {};
     SharedMemory* _sharedMemory {};
+    std::recursive_mutex _readLock {};  // process-level lock blocking access to reading data
 
 #elif defined (__APPLE__)
-    std::thread::id _creationThreadID { std::this_thread::get_id () };
     sem_t* _writeSemaphore {};
     CFMessagePortRef _sendPort {};
     CFMessagePortRef _receivePort {};
-    ReceiveCallback _receiveCallback {};
     IPCPort** _callbackHandle {};
+#endif
+
+    std::thread::id _creationThreadID { std::this_thread::get_id () };
+    ReceiveCallback _receiveCallback {};
+    int32_t _callbackLevel { 0 };
     bool _awaitsReply {};
     ReplyHandler* _replyHandler {};
-#endif
 };

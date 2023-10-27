@@ -30,7 +30,6 @@
 #include "ARA_API/ARAAudioUnit_v3.h"
 #include "ARA_Library/Debug/ARADebug.h"
 #include "ARA_Library/IPC/ARAIPCAudioUnit_v3.h"
-#include "ARA_Library/IPC/ARAIPCLockingContext.h"
 
 
 struct _AudioUnitComponent
@@ -38,7 +37,6 @@ struct _AudioUnitComponent
     AudioComponent component;
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     const ARAFactory * ipcFactory;              // cache - NULL until read via IPC
-    ARAIPCLockingContextRef lockingContextRef;  // invalid until ipcFactory is read via IPC
     ARAIPCMessageSender * factoryMessageSender; // invalid until ipcFactory is read via IPC
 #endif
 };
@@ -223,12 +221,9 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, s
             {
                 if (!audioUnitInstance->audioUnitComponent->ipcFactory)
                 {
-                    audioUnitInstance->audioUnitComponent->lockingContextRef = ARAIPCCreateLockingContext();
                     if ((audioUnitInstance->audioUnitComponent->factoryMessageSender =
-                            ARAIPCAUProxyPlugInInitializeFactoryMessageSender(audioUnitInstance->v3AudioUnit, audioUnitInstance->audioUnitComponent->lockingContextRef)))
+                            ARAIPCAUProxyPlugInInitializeFactoryMessageSender(audioUnitInstance->v3AudioUnit)))
                         audioUnitInstance->audioUnitComponent->ipcFactory = ARAIPCAUProxyPlugInGetFactory(audioUnitInstance->audioUnitComponent->factoryMessageSender);
-                    else
-                        ARAIPCDestroyLockingContext(audioUnitInstance->audioUnitComponent->lockingContextRef);
                 }
                 if ((result = audioUnitInstance->audioUnitComponent->ipcFactory))
                     *messageSender = audioUnitInstance->audioUnitComponent->factoryMessageSender;
@@ -303,7 +298,7 @@ const ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUni
         {
             if (@available(macOS 13.0, *))
             {
-                instance = ARAIPCAUProxyPlugInBindToDocumentController (audioUnitInstance->v3AudioUnit, audioUnitInstance->audioUnitComponent->lockingContextRef, controllerRef, knownRoles, assignedRoles, &audioUnitInstance->instanceSender);
+                instance = ARAIPCAUProxyPlugInBindToDocumentController (audioUnitInstance->v3AudioUnit, controllerRef, knownRoles, assignedRoles, &audioUnitInstance->instanceSender);
                 audioUnitInstance->isBoundViaIPC = (instance != NULL);
             }
         }
@@ -553,7 +548,6 @@ void AudioUnitCleanupComponent(AudioUnitComponent audioUnitComponent)
         if (audioUnitComponent->ipcFactory)
         {
             ARAIPCAUProxyPlugInUninitializeFactoryMessageSender(audioUnitComponent->factoryMessageSender);
-            ARAIPCDestroyLockingContext(audioUnitComponent->lockingContextRef);
         }
     }
 #endif
