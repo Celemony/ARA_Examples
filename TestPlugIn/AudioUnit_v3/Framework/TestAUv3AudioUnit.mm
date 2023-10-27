@@ -279,7 +279,7 @@ void destroy_sharedFactoryMessageChannel() {
     {
         if (_sharedFactoryMessageChannel)
         {
-            ARA::IPC::ARAIPCAUProxyHostUninitalize();
+            ARA::IPC::ARAIPCAUProxyHostUninitialize();
             _sharedFactoryMessageChannel = nil;
         }
     }
