@@ -96,14 +96,14 @@ public:
     virtual bool usesIPC () const { return false; }
 
     // Initialize ARA before creating any document controllers
-    void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress);
+    virtual void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress);
 
     // Factory function for new ARA document controller instances
     virtual const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                             const ARA::ARADocumentProperties* properties);
 
     // Initialize ARA before after destroying all document controllers
-    void uninitializeARA ();
+    virtual void uninitializeARA ();
 
     // Factory function for new plug-in instances
     virtual std::unique_ptr<PlugInInstance> createPlugInInstance () = 0;

@@ -618,12 +618,25 @@ public:
         ARA::IPC::ARAIPCDestroyLockingContext (_lockingContextRef);
     }
 
-    bool usesIPC () const override { return true; }
+    bool usesIPC () const override
+    {
+        return true;
+    }
+
+    void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
+    {
+        ARA::IPC::ARAIPCProxyPlugInInitializeARA (_hostCommandsSender, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
+    }
 
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
         return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_hostCommandsSender, getARAFactory ()->factoryID, hostInstance, properties);
+    }
+
+    void uninitializeARA () override
+    {
+        ARA::IPC::ARAIPCProxyPlugInUninitializeARA (_hostCommandsSender, getARAFactory ()->factoryID);
     }
 
     std::unique_ptr<PlugInInstance> createPlugInInstance () override
