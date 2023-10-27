@@ -39,31 +39,32 @@
 
 API_AVAILABLE(macos(13.0))
 @interface TestAUv3ARAIPCMessageChannel : NSObject<AUMessageChannel>
-- (instancetype _Nullable)initWithAudioUnit:(AUAudioUnit * _Nullable)audioUnit;
-
-- (NSDictionary * _Nonnull)callAudioUnit:(NSDictionary *)message;
-
-@property (nonatomic, readonly, weak) AUAudioUnit * audioUnit;
 @end
 
 
-@implementation TestAUv3ARAIPCMessageChannel
+@implementation TestAUv3ARAIPCMessageChannel {
+    ARA::IPC::ARAIPCMessageSender* _messageSender;
+}
 
 @synthesize callHostBlock = _callHostBlock;
 
-- (instancetype)initWithAudioUnit:(AUAudioUnit * _Nullable)auAudioUnit {
+- (instancetype)initWithAudioUnit:(AUAudioUnit * _Nullable)audioUnit {
     self = [super init];
 
     if (self == nil) { return nil; }
 
     _callHostBlock = nil;
-    _audioUnit = auAudioUnit;
+    _messageSender = ARA::IPC::ARAIPCAUProxyHostInitializeMessageSender(audioUnit, self);
 
     return self;
 }
 
+- (void)dealloc {
+    ARA::IPC::ARAIPCAUProxyHostUninitializeMessageSender(_messageSender);
+}
+
 - (NSDictionary * _Nonnull)callAudioUnit:(NSDictionary *)message {
-    return ARA::IPC::ARAIPCAUProxyHostCommandHandler(self.audioUnit, message);
+    return ARA::IPC::ARAIPCAUProxyHostCommandHandler(_messageSender, message);
 }
 
 @end
