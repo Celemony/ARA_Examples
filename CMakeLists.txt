@@ -69,7 +69,7 @@ endif()
 
 
 # ======================
-# project paths
+# ARA SDK paths
 
 if(ARA_API_DIR)
     # normalize path if provided (and if relative path, assume it's relative to the top-level project)
@@ -89,6 +89,10 @@ else()
 endif()
 set(ARA_LIBRARY_DIR "${ARA_LIBRARY_DIR}" CACHE PATH "directory of the ARA_Library project")
 
+
+# ======================
+# Companion APIs paths
+
 if(ARA_VST3_SDK_DIR)
     # normalize path if provided (and if relative path, assume it's relative to the top-level project)
     get_filename_component(ARA_VST3_SDK_DIR "${ARA_VST3_SDK_DIR}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
@@ -97,15 +101,31 @@ else()
     get_filename_component(ARA_VST3_SDK_DIR ../vst3sdk ABSOLUTE "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 set(ARA_VST3_SDK_DIR "${ARA_VST3_SDK_DIR}" CACHE PATH "directory of the VST3 SDK")
-
-if(ARA_AUDIO_UNIT_SDK_DIR)
-    # normalize path if provided (and if relative path, assume it's relative to the top-level project)
-    get_filename_component(ARA_AUDIO_UNIT_SDK_DIR "${ARA_AUDIO_UNIT_SDK_DIR}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+if(EXISTS "${ARA_VST3_SDK_DIR}")
+    set(ARA_ENABLE_VST3 TRUE)
 else()
-    # if no path provided, assume AudioUnitSDK is right next to our ARA_Examples directory
-    get_filename_component(ARA_AUDIO_UNIT_SDK_DIR ../AudioUnitSDK ABSOLUTE "${CMAKE_CURRENT_SOURCE_DIR}")
+    message(STATUS "No VST3 SDK installed, will not generate VST3 related examples.")
+    set(ARA_ENABLE_VST3 FALSE)
 endif()
-set(ARA_AUDIO_UNIT_SDK_DIR "${ARA_AUDIO_UNIT_SDK_DIR}" CACHE PATH "directory of the Audio Unit SDK")
+
+if(APPLE)
+    if(ARA_AUDIO_UNIT_SDK_DIR)
+        # normalize path if provided (and if relative path, assume it's relative to the top-level project)
+        get_filename_component(ARA_AUDIO_UNIT_SDK_DIR "${ARA_AUDIO_UNIT_SDK_DIR}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+    else()
+        # if no path provided, assume AudioUnitSDK is right next to our ARA_Examples directory
+        get_filename_component(ARA_AUDIO_UNIT_SDK_DIR ../AudioUnitSDK ABSOLUTE "${CMAKE_CURRENT_SOURCE_DIR}")
+    endif()
+    set(ARA_AUDIO_UNIT_SDK_DIR "${ARA_AUDIO_UNIT_SDK_DIR}" CACHE PATH "directory of the Audio Unit SDK")
+    if(EXISTS "${ARA_AUDIO_UNIT_SDK_DIR}")
+        set(ARA_ENABLE_AUDIO_UNIT TRUE)
+    else()
+        message(STATUS "No Audio Unit SDK installed, will not generate Audio Unit related examples.")
+        set(ARA_ENABLE_AUDIO_UNIT FALSE)
+    endif()
+else()
+    set(ARA_ENABLE_AUDIO_UNIT FALSE)
+endif()
 
 if(ARA_CLAP_SDK_DIR)
     # normalize path if provided (and if relative path, assume it's relative to the top-level project)
@@ -120,6 +140,10 @@ if(EXISTS "${ARA_CLAP_SDK_DIR}")
 else()
     message(STATUS "No CLAP SDK installed, will not generate CLAP related examples.")
     set(ARA_ENABLE_CLAP FALSE)
+endif()
+
+if(NOT (ARA_ENABLE_VST3 OR ARA_ENABLE_AUDIO_UNIT OR ARA_ENABLE_CLAP))
+    message(FATAL_ERROR "No Companion API SDK installed - at least one of VST3, Audio Unit or CLAP SDK is required.")
 endif()
 
 
@@ -301,83 +325,88 @@ set(CMAKE_XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME YES)
 
 # ======================
 # external dependency: VST3 SDK
-message(STATUS "Importing VST3 SDK")
+if(ARA_ENABLE_VST3)
 
-if(POLICY CMP0077)
-    set(SMTG_RENAME_ASSERT OFF)
-    set(SMTG_ADD_VSTGUI OFF)
-else()
-    set(SMTG_RENAME_ASSERT OFF CACHE BOOL "Disable SMTG_RENAME_ASSERT per default")
-    set(SMTG_ADD_VSTGUI OFF CACHE BOOL "Disable SMTG_ADD_VSTGUI per default")
-endif()
+    message(STATUS "Importing VST3 SDK")
 
-# when adding these paths, the VST3 SDK CMake file implicitly adds the corresponding wrapper targets,
-# which we currently do not want because we build these plug-ins natively
-#set(SMTG_COREAUDIO_SDK_PATH "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio")
-#set(SMTG_AAX_SDK_PATH "${ARA_AAX_SDK_DIR}")
-add_subdirectory("${ARA_VST3_SDK_DIR}" "${PROJECT_BINARY_DIR}/vst3sdk" EXCLUDE_FROM_ALL)
+    if(POLICY CMP0077)
+        set(SMTG_RENAME_ASSERT OFF)
+        set(SMTG_ADD_VSTGUI OFF)
+    else()
+        set(SMTG_RENAME_ASSERT OFF CACHE BOOL "Disable SMTG_RENAME_ASSERT per default")
+        set(SMTG_ADD_VSTGUI OFF CACHE BOOL "Disable SMTG_ADD_VSTGUI per default")
+    endif()
 
-set_target_properties(base cmake_modules cmake_VST_modules pluginterfaces sdk_hosting sdk_common sdk validator PROPERTIES
-    FOLDER "3rdParty/vst3sdk"
-    XCODE_GENERATE_SCHEME OFF
-    XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
-)
+    # when adding these paths, the VST3 SDK CMake file implicitly adds the corresponding wrapper targets,
+    # which we currently do not want because we build these plug-ins natively
+    #set(SMTG_COREAUDIO_SDK_PATH "${ARA_AUDIO_UNIT_SDK_DIR}/CoreAudio")
+    #set(SMTG_AAX_SDK_PATH "${ARA_AAX_SDK_DIR}")
+    add_subdirectory("${ARA_VST3_SDK_DIR}" "${PROJECT_BINARY_DIR}/vst3sdk" EXCLUDE_FROM_ALL)
 
-set_target_properties(validator PROPERTIES
-    CXX_STANDARD 14
-    # \todo workaround for having to globally set the entitlements, see CMAKE_XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME above
-    XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME NO
-)
-
-# disable some warnings that do not go along with the VST3 coding style
-if(MSVC)
-    target_compile_options(base PUBLIC
-        "/wd4127"
+    set_target_properties(base cmake_modules cmake_VST_modules pluginterfaces sdk_hosting sdk_common sdk validator PROPERTIES
+        FOLDER "3rdParty/vst3sdk"
+        XCODE_GENERATE_SCHEME OFF
+        XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
     )
-else()
-    target_compile_options(base PUBLIC
-        "-Wno-undef"
-        "$<$<COMPILE_LANGUAGE:CXX>:-Wno-non-virtual-dtor>"
+
+    set_target_properties(validator PROPERTIES
+        CXX_STANDARD 14
+        # \todo workaround for having to globally set the entitlements, see CMAKE_XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME above
+        XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME NO
     )
-endif()
 
-# hotfix to silence Steinberg's "DEPRECATED No Linux implementation" warnings
-if(UNIX AND NOT APPLE)
-    target_compile_options(base PRIVATE
-        "-Wno-cpp"
-    )
-endif()
+    # disable some warnings that do not go along with the VST3 coding style
+    if(MSVC)
+        target_compile_options(base PUBLIC
+            "/wd4127"
+        )
+    else()
+        target_compile_options(base PUBLIC
+            "-Wno-undef"
+            "$<$<COMPILE_LANGUAGE:CXX>:-Wno-non-virtual-dtor>"
+        )
+    endif()
 
-function(ara_add_vst3_main target)
-    get_target_property(source_dir ${target} SOURCE_DIR)
-    get_target_property(sources_old ${target} SOURCES)
+    # hotfix to silence Steinberg's "DEPRECATED No Linux implementation" warnings
+    if(UNIX AND NOT APPLE)
+        target_compile_options(base PRIVATE
+            "-Wno-cpp"
+        )
+    endif()
 
-    set(public_sdk_SOURCE_DIR "${ARA_VST3_SDK_DIR}/public.sdk")
-    smtg_target_add_library_main(${target})
+    function(ara_add_vst3_main target)
+        get_target_property(source_dir ${target} SOURCE_DIR)
+        get_target_property(sources_old ${target} SOURCES)
 
-    get_target_property(sources_new ${target} SOURCES)
-    list(REMOVE_ITEM sources_new ${sources_old})
-    source_group("VST3 SDK/main" FILES ${sources_new})
+        set(public_sdk_SOURCE_DIR "${ARA_VST3_SDK_DIR}/public.sdk")
+        smtg_target_add_library_main(${target})
 
-    foreach(source ${sources_new})
-        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-            set_source_files_properties("${source}" PROPERTIES COMPILE_FLAGS
-                "$<$<COMPILE_LANGUAGE:CXX>:-Wno-old-style-cast> -Wno-zero-as-null-pointer-constant -Wno-reserved-id-macro"
-            )
-        elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-            set_source_files_properties("${source}" PROPERTIES COMPILE_FLAGS
-                # \todo CMake 3.10 on Linux struggles with this, but since the SDK only adds .cpp files we can skip the generator expression for now
-                #$<$<COMPILE_LANGUAGE:CXX>:-Wno-old-style-cast>
-                -Wno-old-style-cast
-            )
-        endif()
-    endforeach()
-endfunction()
+        get_target_property(sources_new ${target} SOURCES)
+        list(REMOVE_ITEM sources_new ${sources_old})
+        source_group("VST3 SDK/main" FILES ${sources_new})
+
+        foreach(source ${sources_new})
+            if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+                set_source_files_properties("${source}" PROPERTIES COMPILE_FLAGS
+                    "$<$<COMPILE_LANGUAGE:CXX>:-Wno-old-style-cast> -Wno-zero-as-null-pointer-constant -Wno-reserved-id-macro"
+                )
+            elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+                set_source_files_properties("${source}" PROPERTIES COMPILE_FLAGS
+                    # \todo CMake 3.10 on Linux struggles with this, but since the SDK only adds .cpp files we can skip the generator expression for now
+                    #$<$<COMPILE_LANGUAGE:CXX>:-Wno-old-style-cast>
+                    -Wno-old-style-cast
+                )
+            endif()
+        endforeach()
+    endfunction()
+
+endif(ARA_ENABLE_VST3)
 
 
 # ======================
 # external dependency: Audio Unit SDK
-if(APPLE)
+if(ARA_ENABLE_AUDIO_UNIT)
+
     message(STATUS "Importing AudioUnitSDK")
 
     add_library(AudioUnitSDK ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
@@ -441,7 +470,8 @@ if(APPLE)
         XCODE_GENERATE_SCHEME OFF
         XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
     )
-endif(APPLE)
+
+endif(ARA_ENABLE_AUDIO_UNIT)
 
 
 # ======================
@@ -1075,10 +1105,18 @@ add_library(ARAExamplesCommon ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
     "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/AudioFiles/AudioFiles.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/SignalProcessing/PulsedSineSignal.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/SignalProcessing/PulsedSineSignal.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/VST3Loader.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/VST3Loader.cpp"
 )
-if(APPLE)
+if(ARA_ENABLE_VST3)
+    target_sources(ARAExamplesCommon PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/VST3Loader.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/VST3Loader.cpp"
+    )
+    target_include_directories(ARAExamplesCommon
+        PRIVATE
+            "${ARA_VST3_SDK_DIR}"
+    )
+endif()
+if(ARA_ENABLE_AUDIO_UNIT)
     target_sources(ARAExamplesCommon PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/AudioUnitLoader.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/AudioUnitLoader.m"
@@ -1124,7 +1162,6 @@ target_include_directories(ARAExamplesCommon
         "${CMAKE_CURRENT_SOURCE_DIR}"
     PRIVATE
         "${ARA_LIBRARY_DIR}/.."
-        "${ARA_VST3_SDK_DIR}"
 )
 
 configure_ARA_Examples_target(ARAExamplesCommon)
@@ -1174,78 +1211,82 @@ configure_ARA_Examples_target(ARATestPlugInCommon)
 # ======================
 # audio plug-in target VST3 Test Plug-In
 
-if(APPLE)
-    add_library(ARATestPlugInVST3 MODULE "")
-else()
-    add_library(ARATestPlugInVST3 SHARED "")
-endif()
+if (ARA_ENABLE_VST3)
 
-target_sources(ARATestPlugInVST3 PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/ARATestMainFactory.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Entry.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Processor.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Processor.cpp"
-)
-
-set_target_properties(ARATestPlugInVST3 PROPERTIES
-    FOLDER "Examples/ARATestPlugIn"
-    OUTPUT_NAME "ARATestPlugIn"
-)
-
-target_link_libraries(ARATestPlugInVST3 PRIVATE
-    ARATestPlugInCommon
-    sdk
-)
-if(APPLE)
-    target_link_libraries(ARATestPlugInVST3 PRIVATE
-        "-framework CoreFoundation"
-    )
-elseif(UNIX)
-    target_link_libraries(ARATestPlugInVST3 PRIVATE
-        "pthread"
-        "atomic"
-    )
-endif()
-
-configure_ARA_Examples_target(ARATestPlugInVST3)
-
-ara_add_vst3_main(ARATestPlugInVST3)
-
-ara_configure_binary_package(ARATestPlugInVST3 "vst3" "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Info.plist")
-
-if(ARA_SETUP_DEBUGGING)
-    if(WIN32)
-        ara_postbuild_install_for_debugging(ARATestPlugInVST3 "$ENV{CommonProgramW6432}\\VST3\\" ON)
-    elseif(APPLE)
-        ara_postbuild_install_for_debugging(ARATestPlugInVST3 "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/" ON)
+    if(APPLE)
+        add_library(ARATestPlugInVST3 MODULE "")
+    else()
+        add_library(ARATestPlugInVST3 SHARED "")
     endif()
 
-    add_dependencies(ARATestPlugInVST3 validator)
-    get_target_property(validator_dir validator RUNTIME_OUTPUT_DIRECTORY)
-    get_target_property(plugin_dir ARATestPlugInVST3 RUNTIME_OUTPUT_DIRECTORY)
-    if(ARA_IS_MULTI_CONFIG_GENERATOR)
-        # \todo always using Debug here...
-        # Xcode scheme uses Debug as default config for its "Run" action, regardless of the currently selected configuration.
-        # Also, generator expressions are not evaluated when creating the schemes, so we can't really know what is selected.
-        set(validator_dir "${validator_dir}/Debug")
-        set(plugin_dir "${plugin_dir}/Debug")
-    endif()
+    target_sources(ARATestPlugInVST3 PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/ARATestMainFactory.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Entry.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Processor.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Processor.cpp"
+    )
+
     set_target_properties(ARATestPlugInVST3 PROPERTIES
-        VS_DEBUGGER_WORKING_DIRECTORY  "${plugin_dir}"
-        XCODE_SCHEME_WORKING_DIRECTORY "${plugin_dir}"
-        VS_DEBUGGER_COMMAND     "${validator_dir}/validator"
-        XCODE_SCHEME_EXECUTABLE "${validator_dir}/validator"
-        VS_DEBUGGER_COMMAND_ARGUMENTS "ARATestPlugIn.vst3"
-        XCODE_SCHEME_ARGUMENTS        "ARATestPlugIn.vst3"
+        FOLDER "Examples/ARATestPlugIn"
+        OUTPUT_NAME "ARATestPlugIn"
     )
-    unset(validator_dir)
-endif()
+
+    target_link_libraries(ARATestPlugInVST3 PRIVATE
+        ARATestPlugInCommon
+        sdk
+    )
+    if(APPLE)
+        target_link_libraries(ARATestPlugInVST3 PRIVATE
+            "-framework CoreFoundation"
+        )
+    elseif(UNIX)
+        target_link_libraries(ARATestPlugInVST3 PRIVATE
+            "pthread"
+            "atomic"
+        )
+    endif()
+
+    configure_ARA_Examples_target(ARATestPlugInVST3)
+
+    ara_add_vst3_main(ARATestPlugInVST3)
+
+    ara_configure_binary_package(ARATestPlugInVST3 "vst3" "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/VST3/TestVST3Info.plist")
+
+    if(ARA_SETUP_DEBUGGING)
+        if(WIN32)
+            ara_postbuild_install_for_debugging(ARATestPlugInVST3 "$ENV{CommonProgramW6432}\\VST3\\" ON)
+        elseif(APPLE)
+            ara_postbuild_install_for_debugging(ARATestPlugInVST3 "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/" ON)
+        endif()
+
+        add_dependencies(ARATestPlugInVST3 validator)
+        get_target_property(validator_dir validator RUNTIME_OUTPUT_DIRECTORY)
+        get_target_property(plugin_dir ARATestPlugInVST3 RUNTIME_OUTPUT_DIRECTORY)
+        if(ARA_IS_MULTI_CONFIG_GENERATOR)
+            # \todo always using Debug here...
+            # Xcode scheme uses Debug as default config for its "Run" action, regardless of the currently selected configuration.
+            # Also, generator expressions are not evaluated when creating the schemes, so we can't really know what is selected.
+            set(validator_dir "${validator_dir}/Debug")
+            set(plugin_dir "${plugin_dir}/Debug")
+        endif()
+        set_target_properties(ARATestPlugInVST3 PROPERTIES
+            VS_DEBUGGER_WORKING_DIRECTORY  "${plugin_dir}"
+            XCODE_SCHEME_WORKING_DIRECTORY "${plugin_dir}"
+            VS_DEBUGGER_COMMAND     "${validator_dir}/validator"
+            XCODE_SCHEME_EXECUTABLE "${validator_dir}/validator"
+            VS_DEBUGGER_COMMAND_ARGUMENTS "ARATestPlugIn.vst3"
+            XCODE_SCHEME_ARGUMENTS        "ARATestPlugIn.vst3"
+        )
+        unset(validator_dir)
+    endif()
+
+endif(ARA_ENABLE_VST3)
 
 
 # ======================
 # audio plug-in target Audio Unit Test Plug-In
 
-if(APPLE)
+if(ARA_ENABLE_AUDIO_UNIT)
 
     add_library(ARATestPlugInAudioUnit MODULE
         "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/TestAudioUnit.h"
@@ -1293,7 +1334,7 @@ if(APPLE)
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/mangle-plugin-version.sh "${ARA_API_DIR}/ARA_Version.cmake" \${INFOPLIST_FILE}
     )
 
-endif(APPLE)
+endif(ARA_ENABLE_AUDIO_UNIT)
 
 
 # ======================
@@ -1560,10 +1601,19 @@ target_link_libraries(ARAMiniHost PRIVATE
     ARA_IPC_Library
 )
 
-target_compile_definitions(ARAMiniHost PRIVATE
-#   -DPLUGIN_FORMAT=PLUGIN_FORMAT_AU
-    -DPLUGIN_FORMAT=PLUGIN_FORMAT_VST3
-)
+if(ARA_ENABLE_VST3)
+    target_compile_definitions(ARAMiniHost PRIVATE
+        -DPLUGIN_FORMAT=PLUGIN_FORMAT_VST3
+    )
+elseif(ARA_ENABLE_AUDIO_UNIT)
+    target_compile_definitions(ARAMiniHost PRIVATE
+        -DPLUGIN_FORMAT=PLUGIN_FORMAT_AU
+    )
+elseif(ARA_ENABLE_CLAP)
+    target_compile_definitions(ARAMiniHost PRIVATE
+        -DPLUGIN_FORMAT=PLUGIN_FORMAT_CLAP
+    )
+endif()
 
 if(MSVC)
     target_compile_options(ARAMiniHost PRIVATE
@@ -1586,9 +1636,12 @@ if(WIN32)
 endif()
 
 if(ARA_SETUP_DEBUGGING)
-    add_dependencies(ARAMiniHost ARATestPlugInVST3)
-    if(APPLE)
+    if(ARA_ENABLE_VST3)
+        add_dependencies(ARAMiniHost ARATestPlugInVST3)
+    elseif(ARA_ENABLE_AUDIO_UNIT)
         add_dependencies(ARAMiniHost ARATestPlugInAudioUnit)
+    elseif(ARA_ENABLE_CLAP)
+        add_dependencies(ARAMiniHost ARATestPlugInCLAP)
     endif()
 endif()
 
@@ -1627,6 +1680,12 @@ set_target_properties(ARATestHost PROPERTIES
 target_include_directories(ARATestHost PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost"
 )
+
+if(ARA_ENABLE_VST3)
+    target_compile_definitions(ARATestHost PRIVATE
+        -DARA_ENABLE_VST3=1
+    )
+endif()
 
 if(ARA_ENABLE_CLAP)
     target_compile_definitions(ARATestHost PRIVATE
@@ -1672,8 +1731,10 @@ if(WIN32)
 endif()
 
 if(ARA_SETUP_DEBUGGING)
-    add_dependencies(ARATestHost ARATestPlugInVST3)
-    if(APPLE)
+    if(ARA_ENABLE_VST3)
+        add_dependencies(ARATestHost ARATestPlugInVST3)
+    endif()
+    if(ARA_ENABLE_AUDIO_UNIT)
         add_dependencies(ARATestHost ARATestPlugInAudioUnit)
     endif()
     if(APPLE)

@@ -39,7 +39,12 @@
     #include "ExamplesCommon/PlugInHosting/CLAPLoader.h"
 #endif
 
-#include "ExamplesCommon/PlugInHosting/VST3Loader.h"
+#ifndef ARA_ENABLE_VST3
+    #define ARA_ENABLE_VST3 0
+#endif
+#if ARA_ENABLE_VST3
+    #include "ExamplesCommon/PlugInHosting/VST3Loader.h"
+#endif
 
 #include <codecvt>
 #include <locale>
@@ -431,6 +436,8 @@ private:
 
 /*******************************************************************************/
 
+#if ARA_ENABLE_VST3
+
 class VST3PlugInInstance : public PlugInInstance
 {
 public:
@@ -469,6 +476,8 @@ private:
     VST3Effect const _vst3Effect;
     double _sampleRate { 44100.0 };
 };
+
+#endif  // ARA_ENABLE_VST3
 
 /*******************************************************************************/
 
@@ -599,6 +608,8 @@ std::string createEntryDescription (const std::string& apiName, const std::strin
     return apiName + " " + ((optionalPlugInName.empty ()) ? "" : optionalPlugInName + " ") + "@ " + binaryName;
 }
 
+#if ARA_ENABLE_VST3
+
 class VST3PlugInEntry : public PlugInEntry
 {
 public:
@@ -625,6 +636,8 @@ private:
     VST3Binary const _vst3Binary;
     const std::string _optionalPlugInName;
 };
+
+#endif  // ARA_ENABLE_VST3
 
 /*******************************************************************************/
 
@@ -1178,6 +1191,7 @@ void PlugInEntry::uninitializeARA ()
 
 std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<std::string>& args)
 {
+#if ARA_ENABLE_VST3
     if (args.size () >= 2)
     {
         auto it { std::find (args.begin (), args.end (), "-vst3") };
@@ -1202,6 +1216,7 @@ std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<st
         }
 #endif
     }
+#endif  // ARA_ENABLE_VST3
 
 #if ARA_ENABLE_CLAP
     if (args.size () >= 2)
