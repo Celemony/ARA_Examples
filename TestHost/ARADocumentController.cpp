@@ -60,6 +60,10 @@ ARADocumentController::ARADocumentController (Document* document, PlugInEntry* p
     ARA_VALIDATE_API_INTERFACE (_documentController->getInterface (), ARADocumentControllerInterface);
 
     ARA_VALIDATE_API_CONDITION (_documentController->getFactory () == plugInEntry->getARAFactory ());
+
+#if ARA_VALIDATE_API_CALLS
+    _creationThreadID = std::this_thread::get_id ();
+#endif
 }
 
 ARADocumentController::~ARADocumentController ()

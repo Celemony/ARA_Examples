@@ -60,6 +60,7 @@ ARA::ARAAudioReaderHostRef ARAAudioAccessController::createAudioReaderForSource 
 {
     const auto audioSource = fromHostRef (audioSourceHostRef);
     ARA_VALIDATE_API_ARGUMENT (audioSourceHostRef, ARA::contains (getDocument ()->getAudioSources (), audioSource));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 #if ARA_VALIDATE_API_CALLS
     std::lock_guard<std::mutex> guard (_audioSourceReadersMutex);
 #endif
@@ -98,5 +99,6 @@ void ARAAudioAccessController::destroyAudioReader (ARA::ARAAudioReaderHostRef au
     std::lock_guard<std::mutex> guard (_audioSourceReadersMutex);
 #endif
     ARA_VALIDATE_API_ARGUMENT (audioReaderHostRef, ARA::contains (_audioSourceReaders, audioSourceReader));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
     ARA::find_erase (_audioSourceReaders, audioSourceReader);
 }

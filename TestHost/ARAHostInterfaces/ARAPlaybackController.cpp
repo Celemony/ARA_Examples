@@ -27,21 +27,30 @@
 
 void ARAPlaybackController::requestStartPlayback () noexcept
 {
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
     ARA_WARN ("requestStartPlayback () not implemented.");
 }
+
 void ARAPlaybackController::requestStopPlayback () noexcept
 {
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
     ARA_WARN ("requestStopPlayback () not implemented");
 }
+
 void ARAPlaybackController::requestSetPlaybackPosition (ARA::ARATimePosition timePosition) noexcept
 {
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
     ARA_WARN ("requestSetPlaybackPosition () not implemented, requested time is %.2f", timePosition);
 }
+
 void ARAPlaybackController::requestSetCycleRange (ARA::ARATimePosition startTime, ARA::ARATimeDuration duration) noexcept
 {
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
     ARA_WARN ("requestSetCycleRange () not implemented, requested range is %.2f to %.2f", startTime, startTime + duration);
 }
+
 void ARAPlaybackController::requestEnableCycle (bool enable) noexcept
 {
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
     ARA_WARN ("requestEnableCycle () not implemented, requested to turn %s.", enable ? "on" : "off");
 }

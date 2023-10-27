@@ -36,8 +36,8 @@
 class ARAPlaybackController : public ARA::Host::PlaybackControllerInterface
 {
 public:
-    ARAPlaybackController (ARADocumentController* /*araDocumentController*/) noexcept
-    //: _araDocumentController { araDocumentController }
+    ARAPlaybackController (ARADocumentController* araDocumentController) noexcept
+    : _araDocumentController { araDocumentController }
     {}
 
     void requestStartPlayback () noexcept override;
@@ -46,6 +46,6 @@ public:
     void requestSetCycleRange (ARA::ARATimePosition startTime, ARA::ARATimeDuration duration) noexcept override;
     void requestEnableCycle (bool enable) noexcept override;
 
-//private:
-//  ARADocumentController* const _araDocumentController;
+private:
+    ARADocumentController* const _araDocumentController;
 };

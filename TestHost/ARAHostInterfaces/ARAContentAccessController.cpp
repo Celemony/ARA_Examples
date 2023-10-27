@@ -78,6 +78,7 @@ bool ARAContentAccessController::isMusicalContextContentAvailable (ARA::ARAMusic
 {
     const auto musicalContext = fromHostRef (musicalContextHostRef);
     ARA_VALIDATE_API_ARGUMENT (musicalContext, ARA::contains (getDocument ()->getMusicalContexts (), musicalContext));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 
     return isContentAvailable (musicalContext, type);
 }
@@ -87,6 +88,7 @@ ARA::ARAContentGrade ARAContentAccessController::getMusicalContextContentGrade (
     const auto musicalContext = fromHostRef (musicalContextHostRef);
     ARA_VALIDATE_API_ARGUMENT (musicalContext, ARA::contains (getDocument ()->getMusicalContexts (), musicalContext));
     ARA_VALIDATE_API_STATE (isContentAvailable (musicalContext, type));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 
     return getContentGrade (musicalContext, type);
 }
@@ -96,6 +98,7 @@ ARA::ARAContentReaderHostRef ARAContentAccessController::createMusicalContextCon
     const auto musicalContext = fromHostRef (musicalContextHostRef);
     ARA_VALIDATE_API_ARGUMENT (musicalContextHostRef, ARA::contains (getDocument ()->getMusicalContexts (), musicalContext));
     ARA_VALIDATE_API_STATE (isContentAvailable (musicalContext, type));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 
     if (auto contentReader { createContentReader (musicalContext, type) })
     {
@@ -111,6 +114,7 @@ bool ARAContentAccessController::isAudioSourceContentAvailable (ARA::ARAAudioSou
 {
     const auto audioSource = fromHostRef (audioSourceHostRef);
     ARA_VALIDATE_API_ARGUMENT (audioSource, ARA::contains (getDocument ()->getAudioSources (), audioSource));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 
     return isContentAvailable (audioSource, type);
 }
@@ -120,6 +124,7 @@ ARA::ARAContentGrade ARAContentAccessController::getAudioSourceContentGrade (ARA
     const auto audioSource = fromHostRef (audioSourceHostRef);
     ARA_VALIDATE_API_ARGUMENT (audioSource, ARA::contains (getDocument ()->getAudioSources (), audioSource));
     ARA_VALIDATE_API_STATE (isContentAvailable (audioSource, type));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 
     return getContentGrade (audioSource, type);
 }
@@ -129,6 +134,7 @@ ARA::ARAContentReaderHostRef ARAContentAccessController::createAudioSourceConten
     const auto audioSource = fromHostRef (audioSourceHostRef);
     ARA_VALIDATE_API_ARGUMENT (audioSource, ARA::contains (getDocument ()->getAudioSources (), audioSource));
     ARA_VALIDATE_API_STATE (isContentAvailable (audioSource, type));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 
     if (auto contentReader { createContentReader (audioSource, type) })
     {
@@ -144,6 +150,7 @@ ARA::ARAInt32 ARAContentAccessController::getContentReaderEventCount (ARA::ARACo
 {
     const auto hostDataContentReader = fromHostRef (contentReaderHostRef);
     ARA_VALIDATE_API_ARGUMENT (contentReaderHostRef, ARA::contains (_hostDataContentReaders, hostDataContentReader));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 
     return hostDataContentReader->getEventCount ();
 }
@@ -154,6 +161,7 @@ const void* ARAContentAccessController::getContentReaderDataForEvent (ARA::ARACo
     ARA_VALIDATE_API_ARGUMENT (contentReaderHostRef, ARA::contains (_hostDataContentReaders, hostDataContentReader));
     ARA_VALIDATE_API_ARGUMENT (nullptr, 0 <= eventIndex);
     ARA_VALIDATE_API_ARGUMENT (nullptr, eventIndex < hostDataContentReader->getEventCount ());
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 
     return hostDataContentReader->getDataForEvent (eventIndex);
 }
@@ -162,6 +170,7 @@ void ARAContentAccessController::destroyContentReader (ARA::ARAContentReaderHost
 {
     const auto hostDataContentReader = fromHostRef (contentReaderHostRef);
     ARA_VALIDATE_API_ARGUMENT (contentReaderHostRef, ARA::contains (_hostDataContentReaders, hostDataContentReader));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 
     ARA::find_erase (_hostDataContentReaders, hostDataContentReader);
 }

@@ -34,6 +34,7 @@
 #include "CompanionAPIs.h"
 
 #include <map>
+#include <thread>
 
 // These macros allow us to use pointers to host side model objects as
 // ARA host reference types that will be passed to the ARA APIs
@@ -174,6 +175,7 @@ public:
 #if ARA_VALIDATE_API_CALLS
     bool isUsingArchive (const ArchiveBase* archive = nullptr);
     bool isPollingModelUpdates () const noexcept { return _isPollingModelUpdates; }
+    bool wasCreatedOnCurrentThread () const noexcept { return _creationThreadID == std::this_thread::get_id (); }
 #endif
 
 private:
@@ -208,5 +210,6 @@ private:
 
 #if ARA_VALIDATE_API_CALLS
     bool _isPollingModelUpdates { false };
+    std::thread::id _creationThreadID;
 #endif
 };

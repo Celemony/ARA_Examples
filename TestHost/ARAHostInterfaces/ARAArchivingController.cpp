@@ -32,6 +32,7 @@ ARA::ARASize ARAArchivingController::getArchiveSize (ARA::ARAArchiveReaderHostRe
     const auto archive = fromHostRef (archiveReaderHostRef);
     ARA_VALIDATE_API_ARGUMENT (archiveReaderHostRef, archive != nullptr);
     ARA_VALIDATE_API_STATE (_araDocumentController->isUsingArchive (archive));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 
     return static_cast<ARA::ARASize> (archive->getArchiveSize ());
 }
@@ -43,6 +44,7 @@ bool ARAArchivingController::readBytesFromArchive (ARA::ARAArchiveReaderHostRef 
     const auto archive = fromHostRef (archiveReaderHostRef);
     ARA_VALIDATE_API_ARGUMENT (archiveReaderHostRef, archive != nullptr);
     ARA_VALIDATE_API_STATE (_araDocumentController->isUsingArchive (archive));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
     ARA_VALIDATE_API_ARGUMENT (nullptr, 0 < length);
     ARA_VALIDATE_API_ARGUMENT (nullptr, position + length <= getArchiveSize (archiveReaderHostRef));
 
@@ -56,6 +58,7 @@ bool ARAArchivingController::writeBytesToArchive (ARA::ARAArchiveWriterHostRef a
     auto archive = fromHostRef (archiveWriterHostRef);
     ARA_VALIDATE_API_ARGUMENT (archiveWriterHostRef, archive != nullptr);
     ARA_VALIDATE_API_STATE (_araDocumentController->isUsingArchive (archive));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
     ARA_VALIDATE_API_ARGUMENT (nullptr, 0 < length);
 
     return archive->writeBytes (static_cast<std::streamoff> (position), static_cast<std::streamsize> (length), reinterpret_cast<const char*> (buffer));
@@ -66,12 +69,14 @@ bool ARAArchivingController::writeBytesToArchive (ARA::ARAArchiveWriterHostRef a
 void ARAArchivingController::notifyDocumentArchivingProgress (float value) noexcept
 {
     ARA_VALIDATE_API_STATE (_araDocumentController->isUsingArchive ());
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
     ARA_LOG ("document archiving progress is %.f%%.", 100.0 * value);
 }
 
 void ARAArchivingController::notifyDocumentUnarchivingProgress (float value) noexcept
 {
     ARA_VALIDATE_API_STATE (_araDocumentController->isUsingArchive ());
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
     ARA_LOG ("document unarchiving progress is %.f%%.", 100.0 * value);
 }
 
@@ -79,5 +84,6 @@ ARA::ARAPersistentID ARAArchivingController::getDocumentArchiveID (ARA::ARAArchi
 {
     const auto archive = fromHostRef (archiveReaderHostRef);
     ARA_VALIDATE_API_STATE (_araDocumentController->isUsingArchive (archive));
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
     return archive->getDocumentArchiveID ().c_str ();
 }
