@@ -24,7 +24,7 @@
 #include <MacTypes.h>
 
 #if defined(__cplusplus)
-namespace ARA { namespace IPC { struct ARAIPCMessageSender; } }
+namespace ARA { namespace IPC { class ARAIPCMessageSender; } }
 extern "C"
 {
 #else

@@ -39,7 +39,7 @@ struct _AudioUnitComponent
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     const ARAFactory * ipcFactory;              // cache - NULL until read via IPC
     ARAIPCLockingContextRef lockingContextRef;  // invalid until ipcFactory is read via IPC
-    ARAIPCMessageSender factoryMessageSender;   // invalid until ipcFactory is read via IPC
+    ARAIPCMessageSender * factoryMessageSender; // invalid until ipcFactory is read via IPC
 #endif
 };
 
@@ -58,7 +58,7 @@ struct _AudioUnitInstance
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     BOOL isOutOfProcess;                        // loaded in- or out-of-process
     BOOL isBoundViaIPC;                         // YES if instanceSender has been initialized via ARA binding
-    ARAIPCMessageSender instanceSender;         // IPC sender, only valid when isBoundViaIPC is YES
+    ARAIPCMessageSender * instanceSender;       // IPC sender, only valid when isBoundViaIPC is YES
 #endif
 };
 
@@ -224,13 +224,14 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, s
                 if (!audioUnitInstance->audioUnitComponent->ipcFactory)
                 {
                     audioUnitInstance->audioUnitComponent->lockingContextRef = ARAIPCCreateLockingContext();
-                    if (ARAIPCAUProxyPlugInInitializeFactoryMessageSender(&audioUnitInstance->audioUnitComponent->factoryMessageSender, audioUnitInstance->v3AudioUnit, audioUnitInstance->audioUnitComponent->lockingContextRef))
+                    if ((audioUnitInstance->audioUnitComponent->factoryMessageSender =
+                            ARAIPCAUProxyPlugInInitializeFactoryMessageSender(audioUnitInstance->v3AudioUnit, audioUnitInstance->audioUnitComponent->lockingContextRef)))
                         audioUnitInstance->audioUnitComponent->ipcFactory = ARAIPCAUProxyPlugInGetFactory(audioUnitInstance->audioUnitComponent->factoryMessageSender);
                     else
                         ARAIPCDestroyLockingContext(audioUnitInstance->audioUnitComponent->lockingContextRef);
                 }
                 if ((result = audioUnitInstance->audioUnitComponent->ipcFactory))
-                    *messageSender = &audioUnitInstance->audioUnitComponent->factoryMessageSender;
+                    *messageSender = audioUnitInstance->audioUnitComponent->factoryMessageSender;
             }
         }
         else
