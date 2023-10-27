@@ -26,7 +26,6 @@
     #include "IPC/IPCXMLEncoding.h"
 #endif
 
-
 #if defined (__APPLE__)
     #include <sys/posix_shm.h>
     #include <sys/stat.h>
@@ -46,18 +45,12 @@
 
 IPCMessageChannel::~IPCMessageChannel ()
 {
-    if (_sharedMemory)
-        ::UnmapViewOfFile (_sharedMemory);
-    if (_fileMapping)
-        ::CloseHandle (_fileMapping);
-    if (_dataReceived)
-        ::CloseHandle (_dataReceived);
-    if (_dataAvailable)
-        ::CloseHandle (_dataAvailable);
-    if (_writeLock)
-        ::CloseHandle (_writeLock);
+    ::UnmapViewOfFile (_sharedMemory);
+    ::CloseHandle (_fileMapping);
+    ::CloseHandle (_dataReceived);
+    ::CloseHandle (_dataAvailable);
+    ::CloseHandle (_transactionLock);
 
-    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _creationThreadID);
     ARA_INTERNAL_ASSERT (_callbackLevel == 0);
     ARA_INTERNAL_ASSERT (!_awaitsReply);
     ARA_INTERNAL_ASSERT (_replyHandler == nullptr);
@@ -65,8 +58,8 @@ IPCMessageChannel::~IPCMessageChannel ()
 
 IPCMessageChannel::IPCMessageChannel (const std::string& channelID)
 {
-    _writeLock = ::CreateMutexA (NULL, FALSE, (std::string { "Write" } + channelID).c_str ());
-    ARA_INTERNAL_ASSERT (_writeLock != nullptr);
+    _transactionLock = ::CreateMutexA (NULL, FALSE, (std::string { "Transaction" } + channelID).c_str ());
+    ARA_INTERNAL_ASSERT (_transactionLock != nullptr);
     _dataAvailable = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Available" } + channelID).c_str ());
     ARA_INTERNAL_ASSERT (_dataAvailable != nullptr);
     _dataReceived = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Received" } + channelID).c_str ());
@@ -104,8 +97,37 @@ IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& ch
     return channel;
 }
 
-void IPCMessageChannel::_sendRequest (const ARA::IPC::ARAIPCMessageID messageID, const std::string& messageData)
+void IPCMessageChannel::_lockTransaction (bool isOnCreationThread)
 {
+    if (isOnCreationThread)
+    {
+        while (true)
+        {
+            const auto waitWriteMutex { ::WaitForSingleObject (_transactionLock, 0) };
+            if (waitWriteMutex == WAIT_OBJECT_0)
+                break;
+
+            ARA_INTERNAL_ASSERT (waitWriteMutex == WAIT_TIMEOUT);
+            runReceiveLoop (1);
+        }
+    }
+    else
+    {
+        const auto waitWriteMutex { ::WaitForSingleObject (_transactionLock, messageTimeout) };
+        ARA_INTERNAL_ASSERT (waitWriteMutex == WAIT_OBJECT_0);
+    }
+}
+
+void IPCMessageChannel::_unlockTransaction ()
+{
+    ::ReleaseMutex (_transactionLock);
+}
+
+void IPCMessageChannel::_sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder)
+{
+    const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder)->createEncodedMessage () };
+    ARA_INTERNAL_ASSERT (messageData.size () <= SharedMemory::maxMessageSize);
+
     _readLock.lock ();
     _sharedMemory->messageID = messageID;
     _sharedMemory->messageSize = messageData.size ();
@@ -115,67 +137,6 @@ void IPCMessageChannel::_sendRequest (const ARA::IPC::ARAIPCMessageID messageID,
     const auto waitResult { ::WaitForSingleObject (_dataReceived, messageTimeout) };
     ARA_INTERNAL_ASSERT (waitResult == WAIT_OBJECT_0);
     _readLock.unlock ();
-}
-
-void IPCMessageChannel::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
-                              ReplyHandler const replyHandler, void* replyHandlerUserData)
-{
-    const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder)->createEncodedMessage () };
-    ARA_INTERNAL_ASSERT (messageData.size () <= SharedMemory::maxMessageSize);
-
-    const bool isOnCreationThread { std::this_thread::get_id () == _creationThreadID };
-    const bool needsLock { !isOnCreationThread || (_callbackLevel == 0) };
-//  ARA_LOG ("IPCMessageChannel sends message %i%s%s", messageID, (!isOnCreationThread) ? " from other thread" : "",
-//                                           (needsLock) ? " starting new transaction" : (_callbackLevel > 0) ? " while handling message" : "");
-    if (needsLock)
-    {
-        if (isOnCreationThread)
-        {
-            while (true)
-            {
-                const auto waitWriteMutex { ::WaitForSingleObject (_writeLock, 0) };
-                if (waitWriteMutex == WAIT_OBJECT_0)
-                    break;
-
-                ARA_INTERNAL_ASSERT (waitWriteMutex == WAIT_TIMEOUT);
-                runReceiveLoop (1);
-            }
-        }
-        else
-        {
-            const auto waitWriteMutex { ::WaitForSingleObject (_writeLock, messageTimeout) };
-            ARA_INTERNAL_ASSERT (waitWriteMutex == WAIT_OBJECT_0);
-        }
-    }
-
-    _sendRequest (messageID, messageData);
-    delete encoder;
-
-    const auto previousAwaitsReply { _awaitsReply };
-    const auto previousReplyHandler { _replyHandler };
-    const auto previousReplyHandlerUserData { _replyHandlerUserData };
-    _awaitsReply = true;
-    _replyHandler = replyHandler;
-    _replyHandlerUserData = replyHandlerUserData;
-    do
-    {
-        if (isOnCreationThread)
-            runReceiveLoop (messageTimeout);
-        else
-            std::this_thread::yield (); // \todo maybe it would be better to sleep for some longer interval here instead of simply yielding?
-    } while (_awaitsReply);
-    _awaitsReply = previousAwaitsReply;
-    _replyHandler = previousReplyHandler;
-    _replyHandlerUserData = previousReplyHandlerUserData;
-//  ARA_LOG ("IPCMessageChannel received reply to message %i%s", messageID, (needsLock) ? " ending transaction" : "");
-
-    if (needsLock)
-        ::ReleaseMutex (_writeLock);
-}
-
-ARA::IPC::ARAIPCMessageEncoder* IPCMessageChannel::createEncoder ()
-{
-    return new IPCXMLMessageEncoder {};
 }
 
 void IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
@@ -194,38 +155,13 @@ void IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
     }
 
     const auto messageID { _sharedMemory->messageID };
-    const std::pair <const char*, size_t> messageData { _sharedMemory->messageData, _sharedMemory->messageSize };
+    ARA::IPC::ARAIPCMessageDecoder* decoder { nullptr };
+    if ((messageID != 0) || _replyHandler)
+        decoder = IPCXMLMessageDecoder::createWithMessageData (_sharedMemory->messageData, _sharedMemory->messageSize);
+
     ::SetEvent (_dataReceived);
 
-    if (messageID != 0)
-    {
-        ++_callbackLevel;
-
-//      ARA_LOG ("IPCMessageChannel received message with ID %i%s", messageID, (_awaitsReply) ? " while awaiting reply" : "");
-        const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData.first, messageData.second) };
-        auto replyEncoder { createEncoder () };
-        _receiveCallback (this, messageID, decoder, replyEncoder);
-
-//      ARA_LOG ("IPCMessageChannel replies to message with ID %i", messageID);
-        const auto replyData { static_cast<const IPCXMLMessageEncoder*> (replyEncoder)->createEncodedMessage () };
-        ARA_INTERNAL_ASSERT (replyData.size () <= SharedMemory::maxMessageSize);
-        _sendRequest (0, replyData);
-
-        delete replyEncoder;
-        delete decoder;
-        --_callbackLevel;
-    }
-    else
-    {
-        ARA_INTERNAL_ASSERT (_awaitsReply);
-        if (_replyHandler)
-        {
-            const auto replyDecoder { IPCXMLMessageDecoder::createWithMessageData (messageData.first, messageData.second) };
-            (*_replyHandler) (replyDecoder, _replyHandlerUserData);
-            delete replyDecoder;
-        }
-        _awaitsReply = false;
-    }
+    _routeReceivedMessage (messageID, decoder);
     
     _readLock.unlock ();
 }
@@ -234,25 +170,16 @@ void IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
 #elif defined (__APPLE__)
 //------------------------------------------------------------------------------
 
-_Pragma ("GCC diagnostic push")
-_Pragma ("GCC diagnostic ignored \"-Wold-style-cast\"")
-
 IPCMessageChannel::~IPCMessageChannel ()
 {
-    if (_sendPort)
-    {
-        CFMessagePortInvalidate (_sendPort);
-        CFRelease (_sendPort);
-    }
-    if (_receivePort)
-    {
-        CFMessagePortInvalidate (_receivePort);
-        CFRelease (_receivePort);
-    }
-    if (_writeSemaphore)
-        sem_close (_writeSemaphore);
+    CFMessagePortInvalidate (_sendPort);
+    CFRelease (_sendPort);
 
-    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _creationThreadID);
+    CFMessagePortInvalidate (_receivePort);
+    CFRelease (_receivePort);
+
+    sem_close (_transactionLock);
+
     ARA_INTERNAL_ASSERT (_callbackLevel == 0);
     ARA_INTERNAL_ASSERT (!_awaitsReply);
     ARA_INTERNAL_ASSERT (_replyHandler == nullptr);
@@ -260,53 +187,18 @@ IPCMessageChannel::~IPCMessageChannel ()
 
 CFDataRef IPCMessageChannel::_portCallback (CFMessagePortRef /*port*/, SInt32 messageID, CFDataRef messageData, void* info)
 {
-    auto channel { (IPCMessageChannel*) info };
+    auto channel { static_cast<IPCMessageChannel*> (info) };
     ARA_INTERNAL_ASSERT (std::this_thread::get_id () == channel->_creationThreadID);
 
-    if (messageID != 0)
-    {
-        ++channel->_callbackLevel;
-
-//      ARA_LOG ("IPCMessageChannel received message with ID %i%s", messageID, (channel->_awaitsReply) ? " while awaiting reply" : "");
+    ARA::IPC::ARAIPCMessageDecoder* decoder { nullptr };
+    if ((messageID != 0) || channel->_replyHandler)
 #if USE_ARA_CF_ENCODING
-        const auto decoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
+        decoder = ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData);
 #else
-        const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
+        decoder = IPCXMLMessageDecoder::createWithMessageData (messageData);
 #endif
-        auto replyEncoder { channel->createEncoder () };
-        channel->_receiveCallback (channel, messageID, decoder, replyEncoder);
 
-//      ARA_LOG ("IPCMessageChannel replies to message with ID %i", messageID);
-#if USE_ARA_CF_ENCODING
-        const auto replyData { ARAIPCCFCreateMessageEncoderData (replyEncoder) };
-#else
-        const auto replyData { static_cast<const IPCXMLMessageEncoder*> (replyEncoder)->createEncodedMessage () };
-#endif
-        const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (channel->_sendPort, 0, replyData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
-        ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
-        if (replyData)
-            CFRelease (replyData);
-
-        delete replyEncoder;
-        delete decoder;
-        --channel->_callbackLevel;
-    }
-    else
-    {
-        ARA_INTERNAL_ASSERT (channel->_awaitsReply);
-        if (channel->_replyHandler)
-        {
-            ARA_INTERNAL_ASSERT (messageData != nullptr);
-#if USE_ARA_CF_ENCODING
-            const auto replyDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
-#else
-            const auto replyDecoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
-#endif
-            (*channel->_replyHandler) (replyDecoder, channel->_replyHandlerUserData);
-            delete replyDecoder;
-        }
-        channel->_awaitsReply = false;
-    }
+    channel->_routeReceivedMessage (messageID, decoder);
 
     return nullptr;
 }
@@ -336,7 +228,7 @@ CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCMessageChannel::_creat
     auto wrappedPortID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, portID.c_str (), kCFStringEncodingASCII, kCFAllocatorNull) };
 
     CFMessagePortContext portContext { 0, channel, nullptr, nullptr, nullptr };
-    auto result = CFMessagePortCreateLocal (kCFAllocatorDefault, wrappedPortID, &_portCallback, &portContext, nullptr);
+    auto result = CFMessagePortCreateLocal (kCFAllocatorDefault, wrappedPortID, _portCallback, &portContext, nullptr);
     ARA_INTERNAL_ASSERT (result != nullptr);
 
     CFRelease (wrappedPortID);
@@ -354,7 +246,7 @@ CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCMessageChannel::_creat
 
     auto wrappedPortID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, portID.c_str (), kCFStringEncodingASCII, kCFAllocatorNull) };
 
-    auto timeout { 5.0 };
+    auto timeout { 0.001 * messageTimeout };
     while (timeout > 0.0)
     {
         if ((result = CFMessagePortCreateRemote (kCFAllocatorDefault, wrappedPortID)))
@@ -375,7 +267,7 @@ IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& cha
 {
     auto channel { new IPCMessageChannel };
     channel->_receiveCallback = callback;
-    channel->_writeSemaphore = _openSemaphore (channelID, true);
+    channel->_transactionLock = _openSemaphore (channelID, true);
     channel->_sendPort = _createMessagePortConnectedToID (channelID + ".from_server");
     channel->_receivePort = _createMessagePortPublishingID (channelID + ".to_server", channel);
     return channel;
@@ -387,13 +279,41 @@ IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& ch
     channel->_receiveCallback = callback;
     channel->_receivePort = _createMessagePortPublishingID (channelID + ".from_server", channel);
     channel->_sendPort = _createMessagePortConnectedToID (channelID + ".to_server");
-    channel->_writeSemaphore = _openSemaphore (channelID, false);
-    sem_post (channel->_writeSemaphore);
+    channel->_transactionLock = _openSemaphore (channelID, false);
+    channel->_unlockTransaction ();
     return channel;
 }
 
-void IPCMessageChannel::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
-                              ReplyHandler const replyHandler, void* replyHandlerUserData)
+void IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
+{
+    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _creationThreadID);
+    CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.001 * milliseconds, true);
+}
+
+void IPCMessageChannel::_lockTransaction (bool isOnCreationThread)
+{
+    if (isOnCreationThread)
+    {
+        while (sem_trywait (_transactionLock) != 0)
+        {
+            if (errno != EINTR)
+                runReceiveLoop (1);
+        }
+    }
+    else
+    {
+        while (sem_wait (_transactionLock) != 0)
+            ARA_INTERNAL_ASSERT (errno == EINTR);
+    }
+}
+
+void IPCMessageChannel::_unlockTransaction ()
+{
+    auto result { sem_post (_transactionLock) };
+    ARA_INTERNAL_ASSERT (result == 0);
+}
+
+void IPCMessageChannel::_sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder)
 {
 #if USE_ARA_CF_ENCODING
     const auto messageData { ARAIPCCFCreateMessageEncoderData (encoder) };
@@ -401,32 +321,67 @@ void IPCMessageChannel::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::I
     const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder)->createEncodedMessage () };
 #endif
 
-    const bool isOnCreationThread { std::this_thread::get_id () == _creationThreadID };
-    const bool needsLock { !isOnCreationThread || (_callbackLevel == 0) };
-//  ARA_LOG ("IPCMessageChannel sends message %i%s%s", messageID, (!isOnCreationThread) ? " from other thread" : "",
-//                                           (needsLock) ? " starting new transaction" : (_callbackLevel > 0) ? " while handling message" : "");
-    if (needsLock)
-    {
-        if (isOnCreationThread)
-        {
-            while (sem_trywait (_writeSemaphore) != 0)
-            {
-                if (errno != EINTR)
-                    runReceiveLoop (1);
-            }
-        }
-        else
-        {
-            while (sem_wait (_writeSemaphore) != 0)
-                ARA_INTERNAL_ASSERT (errno == EINTR);
-        }
-    }
-
     const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (_sendPort, messageID, messageData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
     ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
 
     if (messageData)
         CFRelease (messageData);
+}
+
+//------------------------------------------------------------------------------
+#endif
+//------------------------------------------------------------------------------
+
+void IPCMessageChannel::_routeReceivedMessage (ARA::IPC::ARAIPCMessageID messageID, const ARA::IPC::ARAIPCMessageDecoder* decoder)
+{
+    if (messageID != 0)
+    {
+        _handleReceivedMessage (messageID, decoder);
+    }
+    else
+    {
+        ARA_INTERNAL_ASSERT (_awaitsReply);
+        if (_replyHandler)
+        {
+            ARA_INTERNAL_ASSERT (decoder != nullptr);
+            (*_replyHandler) (decoder, _replyHandlerUserData);
+            delete decoder;
+        }
+        else
+        {
+            ARA_INTERNAL_ASSERT (decoder == nullptr);
+        }
+        _awaitsReply = false;
+    }
+}
+
+void IPCMessageChannel::_handleReceivedMessage (ARA::IPC::ARAIPCMessageID messageID, const ARA::IPC::ARAIPCMessageDecoder* decoder)
+{
+    ++_callbackLevel;
+
+    auto replyEncoder { createEncoder () };
+//  ARA_LOG ("IPCMessageChannel handles message with ID %i%s", messageID, (_awaitsReply) ? " (while awaiting reply)" : "");
+    _receiveCallback (this, messageID, decoder, replyEncoder);
+    delete decoder;
+
+//  ARA_LOG ("IPCMessageChannel replies to message with ID %i", messageID);
+    _sendMessage (0, replyEncoder);
+    delete replyEncoder;
+
+    --_callbackLevel;
+}
+
+void IPCMessageChannel::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
+                                     ReplyHandler const replyHandler, void* replyHandlerUserData)
+{
+    const bool isOnCreationThread { std::this_thread::get_id () == _creationThreadID };
+    const bool needsLock { !isOnCreationThread || (_callbackLevel == 0) };
+//  ARA_LOG ("IPCMessageChannel sends message %i%s%s", messageID, (!isOnCreationThread) ? " from other thread" : "",
+//                                              (needsLock) ? " starting new transaction" : (_callbackLevel > 0) ? " while handling message" : "");
+    if (needsLock)
+        _lockTransaction (isOnCreationThread);
+
+    _sendMessage (messageID, encoder);
     delete encoder;
 
     const auto previousAwaitsReply { _awaitsReply };
@@ -448,7 +403,7 @@ void IPCMessageChannel::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::I
 //  ARA_LOG ("IPCMessageChannel received reply to message %i%s", messageID, (needsLock) ? " ending transaction" : "");
 
     if (needsLock)
-        sem_post (_writeSemaphore);
+        _unlockTransaction ();
 }
 
 ARA::IPC::ARAIPCMessageEncoder* IPCMessageChannel::createEncoder ()
@@ -459,15 +414,3 @@ ARA::IPC::ARAIPCMessageEncoder* IPCMessageChannel::createEncoder ()
     return new IPCXMLMessageEncoder {};
 #endif
 }
-
-void IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
-{
-    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _creationThreadID);
-    CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.001 * milliseconds, true);
-}
-
-_Pragma ("GCC diagnostic pop")
-
-//------------------------------------------------------------------------------
-#endif
-//------------------------------------------------------------------------------
