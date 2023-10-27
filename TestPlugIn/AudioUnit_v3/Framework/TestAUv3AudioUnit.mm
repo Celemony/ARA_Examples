@@ -81,7 +81,6 @@ API_AVAILABLE(macos(13.0))
 
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
 @property (nonatomic, nullable, retain) NSObject<AUMessageChannel> * araIPCPlugInExtensionMessageChannel API_AVAILABLE(macos(13.0));
-@property (nonatomic, nullable) const ARA::ARAPlugInExtensionInstance * araIPCPlugInExtensionInstance;
 #endif
 
 @end
@@ -283,14 +282,7 @@ void destroy_sharedFactoryMessageChannel() {
 
         _sharedFactoryMessageChannel = [[TestAUv3ARAIPCMessageChannel alloc] initWithAudioUnit:nil];
 
-        ARA::IPC::ARAIPCAUProxyHostInitialize(_sharedFactoryMessageChannel,
-            ^const ARA::ARAPlugInExtensionInstance * (AUAudioUnit * _Nonnull auAudioUnit, ARA::ARADocumentControllerRef _Nonnull controllerRef,
-                                                      ARA::ARAPlugInInstanceRoleFlags knownRoles, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
-            {
-                TestAUv3AudioUnit * audioUnit = (TestAUv3AudioUnit *)auAudioUnit;
-                audioUnit.araIPCPlugInExtensionInstance = [audioUnit bindToDocumentController:controllerRef withRoles:assignedRoles knownRoles:knownRoles];
-                return audioUnit.araIPCPlugInExtensionInstance;
-            });
+        ARA::IPC::ARAIPCAUProxyHostInitialize(_sharedFactoryMessageChannel);
     }
 }
 
