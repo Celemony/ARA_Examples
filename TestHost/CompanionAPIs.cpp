@@ -144,7 +144,7 @@ public:
     : _message { message },
       _isOwningMessage { false }
     {}
-    
+
     ~ARAIPCXMLMessageEncoder () override
     {
         if (_isOwningMessage)

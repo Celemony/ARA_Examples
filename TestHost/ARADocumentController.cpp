@@ -475,7 +475,7 @@ void ARADocumentController::logAudioModificationPreservesAudioSourceSignalIfSupp
 {
     if (!_documentController->supportsIsAudioModificationPreservingAudioSourceSignal ())
         return;
-    
+
     ARA_LOG ("ARAAudioModificationRef %p %s audio source signal.", getRef (audioModification),
              _documentController->isAudioModificationPreservingAudioSourceSignal( getRef (audioModification)) ? "preserves" : "modifies");
 }

@@ -109,8 +109,8 @@ static ARAAudioReaderHostRef ARA_CALL ARACreateAudioReaderForSource(ARAAudioAcce
 static ARABool ARA_CALL ARAReadAudioSamples(ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef,
                                             ARASamplePosition samplePosition, ARASampleCount samplesPerChannel, void * const buffers[])
 {
-    RenderPulsedSineSignal (samplePosition, kTestAudioSourceSampleRate, kTestAudioSourceSampleCount,
-                            1, samplesPerChannel, buffers, (audioReaderHostRef == kAudioReader64BitHostRef) ? kARATrue : kARAFalse);
+    RenderPulsedSineSignal(samplePosition, kTestAudioSourceSampleRate, kTestAudioSourceSampleCount,
+                           1, samplesPerChannel, buffers, (audioReaderHostRef == kAudioReader64BitHostRef) ? kARATrue : kARAFalse);
     return kARATrue;
 }
 static void ARA_CALL ARADestroyAudioReader(ARAAudioAccessControllerHostRef controllerHostRef, ARAAudioReaderHostRef audioReaderHostRef)
@@ -129,7 +129,7 @@ static ARASize ARA_CALL ARAGetArchiveSize(ARAArchivingControllerHostRef controll
 static ARABool ARA_CALL ARAReadBytesFromArchive(ARAArchivingControllerHostRef controllerHostRef, ARAArchiveReaderHostRef archiveReaderHostRef,
                                                 ARASize position, ARASize length, ARAByte buffer[])
 {
-    memset (&buffer[position], 0, length);
+    memset(&buffer[position], 0, length);
     return kARAFalse;
 }
 static ARABool ARA_CALL ARAWriteBytesToArchive(ARAArchivingControllerHostRef controllerHostRef, ARAArchiveWriterHostRef archiveWriterHostRef,
@@ -285,7 +285,7 @@ static ARAAssertFunction * assertFunctionReference = &assertFunction;
 
 
 // main
-int main (int argc, const char * argv[])
+int main(int argc, const char * argv[])
 {
     ARAInterfaceConfiguration interfaceConfig = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAInterfaceConfiguration, assertFunctionAddress),
                                                   kARAAPIGeneration_2_0_Final, NULL /* asserts will be configured later if needed */ };
@@ -435,7 +435,7 @@ int main (int argc, const char * argv[])
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
     plugInInstance = AudioUnitBindToARADocumentController(audioUnit, documentControllerRef, roles);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
-    vst3Effect = VST3CreateEffect (vst3Binary, ARA_PLUGIN_VST3_OPTIONAL_PLUGIN_NAME);
+    vst3Effect = VST3CreateEffect(vst3Binary, ARA_PLUGIN_VST3_OPTIONAL_PLUGIN_NAME);
     plugInInstance = VST3BindToARADocumentController(vst3Effect, documentControllerRef, roles);
 #endif
 
@@ -480,7 +480,7 @@ int main (int argc, const char * argv[])
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
     AudioUnitCloseInstance(audioUnit);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
-    VST3DestroyEffect (vst3Effect);
+    VST3DestroyEffect(vst3Effect);
 #endif
 
     documentControllerInterface->enableAudioSourceSamplesAccess(documentControllerRef, audioSourceRef, kARAFalse);
@@ -497,7 +497,7 @@ int main (int argc, const char * argv[])
     factory->uninitializeARA();
 
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
-    AudioUnitCleanupComponent (audioUnitComponent);
+    AudioUnitCleanupComponent(audioUnitComponent);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     VST3UnloadBinary(vst3Binary);
 #endif

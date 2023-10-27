@@ -20,12 +20,12 @@
 #ifndef __TestAudioUnit_h__
 #define __TestAudioUnit_h__
 
-_Pragma ("GCC diagnostic push")
-_Pragma ("GCC diagnostic ignored \"-Wimport-preprocessor-directive-pedantic\"")
+_Pragma("GCC diagnostic push")
+_Pragma("GCC diagnostic ignored \"-Wimport-preprocessor-directive-pedantic\"")
 
 #include "AUEffectBase.h"
 
-_Pragma ("GCC diagnostic pop")
+_Pragma("GCC diagnostic pop")
 
 #if !CA_USE_AUDIO_PLUGIN_ONLY
     #error "Audio Unit v1 is no longer supported."
