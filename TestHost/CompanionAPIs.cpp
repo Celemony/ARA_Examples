@@ -31,6 +31,14 @@
 #if defined (__APPLE__)
     #include "ExamplesCommon/PlugInHosting/AudioUnitLoader.h"
 #endif
+
+#ifndef ARA_ENABLE_CLAP
+    #define ARA_ENABLE_CLAP 0
+#endif
+#if ARA_ENABLE_CLAP
+    #include "ExamplesCommon/PlugInHosting/CLAPLoader.h"
+#endif
+
 #include "ExamplesCommon/PlugInHosting/VST3Loader.h"
 
 #include <codecvt>
@@ -464,6 +472,49 @@ private:
 
 /*******************************************************************************/
 
+#if ARA_ENABLE_CLAP
+
+class CLAPPlugInInstance : public PlugInInstance
+{
+public:
+    explicit CLAPPlugInInstance (CLAPPlugIn clapPlugIn)
+    : _clapPlugIn { clapPlugIn }
+    {}
+
+    ~CLAPPlugInInstance () override
+    {
+        CLAPDestroyPlugIn (_clapPlugIn);
+    }
+
+    void bindToDocumentControllerWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
+    {
+        const auto plugInExtensionInstance { CLAPBindToARADocumentController (_clapPlugIn, documentControllerRef, assignedRoles) };
+        validateAndSetPlugInExtensionInstance (plugInExtensionInstance, assignedRoles);
+    }
+
+    void startRendering (int maxBlockSize, double sampleRate) override
+    {
+        CLAPStartRendering (_clapPlugIn, static_cast<uint32_t> (maxBlockSize), sampleRate);
+    }
+
+    void renderSamples (int blockSize, int64_t samplePosition, float* buffer) override
+    {
+        CLAPRenderBuffer (_clapPlugIn, static_cast<uint32_t> (blockSize), samplePosition, buffer);
+    }
+
+    void stopRendering () override
+    {
+        CLAPStopRendering (_clapPlugIn);
+    }
+
+private:
+    CLAPPlugIn const _clapPlugIn;
+};
+
+#endif  // ARA_ENABLE_CLAP
+
+/*******************************************************************************/
+
 #if defined (__APPLE__)
 
 // very crude conversion from string to OSType
@@ -543,16 +594,16 @@ private:
 
 /*******************************************************************************/
 
-std::string createVST3EntryDescription (const std::string& binaryName, const std::string& optionalPlugInName)
+std::string createEntryDescription (const std::string& apiName, const std::string& binaryName, const std::string& optionalPlugInName)
 {
-    return std::string { "VST3 " } + ((optionalPlugInName.empty ()) ? "" : optionalPlugInName + " ") + "@ " + binaryName;
+    return apiName + " " + ((optionalPlugInName.empty ()) ? "" : optionalPlugInName + " ") + "@ " + binaryName;
 }
 
 class VST3PlugInEntry : public PlugInEntry
 {
 public:
     VST3PlugInEntry (const std::string& binaryName, const std::string& optionalPlugInName)
-    : PlugInEntry { createVST3EntryDescription (binaryName, optionalPlugInName) },
+    : PlugInEntry { createEntryDescription ("VST3", binaryName, optionalPlugInName) },
       _vst3Binary { VST3LoadBinary (binaryName.c_str ()) },
       _optionalPlugInName { optionalPlugInName }
     {
@@ -574,6 +625,39 @@ private:
     VST3Binary const _vst3Binary;
     const std::string _optionalPlugInName;
 };
+
+/*******************************************************************************/
+
+#if ARA_ENABLE_CLAP
+
+class CLAPPlugInEntry : public PlugInEntry
+{
+public:
+    CLAPPlugInEntry (const std::string& binaryName, const std::string& optionalPlugInName)
+    : PlugInEntry { createEntryDescription ("CLAP", binaryName, optionalPlugInName) },
+      _clapBinary { CLAPLoadBinary (binaryName.c_str ()) },
+      _optionalPlugInName { optionalPlugInName }
+    {
+        validateAndSetFactory (CLAPGetARAFactory (_clapBinary, (_optionalPlugInName.empty ()) ? nullptr : _optionalPlugInName.c_str ()));
+    }
+
+    ~CLAPPlugInEntry () override
+    {
+        CLAPUnloadBinary (_clapBinary);
+    }
+
+    std::unique_ptr<PlugInInstance> createPlugInInstance () override
+    {
+        auto clapInstance { CLAPCreatePlugIn (_clapBinary, (_optionalPlugInName.empty ()) ? nullptr : _optionalPlugInName.c_str ()) };
+        return std::make_unique<CLAPPlugInInstance> (clapInstance);
+    }
+
+private:
+    CLAPBinary const _clapBinary;
+    const std::string _optionalPlugInName;
+};
+
+#endif  // ARA_ENABLE_CLAP
 
 /*******************************************************************************/
 
@@ -773,12 +857,12 @@ private:
 
 /*******************************************************************************/
 
-class IPCVST3PlugInEntry : public IPCPlugInEntry
+class IPCGenericPlugInEntry : public IPCPlugInEntry
 {
-public:
-    IPCVST3PlugInEntry (const std::string& binaryName, const std::string& optionalPlugInName)
-    : IPCPlugInEntry { createVST3EntryDescription (binaryName, optionalPlugInName),
-                        std::string { "-vst3 " } + binaryName + " " + optionalPlugInName,
+protected:
+    IPCGenericPlugInEntry (const std::string& commandLineArg, const std::string& apiName, const std::string& binaryName, const std::string& optionalPlugInName)
+    : IPCPlugInEntry { createEntryDescription (apiName, binaryName, optionalPlugInName),
+                        commandLineArg + " " + binaryName + " " + optionalPlugInName,
                         [&optionalPlugInName] (IPCSender& hostCommandsSender) -> const ARA::ARAFactory*
                         {
                             const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (&hostCommandsSender) };
@@ -798,6 +882,26 @@ public:
                         } }
     {}
 };
+
+class IPCVST3PlugInEntry : public IPCGenericPlugInEntry
+{
+public:
+    IPCVST3PlugInEntry (const std::string& binaryName, const std::string& optionalPlugInName)
+    : IPCGenericPlugInEntry ("-vst3", "VST3", binaryName, optionalPlugInName)
+    {}
+};
+
+#if ARA_ENABLE_CLAP
+
+class IPCCLAPPlugInEntry : public IPCGenericPlugInEntry
+{
+public:
+    IPCCLAPPlugInEntry (const std::string& binaryName, const std::string& optionalPlugInName)
+    : IPCGenericPlugInEntry ("-clap", "CLAP", binaryName, optionalPlugInName)
+    {}
+};
+
+#endif  // ARA_ENABLE_CLAP
 
 /*******************************************************************************/
 
@@ -1099,6 +1203,33 @@ std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<st
 #endif
     }
 
+#if ARA_ENABLE_CLAP
+    if (args.size () >= 2)
+    {
+        auto it { std::find (args.begin (), args.end (), "-clap") };
+        if (it < args.end () - 1)   // we need at least one follow-up argument
+        {
+            const auto& binaryFileName { *++it };
+            std::string optionalPlugInName {};
+            if ((++it != args.end ()) && ((*it)[0] != '-'))
+                optionalPlugInName = *it;
+            return std::make_unique<CLAPPlugInEntry> (binaryFileName, optionalPlugInName);
+        }
+
+#if ARA_ENABLE_IPC
+        it = std::find (args.begin (), args.end (), "-ipc_clap");
+        if (it < args.end () - 1)   // we need at least one follow-up argument
+        {
+            const auto& binaryFileName { *++it };
+            std::string optionalPlugInName {};
+            if ((++it != args.end ()) && ((*it)[0] != '-'))
+                optionalPlugInName = *it;
+            return std::make_unique<IPCCLAPPlugInEntry> (binaryFileName, optionalPlugInName);
+        }
+#endif
+    }
+#endif  // ARA_ENABLE_CLAP
+
 #if defined (__APPLE__)
     if (args.size () >= 4)
     {
@@ -1124,7 +1255,7 @@ std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<st
         }
 #endif
     }
-#endif
+#endif  // defined (__APPLE__)
 
     return nullptr;
 }

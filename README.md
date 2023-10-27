@@ -111,8 +111,12 @@ Or for the Audio Unit version on macOS:
 
     ./bin/Debug/TestHost -au aufx AraT ADeC
 
-To to run the plug-in in a separate process connected via IPC, use -ipc_vst3 or -ipc_au instead
-of -vst3 or -au.
+Or use the optional CLAP variant:
+
+    ./bin/Debug/TestHost -clap ARATestPlugIn.clap 
+
+To to run the plug-in in a separate process connected via IPC, use -ipc_vst3 or -ipc_au or
+-ipc_clap instead of -vst3 or -au or -clap.
 
 Where applicable (Visual Studio solution, Xcode project), debugging a plug-in target will per
 default launch the validator application provided by the companion API. Debugging with the

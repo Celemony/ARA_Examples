@@ -1628,6 +1628,15 @@ target_include_directories(ARATestHost PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/TestHost"
 )
 
+if(ARA_ENABLE_CLAP)
+    target_compile_definitions(ARATestHost PRIVATE
+        -DARA_ENABLE_CLAP=1
+    )
+    target_link_libraries(ARATestHost PRIVATE
+        clap
+    )
+endif()
+
 target_link_libraries(ARATestHost PRIVATE
     ARAExamplesCommon
     ARA_Host_Library
@@ -1670,6 +1679,9 @@ if(ARA_SETUP_DEBUGGING)
     if(APPLE)
         add_dependencies(ARATestHost ARATestPlugInAUv3App)
     endif()
+    if(ARA_ENABLE_CLAP)
+        add_dependencies(ARATestHost ARATestPlugInCLAP)
+    endif()
 
     set(ARATestHost_Dbg_Arguments "")
     if(WIN32)
@@ -1681,6 +1693,10 @@ if(ARA_SETUP_DEBUGGING)
         #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{CommonProgramW6432}\\VST3\\Celemony\\Melodyne\\Melodyne.vst3\"")
         # alternatively for testing with JUCE_ARA VST3 example:
         #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{CommonProgramW6432}\\VST3\\ARAPluginDemo.vst3\"")
+        # alternatively for testing with optional CLAP example plug-in:
+        #string(APPEND ARATestHost_Dbg_Arguments "-clap ARATestPlugIn.clap")
+        # alternatively for testing with optional CLAP example plug-in in a remote process via IPC:
+        #string(APPEND ARATestHost_Dbg_Arguments "-ipc_clap ARATestPlugIn.clap")
     elseif(APPLE)
         # per default, test with VST3 example plug-in
         string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
@@ -1698,6 +1714,10 @@ if(ARA_SETUP_DEBUGGING)
         # alternatively for testing with JUCE_ARA VST3 or Audio Unit example:
         #string(APPEND ARATestHost_Dbg_Arguments "-vst3 \"$ENV{HOME}/Library/Audio/Plug-Ins/VST3/ARAPluginDemo.vst3\"")
         #string(APPEND ARATestHost_Dbg_Arguments "-au aufx AraD ADeC")
+        # alternatively for testing with optional CLAP example plug-in:
+        #string(APPEND ARATestHost_Dbg_Arguments "-clap ARATestPlugIn.clap")
+        # alternatively for testing with optional CLAP example plug-in in a remote process via IPC:
+        #string(APPEND ARATestHost_Dbg_Arguments "-ipc_clap ARATestPlugIn.clap")
     else()
         string(APPEND ARATestHost_Dbg_Arguments "-vst3 ARATestPlugIn.vst3")
     endif()
