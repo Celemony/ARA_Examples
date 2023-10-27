@@ -123,10 +123,6 @@ public:
     bool supportsStoringAudioFileChunks ();
     bool storeAudioSourceToAudioFileChunk (ArchiveBase* archive, AudioSource* audioSource, ARA::ARAPersistentID* documentArchiveID, bool* openAutomatically);
 
-    // debug support: used by ARAArchivingController only, to validate the time slots when
-    // the plug-in may actually call into the interfaces for reading or writing.
-    bool isUsingArchive (const ArchiveBase* archive = nullptr);
-
     /*******************************************************************************/
     // Functions to enable audio source access and read head/tail time
 
@@ -175,6 +171,11 @@ public:
     ARA::ARAAudioModificationRef getRef (AudioModification* audioModification) const noexcept { return _audioModificationRefs.at (audioModification); }
     ARA::ARAPlaybackRegionRef getRef (PlaybackRegion* playbackRegion) const noexcept { return _playbackRegionRefs.at (playbackRegion); }
 
+#if ARA_VALIDATE_API_CALLS
+    bool isUsingArchive (const ArchiveBase* archive = nullptr);
+    bool isPollingModelUpdates () const noexcept { return _isPollingModelUpdates; }
+#endif
+
 private:
     const DocumentProperties getDocumentProperties () const noexcept;
     const MusicalContextProperties getMusicalContextProperties (const MusicalContext* musicalContext) const noexcept;
@@ -204,4 +205,8 @@ private:
 
     // for debugging only, see isUsingArchive ()
     const ArchiveBase* _currentArchive { nullptr };
+
+#if ARA_VALIDATE_API_CALLS
+    bool _isPollingModelUpdates { false };
+#endif
 };

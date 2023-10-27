@@ -36,6 +36,7 @@ void ARAModelUpdateController::notifyAudioSourceAnalysisProgress (ARA::ARAAudioS
     ARA_VALIDATE_API_ARGUMENT (audioSource, ARA::contains (getDocument ()->getAudioSources (), audioSource));
     ARA_VALIDATE_API_ARGUMENT (nullptr, 0.0f <= value);
     ARA_VALIDATE_API_ARGUMENT (nullptr, value <= 1.0f);
+    ARA_VALIDATE_API_STATE (_araDocumentController->isPollingModelUpdates ());
 
     switch (state)
     {
@@ -78,6 +79,7 @@ void ARAModelUpdateController::notifyAudioSourceContentChanged (ARA::ARAAudioSou
     ARA_VALIDATE_API_ARGUMENT (audioSource, ARA::contains (getDocument ()->getAudioSources (), audioSource));
     ARA_VALIDATE_API_ARGUMENT (range, (range == nullptr) || (0.0 <= range->duration));
     ARA_VALIDATE_API_ARGUMENT (nullptr, scopeFlags.affectEverything () || !scopeFlags.affectSamples ());
+    ARA_VALIDATE_API_STATE (_araDocumentController->isPollingModelUpdates ());
 
     if (_minimalContentUpdateLogging)
         ARA_LOG ("content of audio source %p (ARAAudioSource ref %p) was updated from %.3f to %.3f, flags 0x%X", audioSource, _araDocumentController->getRef (audioSource), ARA::ContentLogger::getStartOfRange (range), ARA::ContentLogger::getEndOfRange (range), scopeFlags);
@@ -93,6 +95,7 @@ void ARAModelUpdateController::notifyAudioModificationContentChanged (ARA::ARAAu
     ARA_VALIDATE_API_ARGUMENT (audioModification, ARA::contains (getDocument ()->getAudioSources (), audioModification->getAudioSource ()));
     ARA_VALIDATE_API_ARGUMENT (audioModification, ARA::contains (audioModification->getAudioSource ()->getAudioModifications (), audioModification));
     ARA_VALIDATE_API_ARGUMENT (range, (range == nullptr) || (0.0 <= range->duration));
+    ARA_VALIDATE_API_STATE (_araDocumentController->isPollingModelUpdates ());
 
     if (_minimalContentUpdateLogging)
         ARA_LOG ("content of audio modification %p (ARAAudioModificationRef ref %p) was updated from %.3f to %.3f, flags 0x%X", audioModification, _araDocumentController->getRef (audioModification), ARA::ContentLogger::getStartOfRange (range), ARA::ContentLogger::getEndOfRange (range), scopeFlags);
@@ -107,6 +110,7 @@ void ARAModelUpdateController::notifyPlaybackRegionContentChanged (ARA::ARAPlayb
     ARA_VALIDATE_API_ARGUMENT (playbackRegion, ARA::contains (getDocument ()->getRegionSequences (), playbackRegion->getRegionSequence ()));
     ARA_VALIDATE_API_ARGUMENT (playbackRegion, ARA::contains (playbackRegion->getRegionSequence ()->getPlaybackRegions (), playbackRegion));
     ARA_VALIDATE_API_ARGUMENT (range, (range == nullptr) || (0.0 <= range->duration));
+    ARA_VALIDATE_API_STATE (_araDocumentController->isPollingModelUpdates ());
 
     if (_minimalContentUpdateLogging)
         ARA_LOG ("content of playback region %p (ARAPlaybackRegionRef ref %p) was updated from %.3f to %.3f, flags 0x%X", playbackRegion, _araDocumentController->getRef (playbackRegion), ARA::ContentLogger::getStartOfRange (range), ARA::ContentLogger::getEndOfRange (range), scopeFlags);
