@@ -314,9 +314,14 @@ endif()
 # ======================
 # Apple signing (defaults to signing locally for debug and not signing for release)
 # Set CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY and CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM
-# in your CMakeCache.txt if building actual products based on these examples.
-if(NOT CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY)
+# in your CMakeCache.txt if building actual products based on these examples,
+# or inject them when generating from the command line.
+if(APPLE AND NOT CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY)
     set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "$<$<CONFIG:Debug>:->")
+    message(WARNING "CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY not set via command line or CMakeCache.txt, binaries will not be signed correctly")
+endif()
+if(APPLE AND NOT CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM)
+    message(WARNING "CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM not set via command line or CMakeCache.txt, binaries will not be signed correctly")
 endif()
 # \todo this should be set per-target, but for some reason CMake ignores it when set only there...
 set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/macOS/ARAExamples.entitlements")

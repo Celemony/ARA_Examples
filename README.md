@@ -85,9 +85,10 @@ to its superior project layout and debugger support, e.g. for VS2019:
     cmake -B build -G "Visual Studio 16 2019" -A x64
 
 To properly handle signing and packaging on macOS, the CMake support is currently explicitly
-limited to creating an Xcode project:
+limited to creating an Xcode project. Further, in order to run in sandbox environments such as
+Audio Unit v3 via XPC, you need to specify your development team and code sign identity:
 
-    cmake -G "Xcode" -B build
+    cmake -B build -G "Xcode" -D CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM=1234567890 -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="Apple Development"
 
 On Linux, the examples in general are still in an experimental state, but have been successfully
 tested on Ubuntu 18.04 with GCC 8.3.0 and clang 7.0 using make as build system:

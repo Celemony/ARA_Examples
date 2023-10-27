@@ -4,6 +4,8 @@ This is a development build of the ARA Examples 2.3.
 
 Changes since previous releases:
 - initial draft of Audio Unit version 3 support (App Extension)
+  Note that macOS code signing is required for proper loading in sandboxes such as App Extensions,
+  configured via CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY and CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM.
 - initial draft of CLAP support
 - various related refactorings and cleanups in plug-in hosting code
 - initial draft of generic ARA IPC implementation in ARA_Library
