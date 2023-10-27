@@ -38,7 +38,8 @@ static CLAP_CONSTEXPR const char CLAP_TEST_PLUGIN_ID[] = "org.ara-audio.examples
 
 static const char* const s_my_features[] = {
    CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
-   CLAP_PLUGIN_FEATURE_ONLY_ARA,
+   CLAP_PLUGIN_FEATURE_ARA_SUPPORTED,
+   CLAP_PLUGIN_FEATURE_ARA_REQUIRED,
    NULL
 };
 

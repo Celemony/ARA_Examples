@@ -128,6 +128,31 @@ CLAPBinary CLAPLoadBinary(const char * binaryName)
     return clapBinary;
 }
 
+void CLAPValidateDescHasARA(CLAPBinary clapBinary, const char * plugin_id)
+{
+    const clap_plugin_factory_t * factory = (const clap_plugin_factory_t *)clapBinary->entry->get_factory(CLAP_PLUGIN_FACTORY_ID);
+    ARA_INTERNAL_ASSERT(factory != NULL);
+
+    const uint32_t plugin_count = factory->get_plugin_count(factory);
+    ARA_INTERNAL_ASSERT(plugin_count > 0);
+
+    for (uint32_t i = 0; i < plugin_count; ++i)
+    {
+        const clap_plugin_descriptor_t * descAtIndex = factory->get_plugin_descriptor(factory, i);
+        ARA_INTERNAL_ASSERT(descAtIndex != NULL);
+        if (strcmp(plugin_id, descAtIndex->id) == 0)
+        {
+            const char * const * feature = descAtIndex->features;
+            while (feature)
+            {
+                if (strcmp(*(feature++), CLAP_PLUGIN_FEATURE_ARA_SUPPORTED) == 0)
+                    return;
+            }
+            ARA_INTERNAL_ASSERT(false && "CLAP ARA effect not tagged as such in features");
+        }
+    }
+}
+
 const ARAFactory * CLAPGetARAFactory(CLAPBinary clapBinary, const char * optionalPlugInName)
 {
     const clap_ara_factory_t * ara_factory = (const clap_ara_factory_t *)clapBinary->entry->get_factory(CLAP_EXT_ARA_FACTORY);
@@ -144,7 +169,10 @@ const ARAFactory * CLAPGetARAFactory(CLAPBinary clapBinary, const char * optiona
             const ARAFactory * factory = ara_factory->get_ara_factory(ara_factory, i);
             ARA_INTERNAL_ASSERT(factory != NULL);
             if (strcmp(optionalPlugInName, factory->plugInName) == 0)
+            {
+                CLAPValidateDescHasARA(clapBinary, ara_factory->get_plugin_id(ara_factory, i));
                 return factory;
+            }
         }
         return NULL;
     }
@@ -152,6 +180,7 @@ const ARAFactory * CLAPGetARAFactory(CLAPBinary clapBinary, const char * optiona
     {
         const ARAFactory * factory =  ara_factory->get_ara_factory(ara_factory, 0);
         ARA_INTERNAL_ASSERT(factory != NULL);
+        CLAPValidateDescHasARA(clapBinary, ara_factory->get_plugin_id(ara_factory, 0));
         return factory;
     }
 }
