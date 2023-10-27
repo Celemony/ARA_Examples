@@ -1,5 +1,5 @@
 //------------------------------------------------------------------------------
-//! \file       IPCPort.cpp
+//! \file       IPCMessageChannel.cpp
 //!             Proof-of-concept implementation of ARAIPCMessageChannel
 //!             for the ARA SDK TestHost (error handling is limited to assertions).
 //! \project    ARA SDK Examples
@@ -17,7 +17,7 @@
 //!             limitations under the License.
 //------------------------------------------------------------------------------
 
-#include "IPCPort.h"
+#include "IPCMessageChannel.h"
 #include "ARA_Library/Debug/ARADebug.h"
 
 #if USE_ARA_CF_ENCODING
@@ -44,7 +44,7 @@
 #if defined (_WIN32)
 //------------------------------------------------------------------------------
 
-IPCPort::~IPCPort ()
+IPCMessageChannel::~IPCMessageChannel ()
 {
     if (_sharedMemory)
         ::UnmapViewOfFile (_sharedMemory);
@@ -63,48 +63,48 @@ IPCPort::~IPCPort ()
     ARA_INTERNAL_ASSERT (_replyHandler == nullptr);
 }
 
-IPCPort::IPCPort (const std::string& portID)
+IPCMessageChannel::IPCMessageChannel (const std::string& channelID)
 {
-    _writeLock = ::CreateMutexA (NULL, FALSE, (std::string { "Write" } + portID).c_str ());
+    _writeLock = ::CreateMutexA (NULL, FALSE, (std::string { "Write" } + channelID).c_str ());
     ARA_INTERNAL_ASSERT (_writeLock != nullptr);
-    _dataAvailable = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Available" } + portID).c_str ());
+    _dataAvailable = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Available" } + channelID).c_str ());
     ARA_INTERNAL_ASSERT (_dataAvailable != nullptr);
-    _dataReceived = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Received" } + portID).c_str ());
+    _dataReceived = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Received" } + channelID).c_str ());
     ARA_INTERNAL_ASSERT (_dataReceived != nullptr);
 }
 
-IPCPort* IPCPort::createPublishingID (const std::string& portID, const ReceiveCallback& callback)
+IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID, const ReceiveCallback& callback)
 {
-    auto port { new IPCPort { portID } };
-    port->_receiveCallback = callback;
+    auto channel { new IPCMessageChannel { channelID } };
+    channel->_receiveCallback = callback;
 
-    const auto mapKey { std::string { "Map" } + portID };
-    port->_fileMapping = ::CreateFileMappingA (INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof (SharedMemory), mapKey.c_str ());
-    ARA_INTERNAL_ASSERT (port->_fileMapping != nullptr);
-    port->_sharedMemory = (SharedMemory*) ::MapViewOfFile (port->_fileMapping, FILE_MAP_WRITE, 0, 0, sizeof (SharedMemory));
-    ARA_INTERNAL_ASSERT (port->_sharedMemory != nullptr);
+    const auto mapKey { std::string { "Map" } + channelID };
+    channel->_fileMapping = ::CreateFileMappingA (INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof (SharedMemory), mapKey.c_str ());
+    ARA_INTERNAL_ASSERT (channel->_fileMapping != nullptr);
+    channel->_sharedMemory = (SharedMemory*) ::MapViewOfFile (channel->_fileMapping, FILE_MAP_WRITE, 0, 0, sizeof (SharedMemory));
+    ARA_INTERNAL_ASSERT (channel->_sharedMemory != nullptr);
 
-    return port;
+    return channel;
 }
 
-IPCPort* IPCPort::createConnectedToID (const std::string& portID, const ReceiveCallback& callback)
+IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID, const ReceiveCallback& callback)
 {
-    auto port { new IPCPort { portID } };
-    port->_receiveCallback = callback;
+    auto channel { new IPCMessageChannel { channelID } };
+    channel->_receiveCallback = callback;
 
-    const auto mapKey { std::string { "Map" } + portID };
-    while (!port->_fileMapping)
+    const auto mapKey { std::string { "Map" } + channelID };
+    while (!channel->_fileMapping)
     {
         ::Sleep (100);
-        port->_fileMapping = ::OpenFileMappingA (FILE_MAP_WRITE, FALSE, mapKey.c_str ());
+        channel->_fileMapping = ::OpenFileMappingA (FILE_MAP_WRITE, FALSE, mapKey.c_str ());
     }
-    port->_sharedMemory = (SharedMemory*) ::MapViewOfFile (port->_fileMapping, FILE_MAP_WRITE, 0, 0, 0);
-    ARA_INTERNAL_ASSERT (port->_sharedMemory != nullptr);
+    channel->_sharedMemory = (SharedMemory*) ::MapViewOfFile (channel->_fileMapping, FILE_MAP_WRITE, 0, 0, 0);
+    ARA_INTERNAL_ASSERT (channel->_sharedMemory != nullptr);
 
-    return port;
+    return channel;
 }
 
-void IPCPort::_sendRequest (const ARA::IPC::ARAIPCMessageID messageID, const std::string& messageData)
+void IPCMessageChannel::_sendRequest (const ARA::IPC::ARAIPCMessageID messageID, const std::string& messageData)
 {
     _readLock.lock ();
     _sharedMemory->messageID = messageID;
@@ -117,15 +117,15 @@ void IPCPort::_sendRequest (const ARA::IPC::ARAIPCMessageID messageID, const std
     _readLock.unlock ();
 }
 
-void IPCPort::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
-                           ReplyHandler const replyHandler, void* replyHandlerUserData)
+void IPCMessageChannel::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
+                              ReplyHandler const replyHandler, void* replyHandlerUserData)
 {
     const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder)->createEncodedMessage () };
     ARA_INTERNAL_ASSERT (messageData.size () <= SharedMemory::maxMessageSize);
 
     const bool isOnCreationThread { std::this_thread::get_id () == _creationThreadID };
     const bool needsLock { !isOnCreationThread || (_callbackLevel == 0) };
-//  ARA_LOG ("IPCPort sends message %i%s%s", messageID, (!isOnCreationThread) ? " from other thread" : "",
+//  ARA_LOG ("IPCMessageChannel sends message %i%s%s", messageID, (!isOnCreationThread) ? " from other thread" : "",
 //                                           (needsLock) ? " starting new transaction" : (_callbackLevel > 0) ? " while handling message" : "");
     if (needsLock)
     {
@@ -167,18 +167,18 @@ void IPCPort::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPC
     _awaitsReply = previousAwaitsReply;
     _replyHandler = previousReplyHandler;
     _replyHandlerUserData = previousReplyHandlerUserData;
-//  ARA_LOG ("IPCPort received reply to message %i%s", messageID, (needsLock) ? " ending transaction" : "");
+//  ARA_LOG ("IPCMessageChannel received reply to message %i%s", messageID, (needsLock) ? " ending transaction" : "");
 
     if (needsLock)
         ::ReleaseMutex (_writeLock);
 }
 
-ARA::IPC::ARAIPCMessageEncoder* IPCPort::createEncoder ()
+ARA::IPC::ARAIPCMessageEncoder* IPCMessageChannel::createEncoder ()
 {
     return new IPCXMLMessageEncoder {};
 }
 
-void IPCPort::runReceiveLoop (int32_t milliseconds)
+void IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
 {
     ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _creationThreadID);
 
@@ -201,12 +201,12 @@ void IPCPort::runReceiveLoop (int32_t milliseconds)
     {
         ++_callbackLevel;
 
-//      ARA_LOG ("IPCPort received message with ID %i%s", messageID, (_awaitsReply) ? " while awaiting reply" : "");
+//      ARA_LOG ("IPCMessageChannel received message with ID %i%s", messageID, (_awaitsReply) ? " while awaiting reply" : "");
         const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData.first, messageData.second) };
         auto replyEncoder { createEncoder () };
         _receiveCallback (messageID, decoder, replyEncoder);
 
-//      ARA_LOG ("IPCPort replies to message with ID %i", messageID);
+//      ARA_LOG ("IPCMessageChannel replies to message with ID %i", messageID);
         const auto replyData { static_cast<const IPCXMLMessageEncoder*> (replyEncoder)->createEncodedMessage () };
         ARA_INTERNAL_ASSERT (replyData.size () <= SharedMemory::maxMessageSize);
         _sendRequest (0, replyData);
@@ -237,7 +237,7 @@ void IPCPort::runReceiveLoop (int32_t milliseconds)
 _Pragma ("GCC diagnostic push")
 _Pragma ("GCC diagnostic ignored \"-Wold-style-cast\"")
 
-IPCPort::~IPCPort ()
+IPCMessageChannel::~IPCMessageChannel ()
 {
     if (_sendPort)
     {
@@ -258,43 +258,43 @@ IPCPort::~IPCPort ()
     ARA_INTERNAL_ASSERT (_replyHandler == nullptr);
 }
 
-CFDataRef IPCPort::_portCallback (CFMessagePortRef /*port*/, SInt32 messageID, CFDataRef messageData, void* info)
+CFDataRef IPCMessageChannel::_portCallback (CFMessagePortRef /*port*/, SInt32 messageID, CFDataRef messageData, void* info)
 {
-    auto port { (IPCPort*) info };
-    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == port->_creationThreadID);
+    auto channel { (IPCMessageChannel*) info };
+    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == channel->_creationThreadID);
 
     if (messageID != 0)
     {
-        ++port->_callbackLevel;
+        ++channel->_callbackLevel;
 
-//      ARA_LOG ("IPCPort received message with ID %i%s", messageID, (port->_awaitsReply) ? " while awaiting reply" : "");
+//      ARA_LOG ("IPCMessageChannel received message with ID %i%s", messageID, (channel->_awaitsReply) ? " while awaiting reply" : "");
 #if USE_ARA_CF_ENCODING
         const auto decoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
 #else
         const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
 #endif
-        auto replyEncoder { port->createEncoder () };
-        port->_receiveCallback (messageID, decoder, replyEncoder);
+        auto replyEncoder { channel->createEncoder () };
+        channel->_receiveCallback (messageID, decoder, replyEncoder);
 
-//      ARA_LOG ("IPCPort replies to message with ID %i", messageID);
+//      ARA_LOG ("IPCMessageChannel replies to message with ID %i", messageID);
 #if USE_ARA_CF_ENCODING
         const auto replyData { ARAIPCCFCreateMessageEncoderData (replyEncoder) };
 #else
         const auto replyData { static_cast<const IPCXMLMessageEncoder*> (replyEncoder)->createEncodedMessage () };
 #endif
-        const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (port->_sendPort, 0, replyData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
+        const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (channel->_sendPort, 0, replyData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
         ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
         if (replyData)
             CFRelease (replyData);
 
         delete replyEncoder;
         delete decoder;
-        --port->_callbackLevel;
+        --channel->_callbackLevel;
     }
     else
     {
-        ARA_INTERNAL_ASSERT (port->_awaitsReply);
-        if (port->_replyHandler)
+        ARA_INTERNAL_ASSERT (channel->_awaitsReply);
+        if (channel->_replyHandler)
         {
             ARA_INTERNAL_ASSERT (messageData != nullptr);
 #if USE_ARA_CF_ENCODING
@@ -302,21 +302,21 @@ CFDataRef IPCPort::_portCallback (CFMessagePortRef /*port*/, SInt32 messageID, C
 #else
             const auto replyDecoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
 #endif
-            (*port->_replyHandler) (replyDecoder, port->_replyHandlerUserData);
+            (*channel->_replyHandler) (replyDecoder, channel->_replyHandlerUserData);
             delete replyDecoder;
         }
-        port->_awaitsReply = false;
+        channel->_awaitsReply = false;
     }
 
     return nullptr;
 }
 
-sem_t* _openSemaphore (const std::string& portID, bool create)
+sem_t* _openSemaphore (const std::string& channelID, bool create)
 {
     const auto previousUMask { umask (0) };
 
     std::string semName { "/" };
-    semName += portID;
+    semName += channelID;
     if (semName.length () > PSHMNAMLEN - 1)
         semName.erase (10, semName.length () - PSHMNAMLEN + 1);
 
@@ -331,11 +331,11 @@ sem_t* _openSemaphore (const std::string& portID, bool create)
     return result;
 }
 
-CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCPort::_createMessagePortPublishingID (const std::string& portID, IPCPort* port)
+CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCMessageChannel::_createMessagePortPublishingID (const std::string& portID, IPCMessageChannel* channel)
 {
     auto wrappedPortID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, portID.c_str (), kCFStringEncodingASCII, kCFAllocatorNull) };
 
-    CFMessagePortContext portContext { 0, port, nullptr, nullptr, nullptr };
+    CFMessagePortContext portContext { 0, channel, nullptr, nullptr, nullptr };
     auto result = CFMessagePortCreateLocal (kCFAllocatorDefault, wrappedPortID, &_portCallback, &portContext, nullptr);
     ARA_INTERNAL_ASSERT (result != nullptr);
 
@@ -348,7 +348,7 @@ CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCPort::_createMessagePo
     return result;
 }
 
-CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCPort::_createMessagePortConnectedToID (const std::string& portID)
+CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCMessageChannel::_createMessagePortConnectedToID (const std::string& portID)
 {
     CFMessagePortRef result {};
 
@@ -371,29 +371,29 @@ CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCPort::_createMessagePo
     return result;
 }
 
-IPCPort* IPCPort::createPublishingID (const std::string& portID, const ReceiveCallback& callback)
+IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID, const ReceiveCallback& callback)
 {
-    auto port { new IPCPort };
-    port->_receiveCallback = callback;
-    port->_writeSemaphore = _openSemaphore (portID, true);
-    port->_sendPort = _createMessagePortConnectedToID (portID + ".from_server");
-    port->_receivePort = _createMessagePortPublishingID (portID + ".to_server", port);
-    return port;
+    auto channel { new IPCMessageChannel };
+    channel->_receiveCallback = callback;
+    channel->_writeSemaphore = _openSemaphore (channelID, true);
+    channel->_sendPort = _createMessagePortConnectedToID (channelID + ".from_server");
+    channel->_receivePort = _createMessagePortPublishingID (channelID + ".to_server", channel);
+    return channel;
 }
 
-IPCPort* IPCPort::createConnectedToID (const std::string& portID, const ReceiveCallback& callback)
+IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID, const ReceiveCallback& callback)
 {
-    auto port { new IPCPort };
-    port->_receiveCallback = callback;
-    port->_receivePort = _createMessagePortPublishingID (portID + ".from_server", port);
-    port->_sendPort = _createMessagePortConnectedToID (portID + ".to_server");
-    port->_writeSemaphore = _openSemaphore (portID, false);
-    sem_post (port->_writeSemaphore);
-    return port;
+    auto channel { new IPCMessageChannel };
+    channel->_receiveCallback = callback;
+    channel->_receivePort = _createMessagePortPublishingID (channelID + ".from_server", channel);
+    channel->_sendPort = _createMessagePortConnectedToID (channelID + ".to_server");
+    channel->_writeSemaphore = _openSemaphore (channelID, false);
+    sem_post (channel->_writeSemaphore);
+    return channel;
 }
 
-void IPCPort::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
-                           ReplyHandler const replyHandler, void* replyHandlerUserData)
+void IPCMessageChannel::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
+                              ReplyHandler const replyHandler, void* replyHandlerUserData)
 {
 #if USE_ARA_CF_ENCODING
     const auto messageData { ARAIPCCFCreateMessageEncoderData (encoder) };
@@ -403,7 +403,7 @@ void IPCPort::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPC
 
     const bool isOnCreationThread { std::this_thread::get_id () == _creationThreadID };
     const bool needsLock { !isOnCreationThread || (_callbackLevel == 0) };
-//  ARA_LOG ("IPCPort sends message %i%s%s", messageID, (!isOnCreationThread) ? " from other thread" : "",
+//  ARA_LOG ("IPCMessageChannel sends message %i%s%s", messageID, (!isOnCreationThread) ? " from other thread" : "",
 //                                           (needsLock) ? " starting new transaction" : (_callbackLevel > 0) ? " while handling message" : "");
     if (needsLock)
     {
@@ -445,13 +445,13 @@ void IPCPort::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPC
     _awaitsReply = previousAwaitsReply;
     _replyHandler = previousReplyHandler;
     _replyHandlerUserData = previousReplyHandlerUserData;
-//  ARA_LOG ("IPCPort received reply to message %i%s", messageID, (needsLock) ? " ending transaction" : "");
+//  ARA_LOG ("IPCMessageChannel received reply to message %i%s", messageID, (needsLock) ? " ending transaction" : "");
 
     if (needsLock)
         sem_post (_writeSemaphore);
 }
 
-ARA::IPC::ARAIPCMessageEncoder* IPCPort::createEncoder ()
+ARA::IPC::ARAIPCMessageEncoder* IPCMessageChannel::createEncoder ()
 {
 #if USE_ARA_CF_ENCODING
     return ARA::IPC::ARAIPCCFCreateMessageEncoder ();
@@ -460,7 +460,7 @@ ARA::IPC::ARAIPCMessageEncoder* IPCPort::createEncoder ()
 #endif
 }
 
-void IPCPort::runReceiveLoop (int32_t milliseconds)
+void IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
 {
     ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _creationThreadID);
     CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.001 * milliseconds, true);

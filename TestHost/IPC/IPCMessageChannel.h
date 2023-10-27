@@ -1,5 +1,5 @@
 //------------------------------------------------------------------------------
-//! \file       IPCPort.h
+//! \file       IPCMessageChannel.h
 //!             Proof-of-concept implementation of ARAIPCMessageChannel
 //!             for the ARA SDK TestHost (error handling is limited to assertions).
 //! \project    ARA SDK Examples
@@ -50,20 +50,17 @@
 #endif
 
 
-class IPCPort : public ARA::IPC::ARAIPCMessageChannel
+class IPCMessageChannel : public ARA::IPC::ARAIPCMessageChannel
 {
 public:
-    // uninitialized port - cannot be used until move-assigned from factory functions
-    IPCPort () = default;
+    ~IPCMessageChannel () override;
 
-    ~IPCPort () override;
-
-    // factory functions for send and receive ports
+    // factory functions for send and receive channels
     using ReceiveCallback = std::function<void (const ARA::IPC::ARAIPCMessageID messageID,
                                                 const ARA::IPC::ARAIPCMessageDecoder* decoder,
                                                 ARA::IPC::ARAIPCMessageEncoder* const replyEncoder)>;
-    static IPCPort* createPublishingID (const std::string& portID, const ReceiveCallback& callback);
-    static IPCPort* createConnectedToID (const std::string& portID, const ReceiveCallback& callback);
+    static IPCMessageChannel* createPublishingID (const std::string& channelID, const ReceiveCallback& callback);
+    static IPCMessageChannel* createConnectedToID (const std::string& channelID, const ReceiveCallback& callback);
 
     ARA::IPC::ARAIPCMessageEncoder* createEncoder () override;
 
@@ -79,12 +76,13 @@ public:
     void runReceiveLoop (int32_t milliseconds);
 
 private:
+    IPCMessageChannel () = default;
 #if defined (_WIN32)
-    explicit IPCPort (const std::string& portID);
+    explicit IPCMessageChannel (const std::string& channelID);
     void _sendRequest (const ARA::IPC::ARAIPCMessageID messageID, const std::string& messageData);
 #elif defined (__APPLE__)
     static CFDataRef _portCallback (CFMessagePortRef port, SInt32 messageID, CFDataRef messageData, void* info);
-    static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortPublishingID (const std::string& portID, IPCPort* port);
+    static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortPublishingID (const std::string& portID, IPCMessageChannel* channel);
     static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortConnectedToID (const std::string& portID);
 #endif
 

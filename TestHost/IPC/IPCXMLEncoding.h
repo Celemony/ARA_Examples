@@ -66,7 +66,7 @@ public:
     void appendBytes (MessageKey argKey, const uint8_t * argValue, size_t argSize, bool copy) override;
     ARA::IPC::ARAIPCMessageEncoder* appendSubMessage (MessageKey argKey) override;
 
-    // to be used by IPCPort only: encoding to port-internal datas format
+    // to be used by IPCMessageChannel only: encoding to channel-internal datas format
 #if defined (__APPLE__)
     __attribute__((cf_returns_retained)) CFDataRef createEncodedMessage () const;
 #else
@@ -82,7 +82,7 @@ private:
 class IPCXMLMessageDecoder : public IPCXMLMessage, public ARA::IPC::ARAIPCMessageDecoder
 {
 public:
-    // to be used by IPCPort only: encoding from port-internal datas format
+    // to be used by IPCMessageChannel only: encoding from channel-internal datas format
 #if defined (__APPLE__)
     static IPCXMLMessageDecoder* createWithMessageData(CFDataRef data);
 #else

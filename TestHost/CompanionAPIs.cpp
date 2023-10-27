@@ -65,7 +65,7 @@
 #include "ARA_Library/IPC/ARAIPCProxyHost.h"
 #include "ARA_Library/IPC/ARAIPCProxyPlugIn.h"
 #include "ARA_Library/IPC/ARAIPCEncoding.h"
-#include "IPC/IPCPort.h"
+#include "IPC/IPCMessageChannel.h"
 #if USE_ARA_CF_ENCODING
     #include "ARA_Library/IPC/ARAIPCCFEncoding.h"
 #else
@@ -88,8 +88,8 @@ void remoteHostCommandHandler (const ARA::IPC::ARAIPCMessageID messageID,
                                ARA::IPC::ARAIPCMessageEncoder* const replyEncoder);
 
 
-// helper function to create unique port IDs for each run
-static const std::string _createPortID ()
+// helper function to create unique IPC message channel IDs for each run
+static const std::string _createChannelID ()
 {
     std::string baseID { "org.ara-audio.examples.testhost.ipc." };
 
@@ -495,16 +495,16 @@ private:
 
 /*******************************************************************************/
 
-// helper class to launch remote before initializing related port members
+// helper class to launch remote before initializing related IPC channel members
 struct RemoteLauncher
 {
-    explicit RemoteLauncher (const std::string& launchArgs, const std::string& portID)
+    explicit RemoteLauncher (const std::string& launchArgs, const std::string& channelID)
     {
         ARA_LOG ("launching remote plug-in process.");
 #if defined (_WIN32)
-        const auto commandLine { std::string { "start " + executablePath + " " + launchArgs + " -_ipcRemote " + portID  } };
+        const auto commandLine { std::string { "start " + executablePath + " " + launchArgs + " -_ipcRemote " + channelID  } };
 #else
-        const auto commandLine { std::string { executablePath + " " + launchArgs + " -_ipcRemote " + portID + " &" } };
+        const auto commandLine { std::string { executablePath + " " + launchArgs + " -_ipcRemote " + channelID + " &" } };
 #endif
         const auto launchResult { system (commandLine.c_str ()) };
         ARA_INTERNAL_ASSERT (launchResult == 0);
@@ -524,20 +524,20 @@ private:
     }
 
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
-                    const std::string portID,
+                    const std::string channelID,
                     const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCMessageChannel*)>& getFactoryFunction)
     : PlugInEntry { std::move (description) },
-      RemoteLauncher { launchArgs, portID },
-      ARA::IPC::RemoteCaller { IPCPort::createConnectedToID (portID, ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher) }
+      RemoteLauncher { launchArgs, channelID },
+      ARA::IPC::RemoteCaller { IPCMessageChannel::createConnectedToID (channelID, ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher) }
     {
-        validateAndSetFactory (getFactoryFunction (static_cast<IPCPort*> (getMessageChannel ())));
+        validateAndSetFactory (getFactoryFunction (static_cast<IPCMessageChannel*> (getMessageChannel ())));
     }
 
 public:
     // \todo the current ARA IPC implementation does not support sending ARA asserts to the host...
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
                     const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCMessageChannel*)>& getFactoryFunction = defaultGetFactory)
-    : IPCPlugInEntry { std::move (description), launchArgs, _createPortID (), getFactoryFunction }
+    : IPCPlugInEntry { std::move (description), launchArgs, _createChannelID (), getFactoryFunction }
     {}
 
     ~IPCPlugInEntry () override
@@ -554,7 +554,7 @@ public:
 
     void idleThreadForDuration (int32_t milliseconds) override
     {
-        static_cast<IPCPort*> (getMessageChannel ())->runReceiveLoop (milliseconds);
+        static_cast<IPCMessageChannel*> (getMessageChannel ())->runReceiveLoop (milliseconds);
     }
 
     void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
@@ -710,11 +710,11 @@ void remoteHostCommandHandler (const ARA::IPC::ARAIPCMessageID messageID,
 
 namespace RemoteHost
 {
-int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& portID)
+int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID)
 {
     _plugInEntry = std::move (plugInEntry);
 
-    auto plugInCallbacksChannel { IPCPort::createPublishingID (portID, remoteHostCommandHandler) };
+    auto plugInCallbacksChannel { IPCMessageChannel::createPublishingID (channelID, remoteHostCommandHandler) };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
     ARA::IPC::ARAIPCProxyHostSetPlugInCallbacksChannel (plugInCallbacksChannel);

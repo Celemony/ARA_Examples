@@ -130,6 +130,6 @@ private:
 // Wrapper class for the remote process main().
 namespace RemoteHost
 {
-    int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& portID);
+    int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID);
 }
 #endif
