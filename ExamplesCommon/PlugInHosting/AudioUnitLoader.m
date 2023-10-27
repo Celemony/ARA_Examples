@@ -37,7 +37,7 @@ struct _AudioUnitComponent
     AudioComponent component;
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     const ARAFactory * ipcFactory;              // cache - NULL until read via IPC
-    ARAIPCMessageSender * factoryMessageSender; // invalid until ipcFactory is read via IPC
+    ARAIPCMessageChannel * factoryIPCChannel;   // invalid until ipcFactory has been read via IPC
 #endif
 };
 
@@ -55,8 +55,8 @@ struct _AudioUnitInstance
     AURenderBlock v3RenderBlock;                // only for AUv3: cache of render block outside ObjC runtime
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     BOOL isOutOfProcess;                        // loaded in- or out-of-process
-    BOOL isBoundViaIPC;                         // YES if instanceSender has been initialized via ARA binding
-    ARAIPCMessageSender * instanceSender;       // IPC sender, only valid when isBoundViaIPC is YES
+    BOOL isBoundViaIPC;                         // YES if extensionIPCChannel has been initialized via ARA binding
+    ARAIPCMessageChannel * extensionIPCChannel; // only valid when isBoundViaIPC is YES
 #endif
 };
 
@@ -185,10 +185,10 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, b
     return result;
 }
 
-const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, struct ARAIPCMessageSender ** messageSender)
+const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, struct ARAIPCMessageChannel ** messageChannel)
 {
     const ARAFactory * result = NULL;    // initially assume this plug-in doesn't support ARA
-    *messageSender = NULL;
+    *messageChannel = NULL;
 
     // check whether the AU supports ARA by trying to get the factory
     if (audioUnitInstance->isAUv2)
@@ -221,12 +221,12 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, s
             {
                 if (!audioUnitInstance->audioUnitComponent->ipcFactory)
                 {
-                    if ((audioUnitInstance->audioUnitComponent->factoryMessageSender =
-                            ARAIPCAUProxyPlugInInitializeFactoryMessageSender(audioUnitInstance->v3AudioUnit)))
-                        audioUnitInstance->audioUnitComponent->ipcFactory = ARAIPCAUProxyPlugInGetFactory(audioUnitInstance->audioUnitComponent->factoryMessageSender);
+                    if ((audioUnitInstance->audioUnitComponent->factoryIPCChannel =
+                            ARAIPCAUProxyPlugInInitializeFactoryMessageChannel(audioUnitInstance->v3AudioUnit)))
+                        audioUnitInstance->audioUnitComponent->ipcFactory = ARAIPCAUProxyPlugInGetFactory(audioUnitInstance->audioUnitComponent->factoryIPCChannel);
                 }
                 if ((result = audioUnitInstance->audioUnitComponent->ipcFactory))
-                    *messageSender = audioUnitInstance->audioUnitComponent->factoryMessageSender;
+                    *messageChannel = audioUnitInstance->audioUnitComponent->factoryIPCChannel;
             }
         }
         else
@@ -298,7 +298,7 @@ const ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUni
         {
             if (@available(macOS 13.0, *))
             {
-                instance = ARAIPCAUProxyPlugInBindToDocumentController (audioUnitInstance->v3AudioUnit, controllerRef, knownRoles, assignedRoles, &audioUnitInstance->instanceSender);
+                instance = ARAIPCAUProxyPlugInBindToDocumentController (audioUnitInstance->v3AudioUnit, controllerRef, knownRoles, assignedRoles, &audioUnitInstance->extensionIPCChannel);
                 audioUnitInstance->isBoundViaIPC = (instance != NULL);
             }
         }
@@ -532,7 +532,7 @@ void AudioUnitCloseInstance(AudioUnitInstance audioUnitInstance)
         if (@available(macOS 13.0, *))
         {
             if (audioUnitInstance->isBoundViaIPC)
-                ARAIPCAUProxyPlugInCleanupBinding(audioUnitInstance->instanceSender);
+                ARAIPCAUProxyPlugInCleanupBinding(audioUnitInstance->extensionIPCChannel);
         }
 #endif
         [audioUnitInstance->v3AudioUnit release];
@@ -546,9 +546,7 @@ void AudioUnitCleanupComponent(AudioUnitComponent audioUnitComponent)
     if (@available(macOS 13.0, *))
     {
         if (audioUnitComponent->ipcFactory)
-        {
-            ARAIPCAUProxyPlugInUninitializeFactoryMessageSender(audioUnitComponent->factoryMessageSender);
-        }
+            ARAIPCAUProxyPlugInUninitializeFactoryMessageChannel(audioUnitComponent->factoryIPCChannel);
     }
 #endif
 

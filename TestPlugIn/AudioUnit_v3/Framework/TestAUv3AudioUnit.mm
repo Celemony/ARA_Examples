@@ -43,7 +43,7 @@ API_AVAILABLE(macos(13.0))
 
 
 @implementation TestAUv3ARAIPCMessageChannel {
-    ARA::IPC::ARAIPCMessageSender* _messageSender;
+    ARA::IPC::ARAIPCMessageChannel* _messageChannel;
 }
 
 @synthesize callHostBlock = _callHostBlock;
@@ -54,17 +54,17 @@ API_AVAILABLE(macos(13.0))
     if (self == nil) { return nil; }
 
     _callHostBlock = nil;
-    _messageSender = ARA::IPC::ARAIPCAUProxyHostInitializeMessageSender(audioUnit, self);
+    _messageChannel = ARA::IPC::ARAIPCAUProxyHostInitializeMessageChannel(audioUnit, self);
 
     return self;
 }
 
 - (void)dealloc {
-    ARA::IPC::ARAIPCAUProxyHostUninitializeMessageSender(_messageSender);
+    ARA::IPC::ARAIPCAUProxyHostUninitializeMessageChannel(_messageChannel);
 }
 
 - (NSDictionary * _Nonnull)callAudioUnit:(NSDictionary *)message {
-    return ARA::IPC::ARAIPCAUProxyHostCommandHandler(_messageSender, message);
+    return ARA::IPC::ARAIPCAUProxyHostCommandHandler(_messageChannel, message);
 }
 
 @end

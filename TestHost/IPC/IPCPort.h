@@ -50,7 +50,7 @@
 #endif
 
 
-class IPCPort : public ARA::IPC::ARAIPCMessageSender
+class IPCPort : public ARA::IPC::ARAIPCMessageChannel
 {
 public:
     // uninitialized port - cannot be used until move-assigned from factory functions
