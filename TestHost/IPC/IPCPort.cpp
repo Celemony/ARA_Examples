@@ -36,28 +36,6 @@
 #if defined (_WIN32)
 //------------------------------------------------------------------------------
 
-IPCPort::IPCPort (IPCPort&& other) noexcept
-{
-    *this = std::move (other);
-}
-
-IPCPort& IPCPort::operator= (IPCPort&& other) noexcept
-{
-    std::swap (_writeLock, other._writeLock);
-    std::swap (_dataAvailable, other._dataAvailable);
-    std::swap (_dataReceived, other._dataReceived);
-    std::swap (_fileMapping, other._fileMapping);
-    std::swap (_sharedMemory, other._sharedMemory);
-//  ARA_INTERNAL_ASSERT (!_readLock.is_locked ());
-
-    std::swap (_creationThreadID, other._creationThreadID);
-    std::swap (_receiveCallback, other._receiveCallback);
-    std::swap (_callbackLevel, other._callbackLevel);
-    std::swap (_awaitsReply, other._awaitsReply);
-    std::swap (_replyHandler, other._replyHandler);
-    return *this;
-}
-
 IPCPort::~IPCPort ()
 {
     if (_sharedMemory)
@@ -87,33 +65,33 @@ IPCPort::IPCPort (const std::string& portID)
     ARA_INTERNAL_ASSERT (_dataReceived != nullptr);
 }
 
-IPCPort IPCPort::createPublishingID (const std::string& portID, const ReceiveCallback& callback)
+IPCPort* IPCPort::createPublishingID (const std::string& portID, const ReceiveCallback& callback)
 {
-    IPCPort port { portID };
-    port._receiveCallback = callback;
+    auto port { new IPCPort { portID } };
+    port->_receiveCallback = callback;
 
     const auto mapKey { std::string { "Map" } + portID };
-    port._fileMapping = ::CreateFileMappingA (INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof (SharedMemory), mapKey.c_str ());
-    ARA_INTERNAL_ASSERT (port._fileMapping != nullptr);
-    port._sharedMemory = (SharedMemory*) ::MapViewOfFile (port._fileMapping, FILE_MAP_WRITE, 0, 0, sizeof (SharedMemory));
-    ARA_INTERNAL_ASSERT (port._sharedMemory != nullptr);
+    port->_fileMapping = ::CreateFileMappingA (INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof (SharedMemory), mapKey.c_str ());
+    ARA_INTERNAL_ASSERT (port->_fileMapping != nullptr);
+    port->_sharedMemory = (SharedMemory*) ::MapViewOfFile (port->_fileMapping, FILE_MAP_WRITE, 0, 0, sizeof (SharedMemory));
+    ARA_INTERNAL_ASSERT (port->_sharedMemory != nullptr);
 
     return port;
 }
 
-IPCPort IPCPort::createConnectedToID (const std::string& portID, const ReceiveCallback& callback)
+IPCPort* IPCPort::createConnectedToID (const std::string& portID, const ReceiveCallback& callback)
 {
-    IPCPort port { portID };
-    port._receiveCallback = callback;
+    auto port { new IPCPort { portID } };
+    port->_receiveCallback = callback;
 
     const auto mapKey { std::string { "Map" } + portID };
-    while (!port._fileMapping)
+    while (!port->_fileMapping)
     {
         ::Sleep (100);
-        port._fileMapping = ::OpenFileMappingA (FILE_MAP_WRITE, FALSE, mapKey.c_str ());
+        port->_fileMapping = ::OpenFileMappingA (FILE_MAP_WRITE, FALSE, mapKey.c_str ());
     }
-    port._sharedMemory = (SharedMemory*) ::MapViewOfFile (port._fileMapping, FILE_MAP_WRITE, 0, 0, 0);
-    ARA_INTERNAL_ASSERT (port._sharedMemory != nullptr);
+    port->_sharedMemory = (SharedMemory*) ::MapViewOfFile (port->_fileMapping, FILE_MAP_WRITE, 0, 0, 0);
+    ARA_INTERNAL_ASSERT (port->_sharedMemory != nullptr);
 
     return port;
 }
@@ -231,30 +209,6 @@ void IPCPort::runReceiveLoop (int32_t milliseconds)
 _Pragma ("GCC diagnostic push")
 _Pragma ("GCC diagnostic ignored \"-Wold-style-cast\"")
 
-IPCPort::IPCPort (IPCPort&& other) noexcept
-{
-    *this = std::move (other);
-}
-
-IPCPort& IPCPort::operator= (IPCPort&& other) noexcept
-{
-    std::swap (_writeSemaphore, other._writeSemaphore);
-    std::swap (_sendPort, other._sendPort);
-    std::swap (_receivePort, other._receivePort);
-    std::swap (_callbackHandle, other._callbackHandle);
-    if (_callbackHandle)
-        *_callbackHandle = this;
-    if (other._callbackHandle)
-        *other._callbackHandle = &other;
-
-    std::swap (_creationThreadID, other._creationThreadID);
-    std::swap (_receiveCallback, other._receiveCallback);
-    std::swap (_callbackLevel, other._callbackLevel);
-    std::swap (_awaitsReply, other._awaitsReply);
-    std::swap (_replyHandler, other._replyHandler);
-    return *this;
-}
-
 IPCPort::~IPCPort ()
 {
     if (_sendPort)
@@ -269,8 +223,6 @@ IPCPort::~IPCPort ()
     }
     if (_writeSemaphore)
         sem_close (_writeSemaphore);
-    if (_callbackHandle)
-        delete _callbackHandle;
 
     ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _creationThreadID);
     ARA_INTERNAL_ASSERT (_callbackLevel == 0);
@@ -280,7 +232,7 @@ IPCPort::~IPCPort ()
 
 CFDataRef IPCPort::_portCallback (CFMessagePortRef /*port*/, SInt32 messageID, CFDataRef messageData, void* info)
 {
-    IPCPort* port = *((IPCPort**) info);
+    auto port { (IPCPort*) info };
     ARA_INTERNAL_ASSERT (std::this_thread::get_id () == port->_creationThreadID);
 
     if (messageID != 0)
@@ -329,11 +281,11 @@ sem_t* _openSemaphore (const std::string& portID, bool create)
     return result;
 }
 
-CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCPort::_createMessagePortPublishingID (const std::string& portID, IPCPort** callbackHandle)
+CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCPort::_createMessagePortPublishingID (const std::string& portID, IPCPort* port)
 {
     auto wrappedPortID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, portID.c_str (), kCFStringEncodingASCII, kCFAllocatorNull) };
 
-    CFMessagePortContext portContext { 0, callbackHandle, nullptr, nullptr, nullptr };
+    CFMessagePortContext portContext { 0, port, nullptr, nullptr, nullptr };
     auto result = CFMessagePortCreateLocal (kCFAllocatorDefault, wrappedPortID, &_portCallback, &portContext, nullptr);
     ARA_INTERNAL_ASSERT (result != nullptr);
 
@@ -369,26 +321,24 @@ CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCPort::_createMessagePo
     return result;
 }
 
-IPCPort IPCPort::createPublishingID (const std::string& portID, const ReceiveCallback& callback)
+IPCPort* IPCPort::createPublishingID (const std::string& portID, const ReceiveCallback& callback)
 {
-    IPCPort port;
-    port._receiveCallback = callback;
-    port._writeSemaphore = _openSemaphore (portID, true);
-    port._callbackHandle = new IPCPort* { &port };
-    port._sendPort = _createMessagePortConnectedToID (portID + ".from_server");
-    port._receivePort = _createMessagePortPublishingID (portID + ".to_server", port._callbackHandle);
+    auto port { new IPCPort };
+    port->_receiveCallback = callback;
+    port->_writeSemaphore = _openSemaphore (portID, true);
+    port->_sendPort = _createMessagePortConnectedToID (portID + ".from_server");
+    port->_receivePort = _createMessagePortPublishingID (portID + ".to_server", port);
     return port;
 }
 
-IPCPort IPCPort::createConnectedToID (const std::string& portID, const ReceiveCallback& callback)
+IPCPort* IPCPort::createConnectedToID (const std::string& portID, const ReceiveCallback& callback)
 {
-    IPCPort port;
-    port._receiveCallback = callback;
-    port._callbackHandle = new IPCPort* { &port };
-    port._receivePort = _createMessagePortPublishingID (portID + ".from_server", port._callbackHandle);
-    port._sendPort = _createMessagePortConnectedToID (portID + ".to_server");
-    port._writeSemaphore = _openSemaphore (portID, false);
-    sem_post (port._writeSemaphore);
+    auto port { new IPCPort };
+    port->_receiveCallback = callback;
+    port->_receivePort = _createMessagePortPublishingID (portID + ".from_server", port);
+    port->_sendPort = _createMessagePortConnectedToID (portID + ".to_server");
+    port->_writeSemaphore = _openSemaphore (portID, false);
+    sem_post (port->_writeSemaphore);
     return port;
 }
 

@@ -294,9 +294,14 @@ private:
 class IPCSender : public ARA::IPC::ARAIPCMessageSender
 {
 public:
-    IPCSender (IPCPort& port)
+    IPCSender (IPCPort* port)
     : _port { port }
     {}
+
+    ~IPCSender () override
+    {
+        delete _port;
+    }
 
     ARA::IPC::ARAIPCMessageEncoder* createEncoder () override
     {
@@ -336,21 +341,26 @@ public:
                     (*replyHandler) (replyDecoder, replyHandlerUserData);
                     delete replyDecoder;
                 } };
-            _port.sendMessage (messageID, messageData, &handler);
+            _port->sendMessage (messageID, messageData, &handler);
         }
         else
         {
-            _port.sendMessage (messageID, messageData, nullptr);
+            _port->sendMessage (messageID, messageData, nullptr);
         }
     }
 
     bool receiverEndianessMatches () override
     {
-        return _port.endianessMatches ();
+        return _port->endianessMatches ();
+    }
+
+    void runReceiveLoop (int32_t milliseconds)
+    {
+        _port->runReceiveLoop (milliseconds);
     }
 
 private:
-    IPCPort& _port;
+    IPCPort* const _port;
 };
 
 #endif // ARA_ENABLE_IPC
@@ -672,14 +682,14 @@ private:
 class IPCPlugInInstance : public PlugInInstance
 {
 public:
-    IPCPlugInInstance (size_t remoteRef, IPCPort& port)
+    IPCPlugInInstance (size_t remoteRef, IPCSender* sender)
     : _remoteRef { remoteRef },
-      _sender { port }
+      _sender { sender }
     {}
 
     ~IPCPlugInInstance () override
     {
-        ARA::IPC::RemoteCaller { &_sender }.remoteCall (kIPCDestroyEffectMethodID, _remoteRef);
+        ARA::IPC::RemoteCaller { _sender }.remoteCall (kIPCDestroyEffectMethodID, _remoteRef);
         if (getARAPlugInExtensionInstance ())
             ARA::IPC::ARAIPCProxyPlugInCleanupBinding (getARAPlugInExtensionInstance ());
     }
@@ -688,13 +698,13 @@ public:
     {
         // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
         const ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
-        auto plugInExtension { ARA::IPC::ARAIPCProxyPlugInBindToDocumentController (_remoteRef, &_sender, documentControllerRef, knownRoles, assignedRoles) };
+        auto plugInExtension { ARA::IPC::ARAIPCProxyPlugInBindToDocumentController (_remoteRef, _sender, documentControllerRef, knownRoles, assignedRoles) };
         validateAndSetPlugInExtensionInstance (plugInExtension, assignedRoles);
     }
 
     void startRendering (int maxBlockSize, double sampleRate) override
     {
-        ARA::IPC::RemoteCaller { &_sender }.remoteCall (kIPCStartRenderingMethodID, _remoteRef, maxBlockSize, sampleRate);
+        ARA::IPC::RemoteCaller { _sender }.remoteCall (kIPCStartRenderingMethodID, _remoteRef, maxBlockSize, sampleRate);
     }
 
     void renderSamples (int blockSize, int64_t samplePosition, float* buffer) override
@@ -702,19 +712,19 @@ public:
         const auto byteSize { static_cast<size_t> (blockSize) * sizeof (float) };
         auto resultSize { byteSize };
         ARA::IPC::BytesDecoder reply { reinterpret_cast<uint8_t*> (buffer), resultSize };
-        ARA::IPC::RemoteCaller { &_sender }.remoteCall (reply, kIPCRenderSamplesMethodID, _remoteRef, samplePosition,
+        ARA::IPC::RemoteCaller { _sender }.remoteCall (reply, kIPCRenderSamplesMethodID, _remoteRef, samplePosition,
                                                        ARA::IPC::BytesEncoder { reinterpret_cast<const uint8_t*> (buffer), byteSize, false });
         ARA_INTERNAL_ASSERT (resultSize == byteSize);
     }
 
     void stopRendering () override
     {
-        ARA::IPC::RemoteCaller { &_sender }.remoteCall (kIPCStopRenderingMethodID, _remoteRef);
+        ARA::IPC::RemoteCaller { _sender }.remoteCall (kIPCStopRenderingMethodID, _remoteRef);
     }
 
 private:
     size_t const _remoteRef;
-    IPCSender _sender;
+    IPCSender* _sender;
 };
 
 /*******************************************************************************/
@@ -751,9 +761,8 @@ public:
                     const std::function<const ARA::ARAFactory* (IPCSender& hostCommandsSender)>& getFactoryFunction = defaultGetFactory)
     : PlugInEntry { std::move (description) },
       _portID { _createPortID () },
-      _remoteLauncher { launchArgs, _portID }
-    {
-        _port = IPCPort::createConnectedToID (_portID,
+      _remoteLauncher { launchArgs, _portID },
+      _hostCommandsSender { new IPCSender { IPCPort::createConnectedToID (_portID,
                     [] (const ARA::IPC::ARAIPCMessageID messageID, IPCPort::ReceivedData const messageData) -> IPCPort::DataToSend
                     {
 #if USE_ARA_CF_ENCODING
@@ -782,9 +791,8 @@ public:
                         delete replyEncoder;
                         delete messageDecoder;
                         return result;
-                    });
-        _hostCommandsSender = new IPCSender { _port };
-
+                    }) } }
+    {
         validateAndSetFactory (getFactoryFunction (*_hostCommandsSender));
     }
 
@@ -802,7 +810,7 @@ public:
 
     void idleThreadForDuration (int32_t milliseconds) override
     {
-        _port.runReceiveLoop (milliseconds);
+        _hostCommandsSender->runReceiveLoop (milliseconds);
     }
 
     void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
@@ -825,7 +833,7 @@ public:
     {
         size_t remoteInstanceRef {};
         ARA::IPC::RemoteCaller { _hostCommandsSender }.remoteCall (remoteInstanceRef, kIPCCreateEffectMethodID);
-        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _port);
+        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _hostCommandsSender);
     }
 
 private:
@@ -833,8 +841,7 @@ private:
 
     RemoteLauncher _remoteLauncher;
 
-    IPCPort _port;
-    IPCSender* _hostCommandsSender {};
+    IPCSender* const _hostCommandsSender {};
 };
 
 /*******************************************************************************/
@@ -1040,7 +1047,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& portID)
                                                 });
 
     while (!_shutDown)
-        port.runReceiveLoop (100 /*ms*/);
+        plugInCallbacksSender.runReceiveLoop (100 /*ms*/);
 
     _plugInEntry.reset ();
 

@@ -52,15 +52,10 @@ public:
     using ReceivedData = CFDataRef;
 #endif
 
-    // C++ "rule of five" standard methods - copying is not allowed, only move
-    IPCPort (const IPCPort& other) = delete;
-    IPCPort& operator= (const IPCPort& other) = delete;
-    IPCPort (IPCPort&& other) noexcept;
-    IPCPort& operator= (IPCPort&& other) noexcept;
-    ~IPCPort ();
-
     // uninitialized port - cannot be used until move-assigned from factory functions
     IPCPort () = default;
+
+    ~IPCPort ();
 
     // factory functions for send and receive ports
 #if defined (__APPLE__)
@@ -68,8 +63,8 @@ public:
 #else
     using ReceiveCallback = std::function<DataToSend (const MessageID messageID, ReceivedData const messageData)>;
 #endif
-    static IPCPort createPublishingID (const std::string& portID, const ReceiveCallback& callback);
-    static IPCPort createConnectedToID (const std::string& portID, const ReceiveCallback& callback);
+    static IPCPort* createPublishingID (const std::string& portID, const ReceiveCallback& callback);
+    static IPCPort* createConnectedToID (const std::string& portID, const ReceiveCallback& callback);
 
     // message sending
     // The messageData will be sent to the receiver, blocking the sending thread until the receiver
@@ -97,7 +92,7 @@ private:
     void _sendRequest (const MessageID messageID, const DataToSend& messageData);
 #elif defined (__APPLE__)
     static CFDataRef _portCallback (CFMessagePortRef port, SInt32 messageID, CFDataRef messageData, void* info);
-    static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortPublishingID (const std::string& portID, IPCPort** callbackHandle);
+    static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortPublishingID (const std::string& portID, IPCPort* port);
     static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortConnectedToID (const std::string& portID);
 #endif
 
@@ -123,7 +118,6 @@ private:
     sem_t* _writeSemaphore {};
     CFMessagePortRef _sendPort {};
     CFMessagePortRef _receivePort {};
-    IPCPort** _callbackHandle {};
 #endif
 
     std::thread::id _creationThreadID { std::this_thread::get_id () };
