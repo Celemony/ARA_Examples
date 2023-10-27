@@ -4,6 +4,7 @@ This is a development build of the ARA Examples 2.3.
 
 Changes since previous releases:
 - initial draft of Audio Unit version 3 support (App Extension)
+- initial draft of CLAP support
 - various related refactorings and cleanups in plug-in hosting code
 - initial draft of generic ARA IPC implementation in ARA_Library
 - IPCDemo refactored and merged into ARATestHost, utilizing new ARA_IPC library draft

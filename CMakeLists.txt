@@ -107,6 +107,21 @@ else()
 endif()
 set(ARA_AUDIO_UNIT_SDK_DIR "${ARA_AUDIO_UNIT_SDK_DIR}" CACHE PATH "directory of the Audio Unit SDK")
 
+if(ARA_CLAP_SDK_DIR)
+    # normalize path if provided (and if relative path, assume it's relative to the top-level project)
+    get_filename_component(ARA_CLAP_SDK_DIR "${ARA_CLAP_SDK_DIR}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+else()
+    # if no path provided, assume clap is right next to our ARA_Examples directory
+    get_filename_component(ARA_CLAP_SDK_DIR ../clap ABSOLUTE "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+set(ARA_CLAP_SDK_DIR "${ARA_CLAP_SDK_DIR}" CACHE PATH "directory of the CLAP SDK")
+if(EXISTS "${ARA_CLAP_SDK_DIR}")
+    set(ARA_ENABLE_CLAP TRUE)
+else()
+    message(STATUS "No CLAP SDK installed, will not generate CLAP related examples.")
+    set(ARA_ENABLE_CLAP FALSE)
+endif()
+
 
 # ======================
 # project globals
@@ -427,6 +442,22 @@ if(APPLE)
         XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
     )
 endif(APPLE)
+
+
+# ======================
+# optional external dependency: CLAP
+
+if(ARA_ENABLE_CLAP)
+    message(STATUS "Importing CLAP SDK")
+
+    add_subdirectory("${ARA_CLAP_SDK_DIR}" "${PROJECT_BINARY_DIR}/clap" EXCLUDE_FROM_ALL)
+
+    set_target_properties(clap clap-tests PROPERTIES
+        FOLDER "3rdParty/clap"
+        XCODE_GENERATE_SCHEME OFF
+        XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
+    )
+endif(ARA_ENABLE_CLAP)
 
 
 # ======================
@@ -1396,6 +1427,74 @@ if(APPLE)
     unset(app_dir)
 
 endif(APPLE)
+
+
+# ======================
+# optional audio plug-in target CLAP Test Plug-In
+
+if(ARA_ENABLE_CLAP)
+
+    if (APPLE)
+        add_library(ARATestPlugInCLAP MODULE "")
+    else()
+        add_library(ARATestPlugInCLAP SHARED "")
+    endif()
+
+    target_sources(ARATestPlugInCLAP PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/CLAP/TestCLAPPlugIn.cpp"
+    )
+
+    set_target_properties(ARATestPlugInCLAP PROPERTIES
+        FOLDER "Examples/ARATestPlugIn"
+        OUTPUT_NAME "ARATestPlugIn"
+    )
+
+    target_compile_features(ARATestPlugInCLAP PRIVATE cxx_std_20)
+
+    if(MSVC)
+        target_compile_options(ARATestPlugInCLAP
+            PRIVATE
+                /wd4100
+        )
+    elseif(GCC_STYLE_COMPILER)
+        target_compile_options(ARATestPlugInCLAP
+            PRIVATE
+                -Wno-unused-parameter
+                -Wno-old-style-cast
+        )
+    endif()
+
+    target_link_libraries(ARATestPlugInCLAP PRIVATE
+        ARATestPlugInCommon
+        clap
+    )
+
+    if(APPLE)
+        target_link_libraries(ARATestPlugInCLAP PRIVATE
+            "-framework CoreFoundation"
+        )
+    elseif(UNIX)
+        target_link_libraries(ARATestPlugInCLAP PRIVATE
+            "pthread"
+            "atomic"
+        )
+    endif()
+
+    configure_ARA_Examples_target(ARATestPlugInCLAP)
+
+    ara_configure_binary_package(ARATestPlugInCLAP "clap" "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/CLAP/TestCLAPInfo.plist")
+
+    if(ARA_SETUP_DEBUGGING)
+        if(WIN32)
+            ara_postbuild_install_for_debugging(ARATestPlugInCLAP "$ENV{CommonProgramW6432}\\CLAP\\" ON)
+        elseif(APPLE)
+            ara_postbuild_install_for_debugging(ARATestPlugInCLAP "$ENV{HOME}/Library/Audio/Plug-Ins/CLAP/" ON)
+        elseif(UNIX)
+            ara_postbuild_install_for_debugging(ARATestPlugInCLAP "$ENV{HOME}/.clap" ON)
+        endif()
+    endif()
+
+endif(ARA_ENABLE_CLAP)
 
 
 # ======================
