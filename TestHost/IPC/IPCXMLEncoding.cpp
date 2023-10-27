@@ -117,7 +117,8 @@ __attribute__((cf_returns_retained)) CFDataRef IPCXMLMessageEncoder::createEncod
 std::string IPCXMLMessageEncoder::createEncodedMessage () const
 #endif
 {
-    if (_root.empty ())
+    if (!_root.first_attribute () &&    // empty () does not work here because the name "msg" will be set
+        !_root.first_child ())
 #if defined (__APPLE__)
         return nullptr;
 #else
