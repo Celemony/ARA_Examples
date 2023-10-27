@@ -74,31 +74,16 @@
 
 
 // minimal set of commands to run a companion API plug-in through IPC
-enum : ARA::IPC::ARAIPCMessageID
-{
-    kIPCCreateEffect = -1,
-    kIPCStartRendering = -2,
-    kIPCRenderSamples = -3,
-    kIPCStopRendering = -4,
-    kIPCDestroyEffect = -5,
-    kIPCTerminate = -6
-};
-static_assert (kIPCCreateEffect < ARA::IPC::kARAIPCMessageIDRangeStart, "conflicting message IDs");
+constexpr auto kIPCCreateEffectMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-1> () };
+constexpr auto kIPCStartRenderingMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-2> () };
+constexpr auto kIPCRenderSamplesMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-3> () };
+constexpr auto kIPCStopRenderingMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-4> () };
+constexpr auto kIPCDestroyEffectMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-5> () };
+constexpr auto kIPCTerminateMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-6> () };
 
 
 IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::ReceivedData const messageData);
 
-
-// check message ID is either one of our commands or in the range of the generic IPC implementation
-bool isValidMessageID (const ARA::IPC::ARAIPCMessageID messageID)
-{
-    if (messageID <= kIPCCreateEffect)
-        return kIPCTerminate <= messageID;
-
-    if  (messageID < ARA::IPC::kARAIPCMessageIDRangeStart)
-        return false;
-    return messageID < ARA::IPC::kARAIPCMessageIDRangeEnd;
-}
 
 // helper function to create unique port IDs for each run
 static const std::string _createPortID ()
@@ -251,8 +236,6 @@ public:
     void sendMessage (const bool stackable, ARA::IPC::ARAIPCMessageID messageID, const ARA::IPC::ARAIPCMessageEncoder& encoder,
                       ARA::IPC::ARAIPCReplyHandler* const replyHandler, void* replyHandlerUserData)
     {
-        ARA_INTERNAL_ASSERT (isValidMessageID (messageID));
-
 #if USE_ARA_CF_ENCODING
         const auto messageData { ARAIPCCFCreateMessageEncoderData (encoder.ref) };
 #else
@@ -526,7 +509,7 @@ public:
 
     ~IPCPlugInInstance () override
     {
-        ARA::IPC::RemoteCaller { _sender }.remoteCallWithoutReply (false, kIPCDestroyEffect, _remoteRef);
+        ARA::IPC::RemoteCaller { _sender }.remoteCall (false, kIPCDestroyEffectMethodID, _remoteRef);
         if (getARAPlugInExtensionInstance ())
             ARA::IPC::ARAIPCProxyPlugInCleanupBinding (getARAPlugInExtensionInstance ());
     }
@@ -541,7 +524,7 @@ public:
 
     void startRendering (int maxBlockSize, double sampleRate) override
     {
-        ARA::IPC::RemoteCaller { _sender }.remoteCallWithoutReply (false, kIPCStartRendering, _remoteRef, maxBlockSize, sampleRate);
+        ARA::IPC::RemoteCaller { _sender }.remoteCall (false, kIPCStartRenderingMethodID, _remoteRef, maxBlockSize, sampleRate);
     }
 
     void renderSamples (int blockSize, int64_t samplePosition, float* buffer) override
@@ -549,13 +532,14 @@ public:
         const auto byteSize { static_cast<size_t> (blockSize) * sizeof (float) };
         auto resultSize { byteSize };
         ARA::IPC::BytesDecoder reply { reinterpret_cast<uint8_t*> (buffer), resultSize };
-        ARA::IPC::RemoteCaller { _sender }.remoteCallWithReply (reply, false, kIPCRenderSamples, _remoteRef, samplePosition, ARA::IPC::BytesEncoder { reinterpret_cast<const uint8_t*> (buffer), byteSize, false });
+        ARA::IPC::RemoteCaller { _sender }.remoteCall (reply, false, kIPCRenderSamplesMethodID, _remoteRef, samplePosition,
+                                                       ARA::IPC::BytesEncoder { reinterpret_cast<const uint8_t*> (buffer), byteSize, false });
         ARA_INTERNAL_ASSERT (resultSize == byteSize);
     }
 
     void stopRendering () override
     {
-        ARA::IPC::RemoteCaller { _sender }.remoteCallWithoutReply (false, kIPCStopRendering, _remoteRef);
+        ARA::IPC::RemoteCaller { _sender }.remoteCall (false, kIPCStopRenderingMethodID, _remoteRef);
     }
 
 private:
@@ -611,7 +595,7 @@ public:
 
     ~IPCPlugInEntry () override
     {
-        ARA::IPC::RemoteCaller { _hostCommandsSender }.remoteCallWithoutReply (false, kIPCTerminate);
+        ARA::IPC::RemoteCaller { _hostCommandsSender }.remoteCall (false, kIPCTerminateMethodID);
 
         _terminateCallbacksThread = true;
         _plugInCallbacksThread.join ();
@@ -646,7 +630,7 @@ public:
             {
                 decoder.methods->readSize (decoder.ref, 0, &remoteInstanceRef);
             } };
-        ARA::IPC::RemoteCaller { _hostCommandsSender }.remoteCallWithReply (customDecode, false, kIPCCreateEffect);
+        ARA::IPC::RemoteCaller { _hostCommandsSender }.remoteCall (customDecode, false, kIPCCreateEffectMethodID);
         return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _hostCommandsPort, _lockingContextRef);
     }
 
@@ -655,7 +639,6 @@ private:
     {
         IPCPort::ReceiveCallback callback { [this] (const ARA::IPC::ARAIPCMessageID messageID, IPCPort::ReceivedData const messageData) -> /*__attribute__((cf_returns_retained))*/ IPCPort::DataToSend
             {
-                ARA_INTERNAL_ASSERT (isValidMessageID (messageID));
 #if USE_ARA_CF_ENCODING
                 const auto messageDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
                 auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
@@ -761,8 +744,6 @@ __attribute__((cf_returns_retained))
 #endif
 IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::ReceivedData const messageData)
 {
-    ARA_INTERNAL_ASSERT (isValidMessageID (messageID));
-
 #if USE_ARA_CF_ENCODING
     auto messageDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
 #else
@@ -776,7 +757,7 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
 
     IPCPort::DataToSend result {};
 
-    if (messageID == kIPCCreateEffect)
+    if (messageID == kIPCCreateEffectMethodID)
     {
         auto plugInInstance { _plugInEntry->createPlugInInstance () };
         const auto plugInInstanceRef { reinterpret_cast<size_t> (plugInInstance.get ()) };
@@ -793,7 +774,7 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
 #endif
         replyEncoder.methods->destroyEncoder (replyEncoder.ref);
     }
-    else if (messageID == kIPCStartRendering)
+    else if (messageID == kIPCStartRenderingMethodID)
     {
         size_t plugInInstanceRef;
         int32_t maxBlockSize;
@@ -802,7 +783,7 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
 
         reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->startRendering (maxBlockSize, sampleRate);
     }
-    else if (messageID == kIPCRenderSamples)
+    else if (messageID == kIPCRenderSamplesMethodID)
     {
         size_t plugInInstanceRef;
         int64_t samplePosition;
@@ -827,14 +808,14 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
 #endif
         replyEncoder.methods->destroyEncoder (replyEncoder.ref);
     }
-    else if (messageID == kIPCStopRendering)
+    else if (messageID == kIPCStopRenderingMethodID)
     {
         size_t plugInInstanceRef;
         ARA::IPC::decodeArguments (&messageDecoder, plugInInstanceRef);
 
         reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->stopRendering ();
     }
-    else if (messageID == kIPCDestroyEffect)
+    else if (messageID == kIPCDestroyEffectMethodID)
     {
         size_t plugInInstanceRef;
         ARA::IPC::decodeArguments (&messageDecoder, plugInInstanceRef);
@@ -842,7 +823,7 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
         ARA::IPC::ARAIPCProxyHostCleanupBinding (reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->getARAPlugInExtensionInstance ());
         delete reinterpret_cast<PlugInInstance*> (plugInInstanceRef);
     }
-    else if (messageID == kIPCTerminate)
+    else if (messageID == kIPCTerminateMethodID)
     {
         _shutDown = true;
     }
