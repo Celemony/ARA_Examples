@@ -86,6 +86,7 @@
     #include "IPC/IPCXMLMessage.h"
 #endif
 
+std::string executablePath {};
 
 // minimal set of commands to run a companion API plug-in through IPC
 constexpr auto kIPCCreateEffectMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-1> () };
@@ -737,10 +738,10 @@ private:
         {
             ARA_LOG ("launching remote plug-in process.");
 #if defined (_WIN32)
-            const auto commandLine { std::string { "start ARATestHost " + launchArgs +
+            const auto commandLine { std::string { "start " + executablePath + " + launchArgs +
                                                    " -_ipcRemote " + hostCommandsPortID + " " + plugInCallbacksPortID  } };
 #else
-            const auto commandLine { std::string { "./ARATestHost " + launchArgs +
+            const auto commandLine { std::string { executablePath + " " + launchArgs +
                                                    " -_ipcRemote " + hostCommandsPortID + " " + plugInCallbacksPortID + " &" } };
 #endif
             const auto launchResult { system (commandLine.c_str ()) };
@@ -1202,8 +1203,12 @@ void PlugInEntry::idleThreadForDuration (int32_t milliseconds)
 
 std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<std::string>& args)
 {
+#if ARA_ENABLE_IPC
+    executablePath = args[0];
+#endif
+
 #if ARA_ENABLE_VST3
-    if (args.size () >= 2)
+    if (args.size () >= 3)
     {
         auto it { std::find (args.begin (), args.end (), "-vst3") };
         if (it < args.end () - 1)   // we need at least one follow-up argument
@@ -1230,7 +1235,7 @@ std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<st
 #endif  // ARA_ENABLE_VST3
 
 #if ARA_ENABLE_CLAP
-    if (args.size () >= 2)
+    if (args.size () >= 3)
     {
         auto it { std::find (args.begin (), args.end (), "-clap") };
         if (it < args.end () - 1)   // we need at least one follow-up argument
@@ -1257,7 +1262,7 @@ std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<st
 #endif  // ARA_ENABLE_CLAP
 
 #if defined (__APPLE__)
-    if (args.size () >= 4)
+    if (args.size () >= 5)
     {
         auto it { std::find (args.begin (), args.end (), "-au") };
         if (it < args.end () - 3)   // we need 3 follow-up arguments

@@ -125,14 +125,14 @@ const std::vector<std::string> parseTestCases (const std::vector<std::string>& a
 // see start of this file for detailed description of the command line arguments
 int main (int argc, const char* argv[])
 {
-    const std::vector<std::string> args (argv + 1, argv + argc);
+    const std::vector<std::string> args (argv, argv + argc);
 
     ARA::ARASetExternalAssertReference (assertFunctionReference);
 
 #if ARA_ENABLE_IPC
     // check if run as remote host
     auto it { std::find (args.begin (), args.end (), "-_ipcRemote") };
-    const bool isRemoteHost { (args.size () >= 3) && (it < args.end () - 2) };  // we need 2 follow-up arguments
+    const bool isRemoteHost { (args.size () >= 4) && (it < args.end () - 2) };  // we need 2 follow-up arguments
     std::string hostCommandsPortID;
     std::string plugInCallbacksPortID;
     if (isRemoteHost)
