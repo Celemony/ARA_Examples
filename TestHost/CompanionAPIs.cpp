@@ -441,7 +441,9 @@ public:
     : PlugInEntry { createAUEntryDescription (type, subType, manufacturer) },
       _audioUnitComponent { AudioUnitPrepareComponentWithIDs (parseOSType (type), parseOSType (subType), parseOSType (manufacturer)) }
     {
-        validateAndSetFactory (AudioUnitGetARAFactory (_audioUnitComponent));
+        AudioUnitInstance audioUnitInstance = AudioUnitOpenInstance(_audioUnitComponent);
+        validateAndSetFactory (AudioUnitGetARAFactory (audioUnitInstance));
+        AudioUnitCloseInstance(audioUnitInstance);
     }
 
     ~AUPlugInEntry () override

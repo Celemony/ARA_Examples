@@ -32,7 +32,7 @@ typedef struct OpaqueAudioComponent * AudioUnitComponent;
 typedef struct _AudioUnitInstance * AudioUnitInstance;
 
 AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype, OSType manufacturer);
-const struct ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitComponent);
+const struct ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance);
 AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent);
 const struct ARA_NAMESPACE ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnit, ARA_NAMESPACE ARADocumentControllerRef controllerRef, ARA_NAMESPACE ARAPlugInInstanceRoleFlags assignedRoles);
 void AudioUnitStartRendering(AudioUnitInstance audioUnit, UInt32 maxBlockSize, double sampleRate);

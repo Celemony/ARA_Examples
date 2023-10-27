@@ -33,6 +33,7 @@
 
 struct _AudioUnitInstance
 {
+    AudioUnitComponent audioUnitComponent;
     BOOL isAUv2;
     union
     {
@@ -92,6 +93,7 @@ AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype,
 AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent)
 {
     __block AudioUnitInstance result = malloc(sizeof(struct _AudioUnitInstance));
+    result->audioUnitComponent = audioUnitComponent;
 
     AudioComponentDescription desc;
     AudioComponentGetDescription(audioUnitComponent, &desc);
@@ -135,10 +137,9 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent)
     return result;
 }
 
-const ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitComponent)
+const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance)
 {
     const ARAFactory * result = NULL;    // initially assume this plug-in doesn't support ARA
-    AudioUnitInstance audioUnitInstance = AudioUnitOpenInstance(audioUnitComponent);
 
     // check whether the AU supports ARA by trying to get the factory
     if (audioUnitInstance->isAUv2)
@@ -179,10 +180,10 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitComponent)
         {
             @autoreleasepool
             {
-                AudioComponentDescription compDesc;
-                OSStatus status = AudioComponentGetDescription(audioUnitComponent, &compDesc);
+                AudioComponentDescription desc;
+                OSStatus status = AudioComponentGetDescription(audioUnitInstance->audioUnitComponent, &desc);
                 ARA_INTERNAL_ASSERT(status == noErr);
-                AVAudioUnitComponent * avComponent = [[[AVAudioUnitComponentManager sharedAudioUnitComponentManager] componentsMatchingDescription:compDesc] firstObject];
+                AVAudioUnitComponent * avComponent = [[[AVAudioUnitComponentManager sharedAudioUnitComponentManager] componentsMatchingDescription:desc] firstObject];
                 ARA_INTERNAL_ASSERT(avComponent);
                 ARA_VALIDATE_API_CONDITION([[avComponent allTagNames] indexOfObject:@kARAAudioComponentTag] != NSNotFound);
             }
@@ -190,7 +191,6 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitComponent audioUnitComponent)
     }
 #endif
 
-    AudioUnitCloseInstance(audioUnitInstance);
     return result;
 }
 
