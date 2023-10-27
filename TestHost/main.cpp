@@ -132,13 +132,11 @@ int main (int argc, const char* argv[])
 #if ARA_ENABLE_IPC
     // check if run as remote host
     auto it { std::find (args.begin (), args.end (), "-_ipcRemote") };
-    const bool isRemoteHost { (args.size () >= 4) && (it < args.end () - 2) };  // we need 2 follow-up arguments
-    std::string hostCommandsPortID;
-    std::string plugInCallbacksPortID;
+    const bool isRemoteHost { (args.size () >= 3) && (it < args.end () - 1) };  // we need 1 follow-up argument
+    std::string portID;
     if (isRemoteHost)
     {
-        hostCommandsPortID = *(++it);
-        plugInCallbacksPortID = *(++it);
+        portID = *(++it);
         ARA::ARASetupDebugMessagePrefix ("REMOTE ARATestHost");
     }
 #endif
@@ -176,7 +174,7 @@ int main (int argc, const char* argv[])
     {
         ARA_LOG ("Remotely hosting ARA plug-in '%s' in %s", factory->plugInName, plugInEntry->getDescription ().c_str ());
 
-        return RemoteHost::main (std::move (plugInEntry), hostCommandsPortID, plugInCallbacksPortID);
+        return RemoteHost::main (std::move (plugInEntry), portID);
     }
 #endif
 

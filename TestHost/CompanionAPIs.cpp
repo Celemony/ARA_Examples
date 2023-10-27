@@ -50,7 +50,6 @@
 #include <locale>
 #include <memory>
 #include <string>
-#include <thread>
 #include <vector>
 #include <cstring>
 #include <thread>
@@ -133,7 +132,7 @@ static const std::string _createPortID ()
 
 #elif defined (__APPLE__)
     CFUUIDRef uuid { CFUUIDCreate (kCFAllocatorDefault) };
-    CFStringRef asString { CFUUIDCreateString(kCFAllocatorDefault, uuid) };
+    CFStringRef asString { CFUUIDCreateString (kCFAllocatorDefault, uuid) };
     const auto result { baseID + CFStringGetCStringPtr (asString, kCFStringEncodingMacRoman) };
     CFRelease (asString);
     CFRelease (uuid);
@@ -331,9 +330,11 @@ public:
             IPCPort::ReplyHandler handler { [replyHandler, replyHandlerUserData] (IPCPort::ReceivedData replyData) -> void
                 {
 #if USE_ARA_CF_ENCODING
+                    ARA_INTERNAL_ASSERT (replyData != nullptr);
                     const auto replyDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (replyData) };
 #else
     #if defined (__APPLE__)
+                    ARA_INTERNAL_ASSERT (replyData != nullptr);
                     IPCXMLMessage reply { replyData };
     #else
                     IPCXMLMessage reply { replyData.first, replyData.second };
@@ -734,15 +735,13 @@ private:
     // helper class to launch remote before initializing related port members
     struct RemoteLauncher
     {
-        explicit RemoteLauncher (const std::string& launchArgs, const std::string& hostCommandsPortID, const std::string& plugInCallbacksPortID)
+        explicit RemoteLauncher (const std::string& launchArgs, const std::string& portID)
         {
             ARA_LOG ("launching remote plug-in process.");
 #if defined (_WIN32)
-            const auto commandLine { std::string { "start " + executablePath + " + launchArgs +
-                                                   " -_ipcRemote " + hostCommandsPortID + " " + plugInCallbacksPortID  } };
+            const auto commandLine { std::string { "start " + executablePath + " " + launchArgs + " -_ipcRemote " + portID  } };
 #else
-            const auto commandLine { std::string { executablePath + " " + launchArgs +
-                                                   " -_ipcRemote " + hostCommandsPortID + " " + plugInCallbacksPortID + " &" } };
+            const auto commandLine { std::string { executablePath + " " + launchArgs + " -_ipcRemote " + portID + " &" } };
 #endif
             const auto launchResult { system (commandLine.c_str ()) };
             ARA_INTERNAL_ASSERT (launchResult == 0);
@@ -761,23 +760,53 @@ public:
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
                     const std::function<const ARA::ARAFactory* (IPCSender& hostCommandsSender)>& getFactoryFunction = defaultGetFactory)
     : PlugInEntry { std::move (description) },
-      _hostCommandsPortID { _createPortID () },
-      _plugInCallbacksPortID { _createPortID () },
-      _remoteLauncher { launchArgs, _hostCommandsPortID, _plugInCallbacksPortID },
-      _plugInCallbacksThread { &IPCPlugInEntry::_plugInCallbacksThreadFunction, this },
-      _hostCommandsPort { IPCPort::createConnectedToID (_hostCommandsPortID.c_str ()) },
-      _lockingContextRef { ARA::IPC::ARAIPCCreateLockingContext () },
-      _hostCommandsSender { _hostCommandsPort, _lockingContextRef }
+      _portID { _createPortID () },
+      _remoteLauncher { launchArgs, _portID },
+      _lockingContextRef { ARA::IPC::ARAIPCCreateLockingContext () }
     {
-        validateAndSetFactory (getFactoryFunction (_hostCommandsSender));
+        _port = IPCPort::createConnectedToID (_portID,
+                    [this] (const ARA::IPC::ARAIPCMessageID messageID, IPCPort::ReceivedData const messageData) -> IPCPort::DataToSend
+                    {
+#if USE_ARA_CF_ENCODING
+                        const auto messageDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
+                        auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
+#else
+    #if defined (__APPLE__)
+                        const IPCXMLMessage message { messageData };
+    #else
+                        const IPCXMLMessage message { messageData.first, messageData.second };
+    #endif
+                        const auto messageDecoder { new ARAIPCXMLMessageDecoder { &message, false } };
+
+                        IPCXMLMessage reply;
+                        auto replyEncoder { new ARAIPCXMLMessageEncoder { (&reply) } };
+#endif
+
+                        const auto lockToken { ARA::IPC::ARAIPCLockContextBeforeHandlingMessage (_lockingContextRef) };
+                        //ARA_LOG("plug-in called host %s", ARA::IPC::decodeHostMessageID (messageID));
+                        ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher (messageID, messageDecoder, replyEncoder);
+                        ARA::IPC::ARAIPCUnlockContextAfterHandlingMessage (_lockingContextRef, lockToken);
+
+#if USE_ARA_CF_ENCODING
+                        const auto result { ARAIPCCFCreateMessageEncoderData (replyEncoder) };
+#else
+                        const auto result { reply.createEncodedMessage () };
+#endif
+                        delete replyEncoder;
+                        delete messageDecoder;
+                        return result;
+                    });
+        _hostCommandsSender = new IPCSender { _port, _lockingContextRef };
+
+        validateAndSetFactory (getFactoryFunction (*_hostCommandsSender));
     }
 
     ~IPCPlugInEntry () override
     {
-        ARA::IPC::RemoteCaller { &_hostCommandsSender }.remoteCall (false, kIPCTerminateMethodID);
+        ARA::IPC::RemoteCaller { _hostCommandsSender }.remoteCall (false, kIPCTerminateMethodID);
 
-        _terminateCallbacksThread = true;
-        _plugInCallbacksThread.join ();
+        delete _hostCommandsSender;
+
         ARA::IPC::ARAIPCDestroyLockingContext (_lockingContextRef);
     }
 
@@ -793,18 +822,18 @@ public:
 
     void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
     {
-        ARA::IPC::ARAIPCProxyPlugInInitializeARA (&_hostCommandsSender, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
+        ARA::IPC::ARAIPCProxyPlugInInitializeARA (_hostCommandsSender, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
     }
 
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
-        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (&_hostCommandsSender, getARAFactory ()->factoryID, hostInstance, properties);
+        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_hostCommandsSender, getARAFactory ()->factoryID, hostInstance, properties);
     }
 
     void uninitializeARA () override
     {
-        ARA::IPC::ARAIPCProxyPlugInUninitializeARA (&_hostCommandsSender, getARAFactory ()->factoryID);
+        ARA::IPC::ARAIPCProxyPlugInUninitializeARA (_hostCommandsSender, getARAFactory ()->factoryID);
     }
 
     std::unique_ptr<PlugInInstance> createPlugInInstance () override
@@ -814,65 +843,18 @@ public:
             {
                 decoder->readSize (0, &remoteInstanceRef);
             } };
-        ARA::IPC::RemoteCaller { &_hostCommandsSender }.remoteCall (customDecode, false, kIPCCreateEffectMethodID);
-        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _hostCommandsPort, _lockingContextRef);
+        ARA::IPC::RemoteCaller { _hostCommandsSender }.remoteCall (customDecode, false, kIPCCreateEffectMethodID);
+        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _port, _lockingContextRef);
     }
 
 private:
-    void _plugInCallbacksThreadFunction ()
-    {
-        IPCPort::ReceiveCallback callback { [this] (const ARA::IPC::ARAIPCMessageID messageID, IPCPort::ReceivedData const messageData) -> /*__attribute__((cf_returns_retained))*/ IPCPort::DataToSend
-            {
-#if USE_ARA_CF_ENCODING
-                const auto messageDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
-                auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
-#else
-    #if defined (__APPLE__)
-                const IPCXMLMessage message { messageData };
-    #else
-                const IPCXMLMessage message { messageData.first, messageData.second };
-    #endif
-                const auto messageDecoder { new ARAIPCXMLMessageDecoder { &message, false } };
-
-                IPCXMLMessage reply;
-                auto replyEncoder { new ARAIPCXMLMessageEncoder { (&reply) } };
-#endif
-            
-                const auto lockToken { ARA::IPC::ARAIPCLockContextBeforeHandlingMessage (_lockingContextRef) };
-                //ARA_LOG("plug-in called host %s", ARA::IPC::decodeHostMessageID (messageID));
-                ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher (messageID, messageDecoder, replyEncoder);
-                ARA::IPC::ARAIPCUnlockContextAfterHandlingMessage (_lockingContextRef, lockToken);
-
-#if USE_ARA_CF_ENCODING
-                const auto result { ARAIPCCFCreateMessageEncoderData (replyEncoder) };
-#else
-                const auto result { reply.createEncodedMessage () };
-#endif
-                delete replyEncoder;
-                delete messageDecoder;
-                return result;
-            } };
-
-        // \todo It would be cleaner to create the port in the c'tor from the main thread,
-        //       but for some reason reading audio is then much slower compared to creating it here...?
-        _plugInCallbacksPort = IPCPort::createPublishingID (_plugInCallbacksPortID.c_str (), callback);
-
-        while (!_terminateCallbacksThread)
-            _plugInCallbacksPort.runReceiveLoop (100);
-    }
-
-private:
-    const std::string _hostCommandsPortID;
-    const std::string _plugInCallbacksPortID;
+    const std::string _portID;
 
     RemoteLauncher _remoteLauncher;
 
-    std::thread _plugInCallbacksThread;
-    bool _terminateCallbacksThread { false };
-    IPCPort _plugInCallbacksPort;
-    IPCPort _hostCommandsPort;
+    IPCPort _port;
     ARA::IPC::ARAIPCLockingContextRef _lockingContextRef;
-    IPCSender _hostCommandsSender;
+    IPCSender* _hostCommandsSender {};
 };
 
 /*******************************************************************************/
@@ -1052,23 +1034,22 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
 
 namespace RemoteHost
 {
-int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& hostCommandsPortID, const std::string& plugInCallbacksPortID)
+int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& portID)
 {
     _plugInEntry = std::move (plugInEntry);
 
     auto lockingContextRef { ARA::IPC::ARAIPCCreateLockingContext () };
 
-    auto hostCommandsPort { IPCPort::createPublishingID (hostCommandsPortID.c_str (),
-                                [&lockingContextRef] (const int32_t messageID, IPCPort::ReceivedData const messageData) -> IPCPort::DataToSend
-                                    {
-                                        const auto lockToken { ARAIPCLockContextBeforeHandlingMessage (lockingContextRef) };
-                                        //ARA_LOG("host called remote %s", ARA::IPC::decodePlugInMessageID (messageID));
-                                        auto result { remoteHostCommandHandler (messageID, messageData) };
-                                        ARAIPCUnlockContextAfterHandlingMessage (lockingContextRef, lockToken);
-                                        return result;
-                                    }) };
-    auto plugInCallbacksPort { IPCPort::createConnectedToID (plugInCallbacksPortID.c_str ()) };
-    IPCSender plugInCallbacksSender { plugInCallbacksPort, lockingContextRef };
+    auto port { IPCPort::createPublishingID (portID,
+                    [&lockingContextRef] (const ARA::IPC::ARAIPCMessageID messageID, IPCPort::ReceivedData const messageData) -> IPCPort::DataToSend
+                    {
+                        const auto lockToken { ARAIPCLockContextBeforeHandlingMessage (lockingContextRef) };
+                        //ARA_LOG("host called remote %s", ARA::IPC::decodePlugInMessageID (messageID));
+                        auto result { remoteHostCommandHandler (messageID, messageData) };
+                        ARAIPCUnlockContextAfterHandlingMessage (lockingContextRef, lockToken);
+                        return result;
+                    }) };
+    IPCSender plugInCallbacksSender { port, lockingContextRef };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
     ARA::IPC::ARAIPCProxyHostSetPlugInCallbacksSender (&plugInCallbacksSender);
@@ -1084,7 +1065,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& hostComma
     ARA::IPC::ARAIPCProxyHostSetBindingHandler (bindingHandler);
 
     while (!_shutDown)
-        hostCommandsPort.runReceiveLoop (100);
+        port.runReceiveLoop (100 /*ms*/);
 
     ARAIPCDestroyLockingContext (lockingContextRef);
 

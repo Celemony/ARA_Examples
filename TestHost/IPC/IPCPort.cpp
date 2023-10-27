@@ -19,6 +19,12 @@
 #include "IPCPort.h"
 #include "ARA_Library/Debug/ARADebug.h"
 
+#if defined (__APPLE__)
+    #include <sys/posix_shm.h>
+    #include <sys/stat.h>
+#endif
+
+
 #if defined (NDEBUG)
     constexpr auto messageTimeout { 500 /* milliseconds */};
 #else
@@ -60,22 +66,22 @@ IPCPort::~IPCPort ()
         ::CloseHandle (_hWriteMutex);
 }
 
-IPCPort::IPCPort (const char* remotePortID)
+IPCPort::IPCPort (const std::string& portID)
 {
-    _hWriteMutex = ::CreateMutexA (NULL, FALSE, (std::string { "Write" } + remotePortID).c_str ());
+    _hWriteMutex = ::CreateMutexA (NULL, FALSE, (std::string { "Write" } + portID).c_str ());
     ARA_INTERNAL_ASSERT (_hWriteMutex != nullptr);
-    _hRequest = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Request" } + remotePortID).c_str ());
+    _hRequest = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Request" } + portID).c_str ());
     ARA_INTERNAL_ASSERT (_hRequest != nullptr);
-    _hResult = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Result" } + remotePortID).c_str ());
+    _hResult = ::CreateEventA (NULL, FALSE, FALSE, (std::string { "Result" } + portID).c_str ());
     ARA_INTERNAL_ASSERT (_hResult != nullptr);
 }
 
-IPCPort IPCPort::createPublishingID (const char* remotePortID, const ReceiveCallback& callback)
+IPCPort IPCPort::createPublishingID (const std::string& portID, const ReceiveCallback& callback)
 {
-    IPCPort port { remotePortID };
-    port._receiveCallback = &callback;
+    IPCPort port { portID };
+    port._receiveCallback = std::move (callback);
 
-    const auto mapKey { std::string { "Map" } + remotePortID };
+    const auto mapKey { std::string { "Map" } + portID };
     port._hMap = ::CreateFileMappingA (INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof (SharedMemory), mapKey.c_str ());
     ARA_INTERNAL_ASSERT (port._hMap != nullptr);
     port._sharedMemory = (SharedMemory*) ::MapViewOfFile (port._hMap, FILE_MAP_WRITE, 0, 0, sizeof (SharedMemory));
@@ -84,11 +90,11 @@ IPCPort IPCPort::createPublishingID (const char* remotePortID, const ReceiveCall
     return port;
 }
 
-IPCPort IPCPort::createConnectedToID (const char* remotePortID)
+IPCPort IPCPort::createConnectedToID (const std::string& portID, const ReceiveCallback& callback)
 {
-    IPCPort port { remotePortID };
+    IPCPort port { portID };
 
-    const auto mapKey { std::string { "Map" } + remotePortID };
+    const auto mapKey { std::string { "Map" } + portID };
     while (!port._hMap)
     {
         Sleep(100);
@@ -132,7 +138,8 @@ void IPCPort::runReceiveLoop (int32_t milliseconds)
 
     const ReceivedData messageData { _sharedMemory->messageData, _sharedMemory->messageSize };
 
-    const auto replyData { (*_receiveCallback)(_sharedMemory->messageID, messageData) };
+//  ARA_LOG ("IPCPort received message with ID %i", _sharedMemory->messageID);
+    const auto replyData { _receiveCallback (_sharedMemory->messageID, messageData) };
 
     ARA_INTERNAL_ASSERT (replyData.size () < SharedMemory::maxMessageSize);
 
@@ -154,10 +161,6 @@ void IPCPort::runReceiveLoop (int32_t milliseconds)
 _Pragma ("GCC diagnostic push")
 _Pragma ("GCC diagnostic ignored \"-Wold-style-cast\"")
 
-IPCPort::IPCPort (CFMessagePortRef port)
-: _port { port }
-{}
-
 IPCPort::IPCPort (IPCPort&& other) noexcept
 {
     *this = std::move (other);
@@ -165,78 +168,190 @@ IPCPort::IPCPort (IPCPort&& other) noexcept
 
 IPCPort& IPCPort::operator= (IPCPort&& other) noexcept
 {
-    std::swap (_port, other._port);
+    std::swap (_creationThreadID, other._creationThreadID);
+    std::swap (_writeSemaphore, other._writeSemaphore);
+    std::swap (_sendPort, other._sendPort);
+    std::swap (_receivePort, other._receivePort);
+    std::swap (_receiveCallback, other._receiveCallback);
+    std::swap (_callbackHandle, other._callbackHandle);
+    if (_callbackHandle)
+        *_callbackHandle = this;
+    if (other._callbackHandle)
+        *other._callbackHandle = &other;
+    std::swap (_awaitsReply, other._awaitsReply);
+    std::swap (_replyHandler, other._replyHandler);
     return *this;
 }
 
 IPCPort::~IPCPort ()
 {
-    if (_port)
+    if (_sendPort)
     {
-        CFMessagePortInvalidate (_port);
-        CFRelease (_port);
+        CFMessagePortInvalidate (_sendPort);
+        CFRelease (_sendPort);
     }
+    if (_receivePort)
+    {
+        CFMessagePortInvalidate (_receivePort);
+        CFRelease (_receivePort);
+    }
+    if (_writeSemaphore)
+        sem_close (_writeSemaphore);
+    if (_callbackHandle)
+        delete _callbackHandle;
+    ARA_INTERNAL_ASSERT (!_awaitsReply);
+    ARA_INTERNAL_ASSERT (_replyHandler == nullptr);
 }
 
-CFDataRef IPCPortCallBack (CFMessagePortRef /*port*/, SInt32 msgid, CFDataRef cfData, void* info)
+CFDataRef IPCPort::_portCallback (CFMessagePortRef /*port*/, SInt32 messageID, CFDataRef messageData, void* info)
 {
-//  ARA_LOG ("IPCPortCallBack %i", msgid);
+    IPCPort* port = *((IPCPort**) info);
+    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == port->_creationThreadID);
 
-    return (*(const IPCPort::ReceiveCallback*) info) (msgid, cfData);
+    if (messageID != 0)
+    {
+//      ARA_LOG ("IPCPort received message with ID %i", messageID);
+        const auto replyData { port->_receiveCallback (messageID, messageData) };
+
+        const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (port->_sendPort, 0, replyData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
+        ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
+        if (replyData)
+            CFRelease (replyData);
+    }
+    else
+    {
+        ARA_INTERNAL_ASSERT (port->_awaitsReply);
+        if (port->_replyHandler)
+            (*port->_replyHandler) (messageData);
+        port->_awaitsReply = false;
+    }
+
+    return nullptr;
 }
 
-IPCPort IPCPort::createPublishingID (const char* remotePortID, const ReceiveCallback& callback)
+sem_t* _openSemaphore (const std::string& portID, bool create)
 {
-    auto portID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, remotePortID, kCFStringEncodingASCII, kCFAllocatorNull) };
-    CFMessagePortContext portContext { 0, (void*) &callback, nullptr, nullptr, nullptr };
-    auto port { CFMessagePortCreateLocal (kCFAllocatorDefault, portID, &IPCPortCallBack, &portContext, nullptr) };
-    CFRelease (portID);
-    CFRunLoopSourceRef runLoopSource { CFMessagePortCreateRunLoopSource (kCFAllocatorDefault, port, 0) };
+    const auto previousUMask { umask (0) };
+
+    std::string semName { "/" };
+    semName += portID;
+    if (semName.length () > PSHMNAMLEN - 1)
+        semName.erase (10, semName.length () - PSHMNAMLEN + 1);
+
+    auto result { sem_open (semName.c_str (), ((create) ? O_CREAT | O_EXCL : 0), S_IRUSR | S_IWUSR, 0) };
+    ARA_INTERNAL_ASSERT (result != SEM_FAILED);
+
+    if (!create)
+        sem_unlink (semName.c_str ());
+
+    umask (previousUMask);
+
+    return result;
+}
+
+CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCPort::_createMessagePortPublishingID (const std::string& portID, IPCPort** callbackHandle)
+{
+    auto wrappedPortID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, portID.c_str (), kCFStringEncodingASCII, kCFAllocatorNull) };
+
+    CFMessagePortContext portContext { 0, callbackHandle, nullptr, nullptr, nullptr };
+    auto result = CFMessagePortCreateLocal (kCFAllocatorDefault, wrappedPortID, &_portCallback, &portContext, nullptr);
+    ARA_INTERNAL_ASSERT (result != nullptr);
+
+    CFRelease (wrappedPortID);
+
+    CFRunLoopSourceRef runLoopSource { CFMessagePortCreateRunLoopSource (kCFAllocatorDefault, result, 0) };
     CFRunLoopAddSource (CFRunLoopGetCurrent (), runLoopSource, kCFRunLoopDefaultMode);
     CFRelease (runLoopSource);
-    ARA_INTERNAL_ASSERT (port != nullptr);
-    return IPCPort { port };
+
+    return result;
 }
 
-IPCPort IPCPort::createConnectedToID (const char* remotePortID)
+CFMessagePortRef __attribute__ ((cf_returns_retained)) IPCPort::_createMessagePortConnectedToID (const std::string& portID)
 {
-    auto timeout { 5.0 };
-    CFMessagePortRef port {};
+    CFMessagePortRef result {};
 
+    auto wrappedPortID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, portID.c_str (), kCFStringEncodingASCII, kCFAllocatorNull) };
+
+    auto timeout { 5.0 };
     while (timeout > 0.0)
     {
-        auto portID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, remotePortID, kCFStringEncodingASCII, kCFAllocatorNull) };
-        port = CFMessagePortCreateRemote (kCFAllocatorDefault, portID);
-        CFRelease (portID);
-        if (port)
+        if ((result = CFMessagePortCreateRemote (kCFAllocatorDefault, wrappedPortID)))
             break;
 
         constexpr auto waitTime { 0.01 };
-        CFRunLoopRunInMode (kCFRunLoopDefaultMode, waitTime, false);
+        CFRunLoopRunInMode (kCFRunLoopDefaultMode, waitTime, true);
         timeout -= waitTime;
     }
-    ARA_INTERNAL_ASSERT (port != nullptr);
+    ARA_INTERNAL_ASSERT (result != nullptr);
 
-    return IPCPort { port };
+    CFRelease (wrappedPortID);
+
+    return result;
+}
+
+IPCPort IPCPort::createPublishingID (const std::string& portID, const ReceiveCallback& callback)
+{
+    IPCPort port;
+    port._receiveCallback = std::move (callback);
+    port._writeSemaphore = _openSemaphore (portID, true);
+    port._callbackHandle = new IPCPort* { &port };
+    port._sendPort = _createMessagePortConnectedToID (portID + ".from_server");
+    port._receivePort = _createMessagePortPublishingID (portID + ".to_server", port._callbackHandle);
+    return port;
+}
+
+IPCPort IPCPort::createConnectedToID (const std::string& portID, const ReceiveCallback& callback)
+{
+    IPCPort port;
+    port._receiveCallback = std::move (callback);
+    port._callbackHandle = new IPCPort* { &port };
+    port._receivePort = _createMessagePortPublishingID (portID + ".from_server", port._callbackHandle);
+    port._sendPort = _createMessagePortConnectedToID (portID + ".to_server");
+    port._writeSemaphore = _openSemaphore (portID, false);
+    sem_post (port._writeSemaphore);
+    return port;
 }
 
 void IPCPort::sendMessage (const MessageID messageID, DataToSend const __attribute__((cf_consumed)) messageData, ReplyHandler* replyHandler)
 {
 //  ARA_LOG ("IPCPort::sendMessage %i", messageID);
 
-    ReceivedData incomingData {};
-    const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (_port, messageID, messageData, 0.001 * messageTimeout, 0.001 * messageTimeout, kCFRunLoopDefaultMode, &incomingData) };
-    ARA_INTERNAL_ASSERT (incomingData && (portSendResult == kCFMessagePortSuccess));
+    const bool isOnCreationThread { std::this_thread::get_id () == _creationThreadID };
+    while (sem_trywait (_writeSemaphore) != 0)
+    {
+        if (isOnCreationThread)
+            runReceiveLoop (1);
+        else
+            std::this_thread::yield (); // \todo maybe it would be better to sleep for some longer interval here instead of simply yielding?
+    }
+
+    const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (_sendPort, messageID, messageData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
+    ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
+
+    sem_post (_writeSemaphore);
+
     if (messageData)
         CFRelease (messageData);
-    if (replyHandler)
-        (*replyHandler) (incomingData);
-    CFRelease (incomingData);
+
+    const auto previousAwaitsReply { _awaitsReply };
+    const auto previousReplyHandler { _replyHandler };
+    _awaitsReply = true;
+    _replyHandler = replyHandler;
+    do
+    {
+        if (isOnCreationThread)
+            runReceiveLoop (messageTimeout);
+        else
+            std::this_thread::yield (); // \todo maybe it would be better to sleep for some longer interval here instead of simply yielding?
+    } while (_awaitsReply);
+    _awaitsReply = previousAwaitsReply;
+    _replyHandler = previousReplyHandler;
 }
 
 void IPCPort::runReceiveLoop (int32_t milliseconds)
 {
-    CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.001 * milliseconds, false);
+    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _creationThreadID);
+    CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.001 * milliseconds, true);
 }
 
 _Pragma ("GCC diagnostic pop")

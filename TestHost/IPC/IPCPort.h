@@ -21,15 +21,17 @@
 
 #if defined (_WIN32)
     #include <Windows.h>
-    #include <string>
     #include <utility>
 #elif defined (__APPLE__)
     #include <CoreFoundation/CoreFoundation.h>
+    #include <thread>
+    #include <semaphore.h>
 #else
     #error "IPC not yet implemented for this platform"
 #endif
 
 #include <functional>
+#include <string>
 
 
 // A simple proof-of-concept wrapper for an IPC communication channel.
@@ -65,8 +67,8 @@ public:
 #else
     using ReceiveCallback = std::function<DataToSend (const MessageID messageID, ReceivedData const messageData)>;
 #endif
-    static IPCPort createPublishingID (const char* remotePortID, const ReceiveCallback& callback);
-    static IPCPort createConnectedToID (const char* remotePortID);
+    static IPCPort createPublishingID (const std::string& portID, const ReceiveCallback& callback);
+    static IPCPort createConnectedToID (const std::string& portID, const ReceiveCallback& callback);
 
     // message sending
     // The messageData will be sent to the receiver, blocking the sending thread until the receiver
@@ -90,9 +92,11 @@ public:
 
 private:
 #if defined (_WIN32)
-    explicit IPCPort (const char* remotePortID);
+    explicit IPCPort (const std::string& portID);
 #elif defined (__APPLE__)
-    explicit IPCPort (CFMessagePortRef __attribute__((cf_consumed)) port);
+    static CFDataRef _portCallback (CFMessagePortRef port, SInt32 messageID, CFDataRef messageData, void* info);
+    static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortPublishingID (const std::string& portID, IPCPort** callbackHandle);
+    static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortConnectedToID (const std::string& portID);
 #endif
 
 private:
@@ -106,7 +110,7 @@ private:
         char messageData[maxMessageSize];
     };
 
-    const ReceiveCallback* _receiveCallback {};
+    ReceiveCallback _receiveCallback {};
     HANDLE _hWriteMutex {};
     HANDLE _hRequest {};
     HANDLE _hResult {};
@@ -114,6 +118,13 @@ private:
     SharedMemory* _sharedMemory {};
 
 #elif defined (__APPLE__)
-    CFMessagePortRef _port {};
+    std::thread::id _creationThreadID { std::this_thread::get_id () };
+    sem_t* _writeSemaphore {};
+    CFMessagePortRef _sendPort {};
+    CFMessagePortRef _receivePort {};
+    ReceiveCallback _receiveCallback {};
+    IPCPort** _callbackHandle {};
+    bool _awaitsReply {};
+    ReplyHandler* _replyHandler {};
 #endif
 };
