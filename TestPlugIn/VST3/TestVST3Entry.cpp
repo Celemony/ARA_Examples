@@ -74,7 +74,7 @@ BEGIN_FACTORY_DEF (TEST_MANUFACTURER_NAME,
                 kVstAudioEffectClass,           // the IAudioProcessor component category (do not changed this)
                 TEST_PLUGIN_NAME,               // here the Plug-in name
                 Vst::kDistributable,            // means that component and controller could be distributed on different computers
-                "Fx|OnlyARA",                   // Subcategory for this Plug-in (see Steinberg::VST::PlugType)
+                "Fx|OnlyARA",                   // Subcategory for this Plug-in (see Steinberg::Vst::PlugType)
                 FULL_VERSION_STR,               // Plug-in version
                 kVstVersionString,              // the VST 3 SDK version (do not changed this, use always this define)
                 TestVST3Processor::createInstance)   // function pointer called when this component should be instantiated
