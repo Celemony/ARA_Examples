@@ -90,7 +90,7 @@ API_AVAILABLE(macos(13.0))
     // C++ members need to be ivars; they would be copied on access if they were properties.
     BufferedInputBus _inputBus;
     TestAUv3DSPKernel  _kernel;
-    ARA::PlugIn::PlugInExtension _araPlugInExtension;
+    ARA::PlugIn::PlugInExtension * _araPlugInExtension;
 }
 
 // MARK: -  AUAudioUnit Overrides
@@ -119,8 +119,10 @@ API_AVAILABLE(macos(13.0))
                                                              busType:AUAudioUnitBusTypeOutput
                                                               busses: @[self.outputBus]];
 
-    // Initialize ARA factory property
+    // Initialize ARA data
     _araFactory = ARATestDocumentController::getARAFactory();
+
+    _araPlugInExtension = nullptr;
 
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     _araIPCPlugInExtensionMessageChannel = nil;
@@ -129,6 +131,26 @@ API_AVAILABLE(macos(13.0))
 
     return self;
 }
+
+- (void) destroyBindingIfNeeded {
+    if (_araPlugInExtension)
+    {
+        delete _araPlugInExtension;
+        _araPlugInExtension = nullptr;
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+        if (@available(macOS 13.0, *))
+        {
+            if (self.araIPCPlugInExtensionInstance)
+                ARA::IPC::ARAIPCAUProxyHostCleanupBinding(self.araIPCPlugInExtensionInstance);
+        }
+#endif
+    }
+}
+
+- (void)dealloc {
+    [self destroyBindingIfNeeded];
+}
+
 
 // If an audio unit has input, an audio unit's audio input connection points.
 // Subclassers must override this property getter and should return the same object every time.
@@ -179,8 +201,9 @@ API_AVAILABLE(macos(13.0))
 
 - (nonnull const ARA::ARAPlugInExtensionInstance *)bindToDocumentController:(nonnull ARA::ARADocumentControllerRef)documentControllerRef
                         withRoles:(ARA::ARAPlugInInstanceRoleFlags)assignedRoles knownRoles:(ARA::ARAPlugInInstanceRoleFlags)knownRoles {
-    _kernel.setARAPlugInExtension(&_araPlugInExtension);
-    return _araPlugInExtension.bindToARA(documentControllerRef, knownRoles, assignedRoles);
+    _araPlugInExtension = new ARA::PlugIn::PlugInExtension;
+    _kernel.setARAPlugInExtension(_araPlugInExtension);
+    return _araPlugInExtension->bindToARA(documentControllerRef, knownRoles, assignedRoles);
 }
 
 // MARK: -  AUAudioUnit (AUAudioUnitImplementation)
@@ -278,15 +301,11 @@ void destroy_sharedFactoryMessageChannel() {
                 TestAUv3AudioUnit * audioUnit = (TestAUv3AudioUnit *)auAudioUnit;
                 audioUnit.araIPCPlugInExtensionInstance = [audioUnit bindToDocumentController:controllerRef withRoles:assignedRoles knownRoles:knownRoles];
                 return audioUnit.araIPCPlugInExtensionInstance;
+            },
+            ^void (AUAudioUnit * _Nonnull auAudioUnit)
+            {
+                [(TestAUv3AudioUnit *)auAudioUnit destroyBindingIfNeeded];
             });
-    }
-}
-
-- (void)dealloc {
-    if (@available(macOS 13.0, *))
-    {
-        if (self.araIPCPlugInExtensionInstance)
-            ARA::IPC::ARAIPCAUProxyHostCleanupBinding(self.araIPCPlugInExtensionInstance);
     }
 }
 
