@@ -308,7 +308,7 @@ public:
     }
 
     void sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
-                      ARA::IPC::ARAIPCReplyHandler* const replyHandler, void* replyHandlerUserData) override
+                      ReplyHandler const replyHandler, void* replyHandlerUserData) override
     {
 #if USE_ARA_CF_ENCODING
         const auto messageData { ARAIPCCFCreateMessageEncoderData (encoder) };
