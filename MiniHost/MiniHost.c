@@ -54,11 +54,13 @@
 // list of available companion APIs
 #define PLUGIN_FORMAT_AU   1
 #define PLUGIN_FORMAT_VST3 2
+#define PLUGIN_FORMAT_CLAP 3
 
 // the project files must pick one of the above formats by defining PLUGIN_FORMAT
 #if !defined(PLUGIN_FORMAT)
     #error "PLUGIN_FORMAT not configured properly in the project"
 #endif
+
 
 // Companion API includes
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
@@ -73,6 +75,11 @@
     #define ARA_PLUGIN_VST3_BINARY "ARATestPlugIn.vst3"
 //  #define ARA_PLUGIN_VST3_BINARY "/Library/Audio/Plug-Ins/VST3/Melodyne.vst3"
     #define ARA_PLUGIN_VST3_OPTIONAL_PLUGIN_NAME NULL
+#elif PLUGIN_FORMAT == PLUGIN_FORMAT_CLAP
+    #include "ExamplesCommon/PlugInHosting/CLAPLoader.h"
+
+    #define ARA_PLUGIN_CLAP_BINARY "ARATestPlugIn.clap"
+    #define ARA_PLUGIN_CLAP_OPTIONAL_PLUGIN_NAME NULL
 #else
     #error "PLUGIN_FORMAT not configured properly in the project"
 #endif
@@ -362,6 +369,12 @@ int main(int argc, const char * argv[])
     ARA_INTERNAL_ASSERT(vst3Binary != NULL);
 
     factory = VST3GetARAFactory(vst3Binary, ARA_PLUGIN_VST3_OPTIONAL_PLUGIN_NAME);
+#elif PLUGIN_FORMAT == PLUGIN_FORMAT_CLAP
+    CLAPPlugIn clapPlugIn;
+    CLAPBinary clapBinary = CLAPLoadBinary(ARA_PLUGIN_CLAP_BINARY);
+    ARA_INTERNAL_ASSERT(clapBinary != NULL);
+
+    factory = CLAPGetARAFactory(clapBinary, ARA_PLUGIN_CLAP_OPTIONAL_PLUGIN_NAME);
 #endif
 
     if (factory == NULL)
@@ -437,6 +450,9 @@ int main(int argc, const char * argv[])
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     vst3Effect = VST3CreateEffect(vst3Binary, ARA_PLUGIN_VST3_OPTIONAL_PLUGIN_NAME);
     plugInInstance = VST3BindToARADocumentController(vst3Effect, documentControllerRef, roles);
+#elif PLUGIN_FORMAT == PLUGIN_FORMAT_CLAP
+    clapPlugIn = CLAPCreatePlugIn(clapBinary, ARA_PLUGIN_CLAP_OPTIONAL_PLUGIN_NAME);
+    plugInInstance = CLAPBindToARADocumentController(clapPlugIn, documentControllerRef, roles);
 #endif
 
     // prepare rendering
@@ -446,6 +462,8 @@ int main(int argc, const char * argv[])
     AudioUnitStartRendering(audioUnit, renderBlockSize, renderSampleRate);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     VST3StartRendering(vst3Effect, renderBlockSize, renderSampleRate);
+#elif PLUGIN_FORMAT == PLUGIN_FORMAT_CLAP
+    CLAPStartRendering(clapPlugIn, renderBlockSize, renderSampleRate);
 #endif
 
 
@@ -463,6 +481,8 @@ int main(int argc, const char * argv[])
         AudioUnitRenderBuffer(audioUnit, renderBlockSize, samplePosition, outputData + samplePosition);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
         VST3RenderBuffer(vst3Effect, renderBlockSize, renderSampleRate, samplePosition, outputData + samplePosition);
+#elif PLUGIN_FORMAT == PLUGIN_FORMAT_CLAP
+        CLAPRenderBuffer(clapPlugIn, renderBlockSize, samplePosition, outputData + samplePosition);
 #endif
     }
 
@@ -473,6 +493,8 @@ int main(int argc, const char * argv[])
     AudioUnitStopRendering(audioUnit);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     VST3StopRendering(vst3Effect);
+#elif PLUGIN_FORMAT == PLUGIN_FORMAT_CLAP
+    CLAPStopRendering(clapPlugIn);
 #endif
 
     plugInInstance->playbackRendererInterface->removePlaybackRegion(plugInInstance->playbackRendererRef, playbackRegionRef);
@@ -481,6 +503,8 @@ int main(int argc, const char * argv[])
     AudioUnitCloseInstance(audioUnit);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     VST3DestroyEffect(vst3Effect);
+#elif PLUGIN_FORMAT == PLUGIN_FORMAT_CLAP
+    CLAPDestroyPlugIn(clapPlugIn);
 #endif
 
     documentControllerInterface->enableAudioSourceSamplesAccess(documentControllerRef, audioSourceRef, kARAFalse);
@@ -500,6 +524,8 @@ int main(int argc, const char * argv[])
     AudioUnitCleanupComponent(audioUnitComponent);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     VST3UnloadBinary(vst3Binary);
+#elif PLUGIN_FORMAT == PLUGIN_FORMAT_CLAP
+    CLAPUnloadBinary(clapBinary);
 #endif
 
     ARA_LOG("teardown completed");
