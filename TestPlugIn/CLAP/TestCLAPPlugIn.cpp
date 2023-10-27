@@ -181,7 +181,7 @@ const ARA::ARAPlugInExtensionInstance *my_plug_ara_bind_to_document_controller(c
    return plug->ara_extension.bindToARA(documentControllerRef, knownRoles, assignedRoles);
 }
 
-static ARA::clap_ara_plugin_extension_t ara_plugin_extension =
+static clap_ara_plugin_extension_t ara_plugin_extension =
 {
    .get_factory = my_plug_ara_get_factory,
    .bind_to_document_controller = my_plug_ara_bind_to_document_controller
@@ -267,7 +267,7 @@ static const void *my_plug_get_extension(const struct clap_plugin *plugin, const
       return &s_my_plug_audio_ports;
    if (!strcmp(id, CLAP_EXT_AUDIO_PORTS_CONFIG))
       return &s_my_plug_audio_ports_config;
-   if (!strcmp(id, ARA::CLAP_EXT_ARA_PLUGINEXTENSION))
+   if (!strcmp(id, CLAP_EXT_ARA_PLUGINEXTENSION))
       return &ara_plugin_extension;
    return NULL;
 }
@@ -343,19 +343,19 @@ static const clap_plugin_factory_t s_plugin_factory = {
 // clap_ara_factory //
 //////////////////////
 
-static uint32_t ara_factory_get_factory_count(const struct ARA::clap_ara_factory* factory) {
+static uint32_t ara_factory_get_factory_count(const struct clap_ara_factory* factory) {
    return 1;
 }
 
-static const ARA::ARAFactory *ara_factory_get_ara_factory(const struct ARA::clap_ara_factory* factory, uint32_t index) {
+static const ARA::ARAFactory *ara_factory_get_ara_factory(const struct clap_ara_factory* factory, uint32_t index) {
    return ARATestDocumentController::getARAFactory();
 }
 
-static const char *ara_factory_get_plugin_id(const struct ARA::clap_ara_factory *factory, uint32_t index) {
+static const char *ara_factory_get_plugin_id(const struct clap_ara_factory *factory, uint32_t index) {
    return CLAP_TEST_PLUGIN_ID;
 }
 
-static ARA::clap_ara_factory_t s_ara_factory =
+static clap_ara_factory_t s_ara_factory =
 {
    .get_factory_count = ara_factory_get_factory_count,
    .get_ara_factory = ara_factory_get_ara_factory,
@@ -378,7 +378,7 @@ static void entry_deinit(void) {
 static const void *entry_get_factory(const char *factory_id) {
    if (!strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID))
       return &s_plugin_factory;
-   if (!strcmp(factory_id, ARA::CLAP_EXT_ARA_FACTORY))
+   if (!strcmp(factory_id, CLAP_EXT_ARA_FACTORY))
       return &s_ara_factory;
    return NULL;
 }
