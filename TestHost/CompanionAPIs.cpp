@@ -53,6 +53,7 @@
 #include <thread>
 #include <vector>
 #include <cstring>
+#include <thread>
 
 /*******************************************************************************/
 
@@ -784,6 +785,11 @@ public:
         return true;
     }
 
+    void idleThreadForDuration (int32_t milliseconds) override
+    {
+        _port.runReceiveLoop (milliseconds);
+    }
+
     void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
     {
         ARA::IPC::ARAIPCProxyPlugInInitializeARA (&_hostCommandsSender, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
@@ -1185,6 +1191,11 @@ void PlugInEntry::uninitializeARA ()
 {
     ARA_INTERNAL_ASSERT (_factory);
     _factory->uninitializeARA ();
+}
+
+void PlugInEntry::idleThreadForDuration (int32_t milliseconds)
+{
+    std::this_thread::sleep_for (std::chrono::milliseconds { milliseconds });
 }
 
 /*******************************************************************************/

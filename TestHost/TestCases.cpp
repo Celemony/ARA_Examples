@@ -634,6 +634,7 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
         // render all playback region samples
         plugInInstance->startRendering (renderBlockSize, renderSampleRate);
 
+        bool renderingCompleted { false };
         auto renderOnOtherThread = [&] () {
             std::thread renderthread { [&] () {
                 ARAAudioAccessController::registerRenderThread();
@@ -644,7 +645,12 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
                     plugInInstance->renderSamples (samplesToRender, samplePosition, &outputData[static_cast<size_t> (outputPosition)]);
                 }
                 ARAAudioAccessController::unregisterRenderThread();
+                renderingCompleted = true;
             } };
+
+            while (!renderingCompleted)
+                plugInEntry->idleThreadForDuration (10);
+
             renderthread.join ();
         };
 
