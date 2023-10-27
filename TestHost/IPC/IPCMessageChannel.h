@@ -24,7 +24,6 @@
 
 #if defined (_WIN32)
     #include <Windows.h>
-    #include <mutex>
     #include <utility>
 #elif defined (__APPLE__)
     #include <CoreFoundation/CoreFoundation.h>
@@ -47,6 +46,10 @@
         #define USE_ARA_CF_ENCODING 0
     #endif
 #endif
+
+
+class IPCSendPort;
+class IPCReceivePort;
 
 
 class IPCMessageChannel : public ARA::IPC::ARAIPCMessageChannel
@@ -75,47 +78,35 @@ public:
     // waits up to the specified amount of milliseconds for an incoming event and processes it
     void runReceiveLoop (int32_t milliseconds);
 
+    // callbacks for the _receivePort
+    const ARA::IPC::ARAIPCMessageDecoder* createDecoderForMessage (ARA::IPC::ARAIPCMessageID messageID,
+#if defined (_WIN32)
+                                                                                                        const char* data, const size_t dataSize);
+#elif defined (__APPLE__)
+                                                                                                        CFDataRef messageData);
+#endif
+    void routeReceivedMessage (ARA::IPC::ARAIPCMessageID messageID, const ARA::IPC::ARAIPCMessageDecoder* decoder);
+
 private:
-    IPCMessageChannel () = default;
+    IPCMessageChannel (const ReceiveCallback& callback);
     void _lockTransaction (bool isOnCreationThread);
     void _unlockTransaction ();
     void _sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder);
-    void _routeReceivedMessage (ARA::IPC::ARAIPCMessageID messageID, const ARA::IPC::ARAIPCMessageDecoder* decoder);
     void _handleReceivedMessage (ARA::IPC::ARAIPCMessageID messageID, const ARA::IPC::ARAIPCMessageDecoder* decoder);
-#if defined (_WIN32)
-    explicit IPCMessageChannel (const std::string& channelID);
-#elif defined (__APPLE__)
-    static CFDataRef _portCallback (CFMessagePortRef port, SInt32 messageID, CFDataRef messageData, void* info);
-    static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortPublishingID (const std::string& portID, IPCMessageChannel* channel);
-    static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortConnectedToID (const std::string& portID);
-#endif
 
 private:
 #if defined (_WIN32)
-    struct SharedMemory
-    {
-        static constexpr DWORD maxMessageSize { 4 * 1024 * 1024L - 64};
-
-        size_t messageSize;
-        ARA::IPC::ARAIPCMessageID messageID;
-        char messageData[maxMessageSize];
-    };
-
-    HANDLE _transactionLock {};         // global lock shared between both processes, taken when starting a new transaction
-    HANDLE _dataAvailable {};           // signal set by the sending side indicating new data has been placed in shared memory
-    HANDLE _dataReceived {};            // signal set by the receiving side when evaluating the shared memory
-    HANDLE _fileMapping {};
-    SharedMemory* _sharedMemory {};
-    std::recursive_mutex _readLock {};  // process-level lock blocking access to reading data
-
+    HANDLE
 #elif defined (__APPLE__)
-    sem_t* _transactionLock {};
-    CFMessagePortRef _sendPort {};
-    CFMessagePortRef _receivePort {};
+    sem_t*
 #endif
+           _transactionLock {};     // global lock shared between both processes, taken when starting a new transaction
+
+    IPCSendPort* _sendPort {};
+    IPCReceivePort* _receivePort {};
 
     std::thread::id _creationThreadID { std::this_thread::get_id () };
-    ReceiveCallback _receiveCallback {};
+    ReceiveCallback const _receiveCallback {};
     int32_t _callbackLevel { 0 };
     bool _awaitsReply {};
     ReplyHandler _replyHandler {};
