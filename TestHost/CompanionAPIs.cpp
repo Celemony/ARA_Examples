@@ -57,18 +57,6 @@
 
 #if ARA_ENABLE_IPC
 
-// select underlying implementation: Apple CFDictionary or a generic pugixml-based
-// Note that the pugixml version is much less efficient because it base64-encodes bytes
-// (used for large sample data) which adds encoding overhead and requires additional copies.
-#ifndef USE_ARA_CF_ENCODING
-    #if defined (__APPLE__)
-        #define USE_ARA_CF_ENCODING 1
-    #else
-        #define USE_ARA_CF_ENCODING 0
-    #endif
-#endif
-
-
 #if defined (__linux__)
     #error "IPC not yet implemented for Linux"
 #endif
@@ -95,7 +83,9 @@ constexpr auto kIPCDestroyEffectMethodID { ARA::IPC::MethodID::createWithNonARAM
 constexpr auto kIPCTerminateMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-6> () };
 
 
-IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::ReceivedData const messageData);
+void remoteHostCommandHandler (const ARA::IPC::ARAIPCMessageID messageID,
+                               const ARA::IPC::ARAIPCMessageDecoder* decoder,
+                               ARA::IPC::ARAIPCMessageEncoder* const replyEncoder);
 
 
 // helper function to create unique port IDs for each run
@@ -138,79 +128,6 @@ static const std::string _createPortID ()
     return result;
 #endif
 }
-
-
-// implementation of the abstract ARAIPCMessageSender interface
-class IPCSender : public ARA::IPC::ARAIPCMessageSender
-{
-public:
-    IPCSender (IPCPort* port)
-    : _port { port }
-    {}
-
-    ~IPCSender () override
-    {
-        delete _port;
-    }
-
-    ARA::IPC::ARAIPCMessageEncoder* createEncoder () override
-    {
-#if USE_ARA_CF_ENCODING
-        return ARA::IPC::ARAIPCCFCreateMessageEncoder ();
-#else
-        return new IPCXMLMessageEncoder {};
-#endif
-    }
-
-    void sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
-                      ReplyHandler const replyHandler, void* replyHandlerUserData) override
-    {
-#if USE_ARA_CF_ENCODING
-        const auto messageData { ARAIPCCFCreateMessageEncoderData (encoder) };
-#else
-        const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder)->createEncodedMessage () };
-#endif
-
-        //ARA_LOG("sendMessage %i", messageID);
-        if (replyHandler)
-        {
-            IPCPort::ReplyHandler handler { [replyHandler, replyHandlerUserData] (IPCPort::ReceivedData replyData) -> void
-                {
-#if USE_ARA_CF_ENCODING
-                    ARA_INTERNAL_ASSERT (replyData != nullptr);
-                    const auto replyDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (replyData) };
-#else
-    #if defined (__APPLE__)
-                    ARA_INTERNAL_ASSERT (replyData != nullptr);
-                    const auto replyDecoder { IPCXMLMessageDecoder::createWithMessageData (replyData) };
-    #else
-                    const auto replyDecoder { IPCXMLMessageDecoder::createWithMessageData (replyData.first, replyData.second) };
-    #endif
-#endif
-                    (*replyHandler) (replyDecoder, replyHandlerUserData);
-                    delete replyDecoder;
-                } };
-            _port->sendMessage (messageID, messageData, &handler);
-        }
-        else
-        {
-            _port->sendMessage (messageID, messageData, nullptr);
-        }
-    }
-
-    bool receiverEndianessMatches () override
-    {
-        return _port->endianessMatches ();
-    }
-
-    void runReceiveLoop (int32_t milliseconds)
-    {
-        _port->runReceiveLoop (milliseconds);
-    }
-
-private:
-    IPCPort* const _port;
-};
 
 #endif // ARA_ENABLE_IPC
 
@@ -599,54 +516,27 @@ struct RemoteLauncher
 class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher, protected ARA::IPC::RemoteCaller
 {
 private:
-    static const ARA::ARAFactory* defaultGetFactory(IPCSender& hostCommandsSender)
+    static const ARA::ARAFactory* defaultGetFactory(IPCPort* hostCommandsSender)
     {
-        const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (&hostCommandsSender) };
+        const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (hostCommandsSender) };
         ARA_INTERNAL_ASSERT (count > 0);
-        return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (&hostCommandsSender, 0U);
+        return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (hostCommandsSender, 0U);
     }
 
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
                     const std::string portID,
-                    const std::function<const ARA::ARAFactory* (IPCSender& hostCommandsSender)>& getFactoryFunction)
+                    const std::function<const ARA::ARAFactory* (IPCPort* hostCommandsSender)>& getFactoryFunction)
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, portID },
-      ARA::IPC::RemoteCaller { new IPCSender { IPCPort::createConnectedToID (portID,
-                    [] (const ARA::IPC::ARAIPCMessageID messageID, IPCPort::ReceivedData const messageData) -> IPCPort::DataToSend
-                    {
-#if USE_ARA_CF_ENCODING
-                        const auto messageDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
-                        auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
-#else
-    #if defined (__APPLE__)
-                        const auto messageDecoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
-    #else
-                        const auto messageDecoder { IPCXMLMessageDecoder::createWithMessageData (messageData.first, messageData.second) };
-    #endif
-
-                        auto replyEncoder { new IPCXMLMessageEncoder {} };
-#endif
-
-                        //ARA_LOG("plug-in called host %s", ARA::IPC::decodeHostMessageID (messageID));
-                        ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher (messageID, messageDecoder, replyEncoder);
-
-#if USE_ARA_CF_ENCODING
-                        const auto result { ARAIPCCFCreateMessageEncoderData (replyEncoder) };
-#else
-                        const auto result { replyEncoder->createEncodedMessage () };
-#endif
-                        delete replyEncoder;
-                        delete messageDecoder;
-                        return result;
-                    }) } }
+      ARA::IPC::RemoteCaller { IPCPort::createConnectedToID (portID, ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher) }
     {
-        validateAndSetFactory (getFactoryFunction (*static_cast<IPCSender*> (getMessageSender ())));
+        validateAndSetFactory (getFactoryFunction (static_cast<IPCPort*> (getMessageSender ())));
     }
 
 public:
     // \todo the current ARA IPC implementation does not support sending ARA asserts to the host...
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
-                    const std::function<const ARA::ARAFactory* (IPCSender& hostCommandsSender)>& getFactoryFunction = defaultGetFactory)
+                    const std::function<const ARA::ARAFactory* (IPCPort* hostCommandsSender)>& getFactoryFunction = defaultGetFactory)
     : IPCPlugInEntry { std::move (description), launchArgs, _createPortID (), getFactoryFunction }
     {}
 
@@ -664,7 +554,7 @@ public:
 
     void idleThreadForDuration (int32_t milliseconds) override
     {
-        static_cast<IPCSender*> (getMessageSender ())->runReceiveLoop (milliseconds);
+        static_cast<IPCPort*> (getMessageSender ())->runReceiveLoop (milliseconds);
     }
 
     void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
@@ -699,22 +589,22 @@ protected:
     IPCGenericPlugInEntry (const std::string& commandLineArg, const std::string& apiName, const std::string& binaryName, const std::string& optionalPlugInName)
     : IPCPlugInEntry { createEntryDescription (apiName, binaryName, optionalPlugInName),
                         commandLineArg + " " + binaryName + " " + optionalPlugInName,
-                        [&optionalPlugInName] (IPCSender& hostCommandsSender) -> const ARA::ARAFactory*
+                        [&optionalPlugInName] (IPCPort* hostCommandsSender) -> const ARA::ARAFactory*
                         {
-                            const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (&hostCommandsSender) };
+                            const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (hostCommandsSender) };
                             ARA_INTERNAL_ASSERT (count > 0);
 
                             if (optionalPlugInName.empty ())
-                                return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (&hostCommandsSender, 0U);
+                                return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (hostCommandsSender, 0U);
 
                             for (auto i { 0U }; i < count; ++i)
                             {
-                                auto factory { ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (&hostCommandsSender, i) };
+                                auto factory { ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (hostCommandsSender, i) };
                                 if (0 == std::strcmp (factory->plugInName, optionalPlugInName.c_str ()))
                                     return factory;
                             }
                             ARA_INTERNAL_ASSERT (false);
-                            return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (&hostCommandsSender, 0U);
+                            return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (hostCommandsSender, 0U);
                         } }
     {}
 };
@@ -759,45 +649,23 @@ public:
 std::unique_ptr<PlugInEntry> _plugInEntry {};
 bool _shutDown { false };
 
-#if defined (__APPLE__)
-__attribute__((cf_returns_retained))
-#endif
-IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::ReceivedData const messageData)
+void remoteHostCommandHandler (const ARA::IPC::ARAIPCMessageID messageID,
+                               const ARA::IPC::ARAIPCMessageDecoder* decoder,
+                               ARA::IPC::ARAIPCMessageEncoder* const replyEncoder)
 {
-#if USE_ARA_CF_ENCODING
-    auto messageDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
-#else
-#if defined (__APPLE__)
-    auto messageDecoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
-#else
-    auto messageDecoder { IPCXMLMessageDecoder::createWithMessageData (messageData.first, messageData.second) };
-#endif
-#endif
-
-    IPCPort::DataToSend result {};
-
     if (messageID == kIPCCreateEffectMethodID)
     {
         auto plugInInstance { _plugInEntry->createPlugInInstance () };
         const auto plugInInstanceRef { reinterpret_cast<size_t> (plugInInstance.get ()) };
         plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
-#if USE_ARA_CF_ENCODING
-        auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
         ARA::IPC::encodeArguments (replyEncoder, plugInInstanceRef);
-        result = ARAIPCCFCreateMessageEncoderData (replyEncoder);
-#else
-        auto replyEncoder { new IPCXMLMessageEncoder {} };
-        ARA::IPC::encodeArguments (replyEncoder, plugInInstanceRef);
-        result = replyEncoder->createEncodedMessage ();
-#endif
-        delete replyEncoder;
     }
     else if (messageID == kIPCStartRenderingMethodID)
     {
         size_t plugInInstanceRef;
         int32_t maxBlockSize;
         double sampleRate;
-        ARA::IPC::decodeArguments (messageDecoder, plugInInstanceRef, maxBlockSize, sampleRate);
+        ARA::IPC::decodeArguments (decoder, plugInInstanceRef, maxBlockSize, sampleRate);
 
         reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->startRendering (maxBlockSize, sampleRate);
     }
@@ -808,34 +676,25 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
         // \todo using static (plus not copy bytes) here assumes single-threaded callbacks, but currently this is a valid requirement
         static std::vector<uint8_t> buffer;
         ARA::IPC::BytesDecoder writer { buffer };
-        ARA::IPC::decodeArguments (messageDecoder, plugInInstanceRef, samplePosition, writer);
+        ARA::IPC::decodeArguments (decoder, plugInInstanceRef, samplePosition, writer);
         ARA_INTERNAL_ASSERT (buffer.size () > 0);
 
         // \todo this ignores potential float data alignment or byte order issues...
         reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->renderSamples (static_cast<int> (buffer.size () / sizeof (float)),
                                                                         samplePosition, reinterpret_cast<float*> (buffer.data ()));
-#if USE_ARA_CF_ENCODING
-        auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
         ARA::IPC::encodeReply (replyEncoder, ARA::IPC::BytesEncoder { buffer, false });
-        result = ARAIPCCFCreateMessageEncoderData (replyEncoder);
-#else
-        auto replyEncoder { new IPCXMLMessageEncoder {} };
-        ARA::IPC::encodeReply (replyEncoder, ARA::IPC::BytesEncoder { buffer, false });
-        result = replyEncoder->createEncodedMessage ();
-#endif
-        delete replyEncoder;
     }
     else if (messageID == kIPCStopRenderingMethodID)
     {
         size_t plugInInstanceRef;
-        ARA::IPC::decodeArguments (messageDecoder, plugInInstanceRef);
+        ARA::IPC::decodeArguments (decoder, plugInInstanceRef);
 
         reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->stopRendering ();
     }
     else if (messageID == kIPCDestroyEffectMethodID)
     {
         size_t plugInInstanceRef;
-        ARA::IPC::decodeArguments (messageDecoder, plugInInstanceRef);
+        ARA::IPC::decodeArguments (decoder, plugInInstanceRef);
 
         ARA::IPC::ARAIPCProxyHostCleanupBinding (reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->getARAPlugInExtensionInstance ());
         delete reinterpret_cast<PlugInInstance*> (plugInInstanceRef);
@@ -846,20 +705,8 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
     }
     else
     {
-#if USE_ARA_CF_ENCODING
-        auto replyEncoder { ARA::IPC::ARAIPCCFCreateMessageEncoder () };
-        ARA::IPC::ARAIPCProxyHostCommandHandler (messageID, messageDecoder, replyEncoder);
-        result = ARAIPCCFCreateMessageEncoderData (replyEncoder);
-#else
-        auto replyEncoder { new IPCXMLMessageEncoder {} };
-        ARA::IPC::ARAIPCProxyHostCommandHandler (messageID, messageDecoder, replyEncoder);
-        result = replyEncoder->createEncodedMessage ();
-#endif
-        delete replyEncoder;
+        ARA::IPC::ARAIPCProxyHostCommandHandler (messageID, decoder, replyEncoder);
     }
-
-    delete messageDecoder;
-    return result;
 }
 
 namespace RemoteHost
@@ -868,17 +715,10 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& portID)
 {
     _plugInEntry = std::move (plugInEntry);
 
-    auto port { IPCPort::createPublishingID (portID,
-                    [] (const ARA::IPC::ARAIPCMessageID messageID, IPCPort::ReceivedData const messageData) -> IPCPort::DataToSend
-                    {
-                        //ARA_LOG("host called remote %s", ARA::IPC::decodePlugInMessageID (messageID));
-                        auto result { remoteHostCommandHandler (messageID, messageData) };
-                        return result;
-                    }) };
-    IPCSender plugInCallbacksSender { port };
+    auto plugInCallbacksSender { IPCPort::createPublishingID (portID, remoteHostCommandHandler) };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
-    ARA::IPC::ARAIPCProxyHostSetPlugInCallbacksSender (&plugInCallbacksSender);
+    ARA::IPC::ARAIPCProxyHostSetPlugInCallbacksSender (plugInCallbacksSender);
     ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef, ARA::ARADocumentControllerRef controllerRef,
                                                         ARA::ARAPlugInInstanceRoleFlags knownRoles, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
                                                         -> const ARA::ARAPlugInExtensionInstance*
@@ -890,7 +730,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& portID)
                                                 });
 
     while (!_shutDown)
-        plugInCallbacksSender.runReceiveLoop (100 /*ms*/);
+        plugInCallbacksSender->runReceiveLoop (100 /*ms*/);
 
     _plugInEntry.reset ();
 

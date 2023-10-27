@@ -1,6 +1,7 @@
 //------------------------------------------------------------------------------
 //! \file       IPCPort.h
-//!             communication channel used for IPC in SDK IPC demo example
+//!             Proof-of-concept implementation of ARAIPCMessageChannel
+//!             for the ARA SDK TestHost (error handling is limited to assertions).
 //! \project    ARA SDK Examples
 //! \copyright  Copyright (c) 2012-2023, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +20,8 @@
 #pragma once
 
 
+#include "ARA_Library/IPC/ARAIPC.h"
+
 #if defined (_WIN32)
     #include <Windows.h>
     #include <mutex>
@@ -35,61 +38,50 @@
 #include <thread>
 
 
-// A simple proof-of-concept wrapper for an IPC communication channel.
-// Error handling is limited to assertions.
-class IPCPort
-{
-public:
-    // ID type for messages
-    using MessageID = int32_t;
-#if defined (_WIN32)
-    using DataToSend = std::string;
-    using ReceivedData = std::pair <const char*, size_t>;
-#elif defined (__APPLE__)
-    // the ownership of DataToSend is transferred both when passing it into sendMessage(),
-    // or when returning it from a ReceiveCallback.
-    using DataToSend = CFDataRef;
-    using ReceivedData = CFDataRef;
+// select underlying implementation: Apple CFDictionary or a generic pugixml-based
+// Note that the pugixml version is much less efficient because it base64-encodes bytes
+// (used for large sample data) which adds encoding overhead and requires additional copies.
+#ifndef USE_ARA_CF_ENCODING
+    #if defined (__APPLE__)
+        #define USE_ARA_CF_ENCODING 1
+    #else
+        #define USE_ARA_CF_ENCODING 0
+    #endif
 #endif
 
+
+class IPCPort : public ARA::IPC::ARAIPCMessageSender
+{
+public:
     // uninitialized port - cannot be used until move-assigned from factory functions
     IPCPort () = default;
 
-    ~IPCPort ();
+    ~IPCPort () override;
 
     // factory functions for send and receive ports
-#if defined (__APPLE__)
-    using ReceiveCallback = std::function</*__attribute__((cf_returns_retained))*/ DataToSend (const MessageID messageID, ReceivedData const messageData)>;
-#else
-    using ReceiveCallback = std::function<DataToSend (const MessageID messageID, ReceivedData const messageData)>;
-#endif
+    using ReceiveCallback = std::function<void (const ARA::IPC::ARAIPCMessageID messageID,
+                                                const ARA::IPC::ARAIPCMessageDecoder* decoder,
+                                                ARA::IPC::ARAIPCMessageEncoder* const replyEncoder)>;
     static IPCPort* createPublishingID (const std::string& portID, const ReceiveCallback& callback);
     static IPCPort* createConnectedToID (const std::string& portID, const ReceiveCallback& callback);
 
-    // message sending
-    // The messageData will be sent to the receiver, blocking the sending thread until the receiver
-    // has processed the message and returned a (potentially empty) reply, which will be forwarded
-    // to the optional replyHandler (can be nullptr if reply should be ignored)
-    using ReplyHandler = std::function<void (ReceivedData)>;
-#if defined (__APPLE__)
-    void sendMessage (const MessageID messageID, const DataToSend __attribute__((cf_consumed)) messageData, ReplyHandler* replyHandler);
-#else
-    void sendMessage (const MessageID messageID, const DataToSend& messageData, ReplyHandler* replyHandler);
-#endif
+    ARA::IPC::ARAIPCMessageEncoder* createEncoder () override;
+
+    void sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
+                      ReplyHandler const replyHandler, void* replyHandlerUserData) override;
+
+    // \todo currently not implemented, we rely on running on the same machine for now
+    //       C++20 offers std::endian which allows for a simple implementation upon connecting...
+    bool receiverEndianessMatches ()  override { return true; }
 
     // message receiving
     // waits up to the specified amount of milliseconds for an incoming event and processes it
     void runReceiveLoop (int32_t milliseconds);
 
-    // indicate byte order mismatch between sending and receiving machine
-    // \todo currently not implemented, we rely on running on the same machine for now
-    //       C++20 offers std::endian which allows for a simple implementation upon connecting...
-    bool endianessMatches () { return true; }
-
 private:
 #if defined (_WIN32)
     explicit IPCPort (const std::string& portID);
-    void _sendRequest (const MessageID messageID, const DataToSend& messageData);
+    void _sendRequest (const ARA::IPC::ARAIPCMessageID messageID, const std::string& messageData);
 #elif defined (__APPLE__)
     static CFDataRef _portCallback (CFMessagePortRef port, SInt32 messageID, CFDataRef messageData, void* info);
     static CFMessagePortRef __attribute__ ((cf_returns_retained)) _createMessagePortPublishingID (const std::string& portID, IPCPort* port);
@@ -103,7 +95,7 @@ private:
         static constexpr DWORD maxMessageSize { 4 * 1024 * 1024L - 64};
 
         size_t messageSize;
-        MessageID messageID;
+        ARA::IPC::ARAIPCMessageID messageID;
         char messageData[maxMessageSize];
     };
 
@@ -124,5 +116,6 @@ private:
     ReceiveCallback _receiveCallback {};
     int32_t _callbackLevel { 0 };
     bool _awaitsReply {};
-    ReplyHandler* _replyHandler {};
+    ReplyHandler _replyHandler {};
+    void* _replyHandlerUserData {};
 };

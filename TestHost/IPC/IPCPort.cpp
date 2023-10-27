@@ -1,6 +1,7 @@
 //------------------------------------------------------------------------------
 //! \file       IPCPort.cpp
-//!             communication channel used for IPC in SDK IPC demo example
+//!             Proof-of-concept implementation of ARAIPCMessageChannel
+//!             for the ARA SDK TestHost (error handling is limited to assertions).
 //! \project    ARA SDK Examples
 //! \copyright  Copyright (c) 2012-2023, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +19,13 @@
 
 #include "IPCPort.h"
 #include "ARA_Library/Debug/ARADebug.h"
+
+#if USE_ARA_CF_ENCODING
+    #include "ARA_Library/IPC/ARAIPCCFEncoding.h"
+#else
+    #include "IPC/IPCXMLEncoding.h"
+#endif
+
 
 #if defined (__APPLE__)
     #include <sys/posix_shm.h>
@@ -96,7 +104,7 @@ IPCPort* IPCPort::createConnectedToID (const std::string& portID, const ReceiveC
     return port;
 }
 
-void IPCPort::_sendRequest (const MessageID messageID, const DataToSend& messageData)
+void IPCPort::_sendRequest (const ARA::IPC::ARAIPCMessageID messageID, const std::string& messageData)
 {
     _readLock.lock ();
     _sharedMemory->messageID = messageID;
@@ -109,8 +117,10 @@ void IPCPort::_sendRequest (const MessageID messageID, const DataToSend& message
     _readLock.unlock ();
 }
 
-void IPCPort::sendMessage (const MessageID messageID, const DataToSend& messageData, ReplyHandler* replyHandler)
+void IPCPort::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
+                           ReplyHandler const replyHandler, void* replyHandlerUserData)
 {
+    const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder)->createEncodedMessage () };
     ARA_INTERNAL_ASSERT (messageData.size () <= SharedMemory::maxMessageSize);
 
     const bool isOnCreationThread { std::this_thread::get_id () == _creationThreadID };
@@ -142,8 +152,10 @@ void IPCPort::sendMessage (const MessageID messageID, const DataToSend& messageD
 
     const auto previousAwaitsReply { _awaitsReply };
     const auto previousReplyHandler { _replyHandler };
+    const auto previousReplyHandlerUserData { _replyHandlerUserData };
     _awaitsReply = true;
     _replyHandler = replyHandler;
+    _replyHandlerUserData = replyHandlerUserData;
     do
     {
         if (isOnCreationThread)
@@ -153,10 +165,16 @@ void IPCPort::sendMessage (const MessageID messageID, const DataToSend& messageD
     } while (_awaitsReply);
     _awaitsReply = previousAwaitsReply;
     _replyHandler = previousReplyHandler;
+    _replyHandlerUserData = previousReplyHandlerUserData;
 //  ARA_LOG ("IPCPort received reply to message %i%s", messageID, (needsLock) ? " ending transaction" : "");
 
     if (needsLock)
         ::ReleaseMutex (_writeLock);
+}
+
+ARA::IPC::ARAIPCMessageEncoder* IPCPort::createEncoder ()
+{
+    return new IPCXMLMessageEncoder {};
 }
 
 void IPCPort::runReceiveLoop (int32_t milliseconds)
@@ -175,7 +193,7 @@ void IPCPort::runReceiveLoop (int32_t milliseconds)
     }
 
     const auto messageID { _sharedMemory->messageID };
-    const ReceivedData messageData { _sharedMemory->messageData, _sharedMemory->messageSize };
+    const std::pair <const char*, size_t> messageData { _sharedMemory->messageData, _sharedMemory->messageSize };
     ::SetEvent (_dataReceived);
 
     if (messageID != 0)
@@ -183,19 +201,28 @@ void IPCPort::runReceiveLoop (int32_t milliseconds)
         ++_callbackLevel;
 
 //      ARA_LOG ("IPCPort received message with ID %i%s", messageID, (_awaitsReply) ? " while awaiting reply" : "");
-        const auto replyData { _receiveCallback (messageID, messageData) };
-        ARA_INTERNAL_ASSERT (replyData.size () <= SharedMemory::maxMessageSize);
+        const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData.first, messageData.second) };
+        auto replyEncoder { createEncoder () };
+        _receiveCallback (messageID, decoder, replyEncoder);
 
 //      ARA_LOG ("IPCPort replies to message with ID %i", messageID);
+        const auto replyData { static_cast<const IPCXMLMessageEncoder*> (replyEncoder)->createEncodedMessage () };
+        ARA_INTERNAL_ASSERT (replyData.size () <= SharedMemory::maxMessageSize);
         _sendRequest (0, replyData);
 
+        delete replyEncoder;
+        delete decoder;
         --_callbackLevel;
     }
     else
     {
         ARA_INTERNAL_ASSERT (_awaitsReply);
         if (_replyHandler)
-            (*_replyHandler) (messageData);
+        {
+            const auto replyDecoder { IPCXMLMessageDecoder::createWithMessageData (messageData.first, messageData.second) };
+            (*_replyHandler) (replyDecoder, _replyHandlerUserData);
+            delete replyDecoder;
+        }
         _awaitsReply = false;
     }
     
@@ -240,21 +267,43 @@ CFDataRef IPCPort::_portCallback (CFMessagePortRef /*port*/, SInt32 messageID, C
         ++port->_callbackLevel;
 
 //      ARA_LOG ("IPCPort received message with ID %i%s", messageID, (port->_awaitsReply) ? " while awaiting reply" : "");
-        const auto replyData { port->_receiveCallback (messageID, messageData) };
+#if USE_ARA_CF_ENCODING
+        const auto decoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
+#else
+        const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
+#endif
+        auto replyEncoder { port->createEncoder () };
+        port->_receiveCallback (messageID, decoder, replyEncoder);
 
 //      ARA_LOG ("IPCPort replies to message with ID %i", messageID);
+#if USE_ARA_CF_ENCODING
+        const auto replyData { ARAIPCCFCreateMessageEncoderData (replyEncoder) };
+#else
+        const auto replyData { static_cast<const IPCXMLMessageEncoder*> (replyEncoder)->createEncodedMessage () };
+#endif
         const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (port->_sendPort, 0, replyData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
         ARA_INTERNAL_ASSERT (portSendResult == kCFMessagePortSuccess);
         if (replyData)
             CFRelease (replyData);
 
+        delete replyEncoder;
+        delete decoder;
         --port->_callbackLevel;
     }
     else
     {
         ARA_INTERNAL_ASSERT (port->_awaitsReply);
         if (port->_replyHandler)
-            (*port->_replyHandler) (messageData);
+        {
+            ARA_INTERNAL_ASSERT (messageData != nullptr);
+#if USE_ARA_CF_ENCODING
+            const auto replyDecoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
+#else
+            const auto replyDecoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
+#endif
+            (*port->_replyHandler) (replyDecoder, port->_replyHandlerUserData);
+            delete replyDecoder;
+        }
         port->_awaitsReply = false;
     }
 
@@ -342,8 +391,15 @@ IPCPort* IPCPort::createConnectedToID (const std::string& portID, const ReceiveC
     return port;
 }
 
-void IPCPort::sendMessage (const MessageID messageID, const DataToSend __attribute__((cf_consumed)) messageData, ReplyHandler* replyHandler)
+void IPCPort::sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
+                           ReplyHandler const replyHandler, void* replyHandlerUserData)
 {
+#if USE_ARA_CF_ENCODING
+    const auto messageData { ARAIPCCFCreateMessageEncoderData (encoder) };
+#else
+    const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder)->createEncodedMessage () };
+#endif
+
     const bool isOnCreationThread { std::this_thread::get_id () == _creationThreadID };
     const bool needsLock { !isOnCreationThread || (_callbackLevel == 0) };
 //  ARA_LOG ("IPCPort sends message %i%s%s", messageID, (!isOnCreationThread) ? " from other thread" : "",
@@ -373,8 +429,10 @@ void IPCPort::sendMessage (const MessageID messageID, const DataToSend __attribu
 
     const auto previousAwaitsReply { _awaitsReply };
     const auto previousReplyHandler { _replyHandler };
+    const auto previousReplyHandlerUserData { _replyHandlerUserData };
     _awaitsReply = true;
     _replyHandler = replyHandler;
+    _replyHandlerUserData = replyHandlerUserData;
     do
     {
         if (isOnCreationThread)
@@ -384,10 +442,20 @@ void IPCPort::sendMessage (const MessageID messageID, const DataToSend __attribu
     } while (_awaitsReply);
     _awaitsReply = previousAwaitsReply;
     _replyHandler = previousReplyHandler;
+    _replyHandlerUserData = previousReplyHandlerUserData;
 //  ARA_LOG ("IPCPort received reply to message %i%s", messageID, (needsLock) ? " ending transaction" : "");
 
     if (needsLock)
         sem_post (_writeSemaphore);
+}
+
+ARA::IPC::ARAIPCMessageEncoder* IPCPort::createEncoder ()
+{
+#if USE_ARA_CF_ENCODING
+    return ARA::IPC::ARAIPCCFCreateMessageEncoder ();
+#else
+    return new IPCXMLMessageEncoder {};
+#endif
 }
 
 void IPCPort::runReceiveLoop (int32_t milliseconds)
