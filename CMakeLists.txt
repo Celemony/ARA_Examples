@@ -21,23 +21,13 @@
 # ======================
 # cmake compatibility
 
-# VisualStudio 2017 ships with 3.12 so this is our minimum requirement.
 # You may be able to use older versions by commenting out this line, but we do not support it.
-cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
-if(WIN32)
-    # on 3.13 and up we can additionally use VS_DEBUGGER_COMMAND
-    if(CMAKE_VERSION VERSION_LESS 3.13)
-        message(STATUS "Using CMake 3.13 or higher is suggested to improve debugger integration.")
-    endif()
-elseif(APPLE)
-    # 3.15 and up is required for for XCODE_GENERATE_SCHEME
-    if(CMAKE_VERSION VERSION_LESS 3.15)
-        message(STATUS "Using CMake 3.15 or higher is required for proper debugger integration!")
-    endif()
+cmake_minimum_required(VERSION 3.19 FATAL_ERROR)
+if(APPLE)
     if(NOT CMAKE_GENERATOR MATCHES "Xcode")
         message(FATAL_ERROR "CMake support for Apple platforms is currently limited to Xcode, add '-G Xcode'.")
     endif()
-else()
+elseif(NOT WIN32)
     message(STATUS "Careful: ARA CMake support for this system is currently experimental.")
 endif()
 
@@ -217,6 +207,7 @@ set(CXX_STANDARD_REQUIRED ON)
 # older CMake can't link to object targets, must build static lib instead
 # \todo when building universal binaries for macOS, the paths to the object files are broken...
 #       to work around, we need to stick with static libs for now.
+#       CMake 3.20 promises a fix for the issue...
 #if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.12)
 #    set(ARA_SHARED_TARGET_TYPE OBJECT)
 #else()

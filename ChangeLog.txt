@@ -14,6 +14,7 @@ Changes since previous releases:
 - updated Audio Unit SDK from the old CoreAudioUtilityClasses.zip sample code download to
   Apple's current release on github (note: requires update to C++17 for affected targets)
 - updated VST3 SDK to version 3.7.8 build 34
+- required minimum CMake version increased from 3.12 to 3.19 (same as VST3)
 
 
 === ARA SDK 2.2 release (aka 2.2.001) (2022/11/07) ===
