@@ -2,7 +2,7 @@
 //! \file       ARAExamples.rc
 //!             Windows resource fork implementation for the ARA examples.
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2022, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2023, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -32,7 +32,7 @@
 // Version
 
 #define COMPANY_NAME        "ARA SDK Examples"
-#define COPYRIGHT_YEAR      "2012-2022"
+#define COPYRIGHT_YEAR      "2012-2023"
 #define LEGAL_TRADEMARKS    "ARA Audio Random Access is a trademark of Celemony Software GmbH. VST is a trademark of Steinberg Media Technologies GmbH."
 
 // \todo we're currently only building either .exe or .vst3, so checking ARA_TARGET_TYPE_... this way is sufficient for now

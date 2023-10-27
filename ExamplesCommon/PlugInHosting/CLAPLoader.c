@@ -2,7 +2,7 @@
 //! \file       CLAPLoader.c
 //!             CLAP specific ARA implementation for the SDK's hosting examples
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2022-2022, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2022-2023, Celemony Software GmbH, All Rights Reserved.
 //!             Developed in cooperation with Timo Kaluza (defiantnerd)
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
