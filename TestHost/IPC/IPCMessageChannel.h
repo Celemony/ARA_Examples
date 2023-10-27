@@ -56,7 +56,8 @@ public:
     ~IPCMessageChannel () override;
 
     // factory functions for send and receive channels
-    using ReceiveCallback = std::function<void (const ARA::IPC::ARAIPCMessageID messageID,
+    using ReceiveCallback = std::function<void (ARAIPCMessageChannel* messageChannel,
+                                                const ARA::IPC::ARAIPCMessageID messageID,
                                                 const ARA::IPC::ARAIPCMessageDecoder* decoder,
                                                 ARA::IPC::ARAIPCMessageEncoder* const replyEncoder)>;
     static IPCMessageChannel* createPublishingID (const std::string& channelID, const ReceiveCallback& callback);

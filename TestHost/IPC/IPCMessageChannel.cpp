@@ -204,7 +204,7 @@ void IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
 //      ARA_LOG ("IPCMessageChannel received message with ID %i%s", messageID, (_awaitsReply) ? " while awaiting reply" : "");
         const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData.first, messageData.second) };
         auto replyEncoder { createEncoder () };
-        _receiveCallback (messageID, decoder, replyEncoder);
+        _receiveCallback (this, messageID, decoder, replyEncoder);
 
 //      ARA_LOG ("IPCMessageChannel replies to message with ID %i", messageID);
         const auto replyData { static_cast<const IPCXMLMessageEncoder*> (replyEncoder)->createEncodedMessage () };
@@ -274,7 +274,7 @@ CFDataRef IPCMessageChannel::_portCallback (CFMessagePortRef /*port*/, SInt32 me
         const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
 #endif
         auto replyEncoder { channel->createEncoder () };
-        channel->_receiveCallback (messageID, decoder, replyEncoder);
+        channel->_receiveCallback (channel, messageID, decoder, replyEncoder);
 
 //      ARA_LOG ("IPCMessageChannel replies to message with ID %i", messageID);
 #if USE_ARA_CF_ENCODING

@@ -83,7 +83,8 @@ constexpr auto kIPCDestroyEffectMethodID { ARA::IPC::MethodID::createWithNonARAM
 constexpr auto kIPCTerminateMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-6> () };
 
 
-void remoteHostCommandHandler (const ARA::IPC::ARAIPCMessageID messageID,
+void remoteHostCommandHandler (ARA::IPC::ARAIPCMessageChannel* channel,
+                               const ARA::IPC::ARAIPCMessageID messageID,
                                const ARA::IPC::ARAIPCMessageDecoder* decoder,
                                ARA::IPC::ARAIPCMessageEncoder* const replyEncoder);
 
@@ -649,7 +650,8 @@ public:
 std::unique_ptr<PlugInEntry> _plugInEntry {};
 bool _shutDown { false };
 
-void remoteHostCommandHandler (const ARA::IPC::ARAIPCMessageID messageID,
+void remoteHostCommandHandler (ARA::IPC::ARAIPCMessageChannel* messageChannel,
+                               const ARA::IPC::ARAIPCMessageID messageID,
                                const ARA::IPC::ARAIPCMessageDecoder* decoder,
                                ARA::IPC::ARAIPCMessageEncoder* const replyEncoder)
 {
@@ -704,7 +706,7 @@ void remoteHostCommandHandler (const ARA::IPC::ARAIPCMessageID messageID,
     }
     else
     {
-        ARA::IPC::ARAIPCProxyHostCommandHandler (messageID, decoder, replyEncoder);
+        ARA::IPC::ARAIPCProxyHostCommandHandler (messageChannel, messageID, decoder, replyEncoder);
     }
 }
 
@@ -717,7 +719,6 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
     auto plugInCallbacksChannel { IPCMessageChannel::createPublishingID (channelID, remoteHostCommandHandler) };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
-    ARA::IPC::ARAIPCProxyHostSetPlugInCallbacksChannel (plugInCallbacksChannel);
     ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef, ARA::ARADocumentControllerRef controllerRef,
                                                         ARA::ARAPlugInInstanceRoleFlags knownRoles, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
                                                         -> const ARA::ARAPlugInExtensionInstance*
