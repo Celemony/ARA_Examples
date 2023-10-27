@@ -33,7 +33,7 @@
 #define NULL nullptr
 
 
-static CLAP_CONSTEXPR const char CLAP_TEST_PLUGIN_ID[] = "com.arademocompany.testplugin.clap";
+static CLAP_CONSTEXPR const char CLAP_TEST_PLUGIN_ID[] = "org.ara-audio.examples.testplugin.clap";
 
 
 static const char* const s_my_features[] = {

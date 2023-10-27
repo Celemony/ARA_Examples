@@ -12,7 +12,7 @@
 			<key>manufacturer</key>
 			<string>ADeC</string>
 			<key>name</key>
-			<string>ARA Demo Company: ARATestPlugIn</string>
+			<string>ARA SDK Examples: ARATestPlugIn</string>
 			<key>sandboxSafe</key>
 			<true/>
 			<key>subtype</key>

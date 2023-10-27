@@ -886,7 +886,7 @@ function(configure_ARA_Examples_target target)
             -DNOMINMAX=1
         )
     elseif(APPLE)
-        set(bundle_identifier com.arademocompany.${target})
+        set(bundle_identifier org.ara-audio.examples.${target})
         set_target_properties(${target} PROPERTIES
             ARA_PRODUCT_BUNDLE_IDENTIFIER ${bundle_identifier}
         )
@@ -1415,7 +1415,7 @@ if(APPLE)
     ara_configure_binary_package(ARATestPlugInAUv3Extension "appex" "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Extension/TestAUv3ExtensionInfo.plist")
 
     # hotfix: bundle identifier of extension must start with identifier of container application, patch accordingly
-    set(auv3_bundle_id com.arademocompany.ARATestPlugInAUv3App.AUv3Extension)
+    set(auv3_bundle_id org.ara-audio.examples.ARATestPlugInAUv3App.AUv3Extension)
     # \todo this would be cleaner:
     #set(auv3_bundle_id $<TARGET_PROPERTY:ARATestPlugInAUv3App,ARA_PRODUCT_BUNDLE_IDENTIFIER>.AUv3Extension)
     set_target_properties(ARATestPlugInAUv3Extension PROPERTIES

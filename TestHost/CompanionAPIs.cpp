@@ -101,7 +101,7 @@ IPCPort::DataToSend remoteHostCommandHandler (const int32_t messageID, IPCPort::
 // helper function to create unique port IDs for each run
 static const std::string _createPortID ()
 {
-    std::string baseID { "com.arademocompany.TestHost.IPC." };
+    std::string baseID { "org.ara-audio.examples.testhost.ipc." };
 
 #if defined (_WIN32)
     std::string uniqueID;

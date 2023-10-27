@@ -31,7 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Version
 
-#define COMPANY_NAME        "ARA Demo Company"
+#define COMPANY_NAME        "ARA SDK Examples"
 #define COPYRIGHT_YEAR      "2012-2022"
 #define LEGAL_TRADEMARKS    "ARA Audio Random Access is a trademark of Celemony Software GmbH. VST is a trademark of Steinberg Media Technologies GmbH."
 

@@ -26,11 +26,11 @@
 #endif
 
 #define TEST_PLUGIN_NAME "ARATestPlugIn"
-#define TEST_MANUFACTURER_NAME "ARA Demo Company"
-#define TEST_INFORMATION_URL "https://www.arademocompany.com"
-#define TEST_MAILTO_URL "mailto:info@arademocompany.com"
+#define TEST_MANUFACTURER_NAME "ARA SDK Examples"
+#define TEST_INFORMATION_URL "https://www.ara-audio.org/examples"
+#define TEST_MAILTO_URL "mailto:info@ara-audio.org?subject=ARATestPlugIn"
 #define TEST_VERSION_STRING IN_QUOTES(ARA_MAJOR_VERSION) "." IN_QUOTES(ARA_MINOR_VERSION) "." IN_QUOTES(ARA_PATCH_VERSION)
 
-#define TEST_FACTORY_ID "com.arademocompany.testplugin.arafactory"
-#define TEST_DOCUMENT_ARCHIVE_ID "com.arademocompany.testplugin.aradocumentarchive.version1"
-#define TEST_FILECHUNK_ARCHIVE_ID "com.arademocompany.testplugin.arafilechunkarchive.version1"
+#define TEST_FACTORY_ID "org.ara-audio.examples.testplugin.arafactory"
+#define TEST_DOCUMENT_ARCHIVE_ID "org.ara-audio.examples.testplugin.aradocumentarchive.version1"
+#define TEST_FILECHUNK_ARCHIVE_ID "org.ara-audio.examples.testplugin.arafilechunkarchive.version1"

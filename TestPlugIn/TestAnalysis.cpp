@@ -109,7 +109,7 @@ public:
 
     const std::string& getIdentifier () const override
     {
-        static const std::string identifier { "com.arademocompany.testplugin.algorithm.default" };
+        static const std::string identifier { "org.ara-audio.examples.testplugin.algorithm.default" };
         return identifier;
     }
 
@@ -234,7 +234,7 @@ public:
 
     const std::string& getIdentifier () const override
     {
-        static const std::string identifier { "com.arademocompany.testplugin.algorithm.singlenote" };
+        static const std::string identifier { "org.ara-audio.examples.testplugin.algorithm.singlenote" };
         return identifier;
     }
 
