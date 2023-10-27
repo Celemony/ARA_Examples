@@ -817,7 +817,7 @@ void ARATestDocumentController::enableRendererModelGraphAccess () noexcept
 
 /*******************************************************************************/
 
-static constexpr std::array<ARA::ARAContentType, 1> analyzeableContentTypes { ARA::kARAContentTypeNotes };
+static constexpr std::array<ARA::ARAContentType, 1> analyzeableContentTypes { { ARA::kARAContentTypeNotes } };
 
 class ARATestFactoryConfig : public ARA::PlugIn::FactoryConfig
 {
