@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------
-//! \file       IPCMessage.h
-//!             messaging used for IPC in SDK IPC demo example
+//! \file       IPCXMLMessage.h
+//!             XML-based messaging used for IPC in SDK IPC demo example
 //! \project    ARA SDK Examples
 //! \copyright  Copyright (c) 2012-2022, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,17 +18,6 @@
 
 #pragma once
 
-// select underlying implementation: Apple CFDictionary or a generic pugixml-based
-// Note that the pugixml version is much less efficient because it base64-encodes bytes
-// (used for large sample data) which adds encoding overhead and requires additional copies.
-#ifndef IPC_MESSAGE_USE_CFDICTIONARY
-    #if defined (__APPLE__)
-        #define IPC_MESSAGE_USE_CFDICTIONARY 1
-    #else
-        #define IPC_MESSAGE_USE_CFDICTIONARY 0
-    #endif
-#endif
-
 #include <memory>
 #include <type_traits>
 #include <vector>
@@ -37,10 +26,7 @@
     #include <CoreFoundation/CoreFoundation.h>
 #endif
 
-#if !IPC_MESSAGE_USE_CFDICTIONARY
-    #include "3rdParty/pugixml/src/pugixml.hpp"
-    #include "3rdParty/cpp-base64/base64.h"
-#endif
+#include "3rdParty/pugixml/src/pugixml.hpp"
 
 
 // A simple proof-of-concept wrapper for the IPC messages sent back and forth in the ARA IPC example.
@@ -54,34 +40,30 @@
 // side had smaller pointers, some additional infrastructure would be needed to allocate a unique
 // 32 bit representation for each size_t provided by the 64 bit process to the 32 bit process,
 // and then map between the two.
-class IPCMessage
+class IPCXMLMessage
 {
 public:
     // key type for message arguments
     using MessageKey = int32_t;
 
     // C++ "rule of five" standard methods
-    IPCMessage (const IPCMessage& other) { *this = other; }
-    IPCMessage (IPCMessage&& other) noexcept { *this = std::move (other); }
-    IPCMessage& operator= (const IPCMessage& other);
-    IPCMessage& operator= (IPCMessage&& other)  noexcept;
-#if IPC_MESSAGE_USE_CFDICTIONARY
-    ~IPCMessage ();
-#endif
+    IPCXMLMessage (const IPCXMLMessage& other) { *this = other; }
+    IPCXMLMessage (IPCXMLMessage&& other) noexcept { *this = std::move (other); }
+    IPCXMLMessage& operator= (const IPCXMLMessage& other);
+    IPCXMLMessage& operator= (IPCXMLMessage&& other)  noexcept;
 
     // to be used by IPCPort only: encoding from/to port-internal datas format
 #if defined (__APPLE__)
-    explicit IPCMessage (CFDataRef data);
+    explicit IPCXMLMessage (CFDataRef data);
     __attribute__((cf_returns_retained)) CFDataRef createEncodedMessage () const;
 #else
-    IPCMessage (const char* data, const size_t dataSize);
+    IPCXMLMessage (const char* data, const size_t dataSize);
     std::string createEncodedMessage () const;
 #endif
 
     // default construction, creating empty message
-    IPCMessage () = default;
+    IPCXMLMessage () = default;
 
-    // ARA::IPC::ARAIPCMessageEncoder implementation
     void appendInt32 (const MessageKey argKey, const int32_t argValue);
     void appendInt64 (const MessageKey argKey, const int64_t argValue);
     void appendSize (const MessageKey argKey, const size_t argValue);
@@ -89,9 +71,8 @@ public:
     void appendDouble (const MessageKey argKey, const double argValue);
     void appendString (const MessageKey argKey, const char* const argValue);
     void appendBytes (const MessageKey argKey, const uint8_t* argValue, const size_t argSize, const bool copy);
-    IPCMessage* appendSubMessage (const MessageKey argKey);
+    IPCXMLMessage* appendSubMessage (const MessageKey argKey);
 
-    // ARA::IPC::ARAIPCMessageDecoder implementation
     bool isEmpty () const;
     bool readInt32 (const MessageKey argKey, int32_t& argValue) const;
     bool readInt64 (const MessageKey argKey, int64_t& argValue) const;
@@ -101,35 +82,18 @@ public:
     bool readString (const MessageKey argKey, const char*& argValue) const;
     bool readBytesSize (const MessageKey argKey, size_t& argSize) const;
     void readBytes (const MessageKey argKey, uint8_t* const argValue) const;
-    IPCMessage* readSubMessage (const MessageKey argKey) const;
+    IPCXMLMessage* readSubMessage (const MessageKey argKey) const;
 
 private:
-#if IPC_MESSAGE_USE_CFDICTIONARY
-    // wrap key value into CFString (no reference count transferred to caller)
-    static CFStringRef _getEncodedKey (const MessageKey argKey);
-
-    // internal primitive
-    // typically, a copy should be made whenever the input is writable -
-    // an exception is appending writable sub-messages
-    void _setup (CFDictionaryRef dictionary, bool isWritable, bool makeCopy);
-
-    void _appendEncodedArg (const MessageKey argKey, __attribute__((cf_consumed)) CFTypeRef argObject);
-#else
-    static const char* _getEncodedKey (const MessageKey argKey);
-
     void _makeWritableIfNeeded ();
-
+    static const char* _getEncodedKey (const MessageKey argKey);
     pugi::xml_attribute _appendAttribute (const MessageKey argKey);
-#endif
 
 private:
-#if IPC_MESSAGE_USE_CFDICTIONARY
-    CFDictionaryRef _dictionary {};     // if modified, actually converted to a CFMutableDictionaryRef
-#else
     std::shared_ptr<pugi::xml_document> _dictionary {};
     pugi::xml_node _root {};
+    bool _isWritable {};
+
     mutable std::string _bytesCacheData {};
     mutable MessageKey _bytesCacheKey { std::numeric_limits<MessageKey>::max () };
-#endif
-    bool _isWritable {};
 };

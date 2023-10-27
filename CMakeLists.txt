@@ -1546,8 +1546,8 @@ endif()
 # \todo add IPC implementation for Linux
 if(APPLE OR WIN32)
     target_sources(ARATestHost PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCMessage.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCMessage.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCXMLMessage.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCXMLMessage.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCPort.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCPort.cpp"
     )
