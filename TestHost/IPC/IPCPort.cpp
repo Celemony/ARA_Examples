@@ -38,7 +38,6 @@ IPCPort::IPCPort (IPCPort&& other) noexcept
 IPCPort& IPCPort::operator= (IPCPort&& other) noexcept
 {
     std::swap (_receiveCallback, other._receiveCallback);
-    std::swap (_hSendMutex, other._hSendMutex);
     std::swap (_hWriteMutex, other._hWriteMutex);
     std::swap (_hRequest, other._hRequest);
     std::swap (_hResult, other._hResult);
@@ -59,8 +58,6 @@ IPCPort::~IPCPort ()
         ::CloseHandle (_hRequest);
     if (_hWriteMutex)
         ::CloseHandle (_hWriteMutex);
-    if (_hSendMutex)
-        ::CloseHandle (_hSendMutex);
 }
 
 IPCPort::IPCPort (const char* remotePortID)
@@ -91,9 +88,6 @@ IPCPort IPCPort::createConnectedToID (const char* remotePortID)
 {
     IPCPort port { remotePortID };
 
-    port._hSendMutex = ::CreateMutexA (NULL, FALSE, (std::string { "Send" } + remotePortID).c_str ());
-    ARA_INTERNAL_ASSERT (port._hSendMutex != nullptr);
-
     const auto mapKey { std::string { "Map" } + remotePortID };
     while (!port._hMap)
     {
@@ -112,9 +106,6 @@ void IPCPort::sendMessage (const MessageID messageID, DataToSend const messageDa
 
     ARA_INTERNAL_ASSERT (messageData.size () < SharedMemory::maxMessageSize);
 
-    const auto waitSendMutex { ::WaitForSingleObject (_hSendMutex, messageTimeout) };
-    ARA_INTERNAL_ASSERT (waitSendMutex == WAIT_OBJECT_0);
-
     const auto waitWriteMutex { ::WaitForSingleObject (_hWriteMutex, messageTimeout) };
     ARA_INTERNAL_ASSERT (waitWriteMutex == WAIT_OBJECT_0);
 
@@ -130,8 +121,6 @@ void IPCPort::sendMessage (const MessageID messageID, DataToSend const messageDa
     ARA_INTERNAL_ASSERT (waitResult == WAIT_OBJECT_0);
     if (replyHandler)
         (*replyHandler) ({ _sharedMemory->messageData, _sharedMemory->messageSize });
-
-    ::ReleaseMutex (_hSendMutex);
 }
 
 void IPCPort::runReceiveLoop (int32_t milliseconds)
@@ -236,9 +225,7 @@ void IPCPort::sendMessage (const MessageID messageID, DataToSend const __attribu
 //  ARA_LOG ("IPCPort::sendMessage %i", messageID);
 
     ReceivedData incomingData {};
-    os_unfair_lock_lock (&_sendLock);
     const auto ARA_MAYBE_UNUSED_VAR (portSendResult) { CFMessagePortSendRequest (_port, messageID, messageData, 0.001 * messageTimeout, 0.001 * messageTimeout, kCFRunLoopDefaultMode, &incomingData) };
-    os_unfair_lock_unlock (&_sendLock);
     ARA_INTERNAL_ASSERT (incomingData && (portSendResult == kCFMessagePortSuccess));
     if (messageData)
         CFRelease (messageData);
