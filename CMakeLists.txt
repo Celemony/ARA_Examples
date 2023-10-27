@@ -1030,6 +1030,12 @@ function(ara_configure_binary_package target extension apple_plist_file)
         )
     endif()
 
+   if(MSVC)
+        target_link_options(${target} PRIVATE
+            /NOEXP
+        )
+    endif()
+
     # even though our plug-ins are technically libs, they are distributed as user-visible binaries so we place them next to the apps
     set_target_properties(${target} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
@@ -1229,6 +1235,7 @@ if (ARA_ENABLE_VST3)
     set_target_properties(ARATestPlugInVST3 PROPERTIES
         FOLDER "Examples/ARATestPlugIn"
         OUTPUT_NAME "ARATestPlugIn"
+        PDB_NAME "ARATestPlugIn_vst3"
     )
 
     target_link_libraries(ARATestPlugInVST3 PRIVATE
@@ -1497,6 +1504,7 @@ if(ARA_ENABLE_CLAP)
     set_target_properties(ARATestPlugInCLAP PROPERTIES
         FOLDER "Examples/ARATestPlugIn"
         OUTPUT_NAME "ARATestPlugIn"
+        PDB_NAME "ARATestPlugIn_clap"
     )
 
     target_compile_features(ARATestPlugInCLAP PRIVATE cxx_std_20)
