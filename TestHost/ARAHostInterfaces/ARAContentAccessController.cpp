@@ -86,7 +86,7 @@ ARA::ARAContentGrade ARAContentAccessController::getMusicalContextContentGrade (
 {
     const auto musicalContext = fromHostRef (musicalContextHostRef);
     ARA_VALIDATE_API_ARGUMENT (musicalContext, ARA::contains (getDocument ()->getMusicalContexts (), musicalContext));
-    ARA_VALIDATE_API_ARGUMENT (nullptr, isContentAvailable (musicalContext, type));
+    ARA_VALIDATE_API_STATE (isContentAvailable (musicalContext, type));
 
     return getContentGrade (musicalContext, type);
 }
@@ -95,7 +95,7 @@ ARA::ARAContentReaderHostRef ARAContentAccessController::createMusicalContextCon
 {
     const auto musicalContext = fromHostRef (musicalContextHostRef);
     ARA_VALIDATE_API_ARGUMENT (musicalContextHostRef, ARA::contains (getDocument ()->getMusicalContexts (), musicalContext));
-    ARA_VALIDATE_API_ARGUMENT (nullptr, isContentAvailable (musicalContext, type));
+    ARA_VALIDATE_API_STATE (isContentAvailable (musicalContext, type));
 
     if (auto contentReader { createContentReader (musicalContext, type) })
     {
@@ -119,7 +119,7 @@ ARA::ARAContentGrade ARAContentAccessController::getAudioSourceContentGrade (ARA
 {
     const auto audioSource = fromHostRef (audioSourceHostRef);
     ARA_VALIDATE_API_ARGUMENT (audioSource, ARA::contains (getDocument ()->getAudioSources (), audioSource));
-    ARA_VALIDATE_API_ARGUMENT (nullptr, isContentAvailable (audioSource, type));
+    ARA_VALIDATE_API_STATE (isContentAvailable (audioSource, type));
 
     return getContentGrade (audioSource, type);
 }
@@ -128,7 +128,7 @@ ARA::ARAContentReaderHostRef ARAContentAccessController::createAudioSourceConten
 {
     const auto audioSource = fromHostRef (audioSourceHostRef);
     ARA_VALIDATE_API_ARGUMENT (audioSource, ARA::contains (getDocument ()->getAudioSources (), audioSource));
-    ARA_VALIDATE_API_ARGUMENT (nullptr, isContentAvailable (audioSource, type));
+    ARA_VALIDATE_API_STATE (isContentAvailable (audioSource, type));
 
     if (auto contentReader { createContentReader (audioSource, type) })
     {

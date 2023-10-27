@@ -65,8 +65,8 @@ bool ARAArchivingController::writeBytesToArchive (ARA::ARAArchiveWriterHostRef a
 // use to keep track of its archiving/unarchiving progress
 void ARAArchivingController::notifyDocumentArchivingProgress (float value) noexcept
 {
-    ARA_LOG ("document archiving progress is %.f%%.", 100.0 * value);
     ARA_VALIDATE_API_STATE (_araDocumentController->isUsingArchive ());
+    ARA_LOG ("document archiving progress is %.f%%.", 100.0 * value);
 }
 
 void ARAArchivingController::notifyDocumentUnarchivingProgress (float value) noexcept
@@ -78,5 +78,6 @@ void ARAArchivingController::notifyDocumentUnarchivingProgress (float value) noe
 ARA::ARAPersistentID ARAArchivingController::getDocumentArchiveID (ARA::ARAArchiveReaderHostRef archiveReaderHostRef) noexcept
 {
     const auto archive = fromHostRef (archiveReaderHostRef);
+    ARA_VALIDATE_API_STATE (_araDocumentController->isUsingArchive (archive));
     return archive->getDocumentArchiveID ().c_str ();
 }
