@@ -719,8 +719,9 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
     auto plugInCallbacksChannel { IPCMessageChannel::createPublishingID (channelID, remoteHostCommandHandler) };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
-    ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef, ARA::ARADocumentControllerRef controllerRef,
-                                                        ARA::ARAPlugInInstanceRoleFlags knownRoles, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
+    ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCMessageChannel* /*messageChannel*/, ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef,
+                                                    ARA::ARADocumentControllerRef controllerRef,
+                                                    ARA::ARAPlugInInstanceRoleFlags knownRoles, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
                                                         -> const ARA::ARAPlugInExtensionInstance*
                                                 {
                                                     // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
