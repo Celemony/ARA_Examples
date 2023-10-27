@@ -347,8 +347,15 @@ int main (int argc, const char * argv[])
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
     AudioUnitComponent audioUnitComponent = AudioUnitPrepareComponentWithIDs(ARA_PLUGIN_AUDIOUNIT_IDS);
     ARA_INTERNAL_ASSERT(audioUnitComponent != NULL);
-    AudioUnitInstance audioUnit = AudioUnitOpenInstance(audioUnitComponent);
-    factory = AudioUnitGetARAFactory(audioUnit);
+    AudioUnitInstance audioUnit = AudioUnitOpenInstance(audioUnitComponent, false);
+
+    struct ARAIPCMessageSender * messageSender;
+    factory = AudioUnitGetARAFactory(audioUnit, &messageSender);
+    if (messageSender != NULL)
+    {
+        ARA_WARN("this plug-in requires to use IPC, which is not supported in this simple example.");
+        return -1;
+    }
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     VST3Effect vst3Effect;
     VST3Binary vst3Binary = VST3LoadBinary(ARA_PLUGIN_VST3_BINARY);
@@ -490,7 +497,7 @@ int main (int argc, const char * argv[])
     factory->uninitializeARA();
 
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
-    // unloading is not supported for Audio Units
+    AudioUnitCleanupComponent (audioUnitComponent);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
     VST3UnloadBinary(vst3Binary);
 #endif

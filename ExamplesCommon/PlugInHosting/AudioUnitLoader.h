@@ -24,21 +24,32 @@
 #include <MacTypes.h>
 
 #if defined(__cplusplus)
+namespace ARA { namespace IPC { struct ARAIPCMessageSender; } }
 extern "C"
 {
+#else
+struct ARAIPCMessageSender;
 #endif
 
-typedef struct OpaqueAudioComponent * AudioUnitComponent;
+typedef struct _AudioUnitComponent * AudioUnitComponent;
 typedef struct _AudioUnitInstance * AudioUnitInstance;
 
 AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype, OSType manufacturer);
-const struct ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance);
-AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent);
-const struct ARA_NAMESPACE ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnit, ARA_NAMESPACE ARADocumentControllerRef controllerRef, ARA_NAMESPACE ARAPlugInInstanceRoleFlags assignedRoles);
+bool AudioUnitIsV2(AudioUnitComponent audioUnitComponent);
+AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, bool useIPC);
+// On return, *messageSender will be NULL if Audio Unit does not use IPC, otherwise it will point to
+// a valid ARAIPCMessageSender for all factory-related calls until AudioUnitCleanupComponent() is called.
+#if defined(__cplusplus)
+const ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnit, ARA_NAMESPACE IPC::ARAIPCMessageSender ** messageSender);
+#else
+const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnit, struct ARAIPCMessageSender ** messageSender);
+#endif
+const ARA_NAMESPACE ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnit, ARA_NAMESPACE ARADocumentControllerRef controllerRef, ARA_NAMESPACE ARAPlugInInstanceRoleFlags assignedRoles);
 void AudioUnitStartRendering(AudioUnitInstance audioUnit, UInt32 maxBlockSize, double sampleRate);
 void AudioUnitRenderBuffer(AudioUnitInstance audioUnit, UInt32 blockSize, SInt64 samplePosition, float * buffer);
 void AudioUnitStopRendering(AudioUnitInstance audioUnit);
 void AudioUnitCloseInstance(AudioUnitInstance audioUnit);
+void AudioUnitCleanupComponent(AudioUnitComponent audioUnitComponent);
 
 #if defined(__cplusplus)
 }   // extern "C"

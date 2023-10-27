@@ -29,6 +29,19 @@
 #include "ARA_API/ARAAudioUnit.h"
 #include "ARA_API/ARAAudioUnit_v3.h"
 #include "ARA_Library/Debug/ARADebug.h"
+#include "ARA_Library/IPC/ARAIPCAudioUnit_v3.h"
+#include "ARA_Library/IPC/ARAIPCLockingContext.h"
+
+
+struct _AudioUnitComponent
+{
+    AudioComponent component;
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+    const ARAFactory * ipcFactory;              // cache - NULL until read via IPC
+    ARAIPCLockingContextRef lockingContextRef;  // invalid until ipcFactory is read via IPC
+    ARAIPCMessageSender factoryMessageSender;   // invalid until ipcFactory is read via IPC
+#endif
+};
 
 
 struct _AudioUnitInstance
@@ -40,15 +53,25 @@ struct _AudioUnitInstance
         AudioUnit v2AudioUnit;
         AUAudioUnit * __strong v3AudioUnit;
     };
-    AURenderBlock v3RenderBlock;    // only for AUv3: cache of render block outside ObjC runtime
     SInt64 samplePosition;
+    AURenderBlock v3RenderBlock;                // only for AUv3: cache of render block outside ObjC runtime
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+    BOOL isOutOfProcess;                        // loaded in- or out-of-process
+    BOOL isBoundViaIPC;                         // YES if instanceSender has been initialized via ARA binding
+    ARAIPCMessageSender instanceSender;         // IPC sender, only valid when isBoundViaIPC is YES
+#endif
 };
 
 
 AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype, OSType manufacturer)
 {
+    AudioUnitComponent result = malloc(sizeof(struct _AudioUnitComponent));
+    result->component = NULL;
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+    result->ipcFactory = NULL;
+#endif
+
     AudioComponentDescription compDesc = { type, subtype, manufacturer, 0, 0 };
-    AudioComponent component = NULL;
     if (@available(macOS 10.10, *))
     {
         @autoreleasepool
@@ -66,7 +89,7 @@ AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype,
             if (avComponent)
             {
                 ARA_VALIDATE_API_CONDITION([avComponent passesAUVal]);
-                component = [avComponent audioComponent];
+                result->component = [avComponent audioComponent];
 
 #if ARA_CPU_ARM
                 // when migrating to ARM machines, we suggest to also add App Sandbox safety
@@ -84,27 +107,39 @@ AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype,
     }
     else
     {
-        component = AudioComponentFindNext(NULL, &compDesc);
+        result->component = AudioComponentFindNext(NULL, &compDesc);
     }
-    ARA_INTERNAL_ASSERT(component);
-    return component;
+    ARA_INTERNAL_ASSERT(result->component);
+    return result;
 }
 
-AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent)
+bool AudioUnitIsV2(AudioUnitComponent audioUnitComponent)
+{
+    AudioComponentDescription desc;
+    AudioComponentGetDescription(audioUnitComponent->component, &desc);
+    return ((desc.componentFlags & kAudioComponentFlag_IsV3AudioUnit) == 0);
+}
+
+AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, bool useIPC)
 {
     __block AudioUnitInstance result = malloc(sizeof(struct _AudioUnitInstance));
     result->audioUnitComponent = audioUnitComponent;
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+    result->isOutOfProcess = useIPC;
+    result->isBoundViaIPC = NO;
+#endif
 
     AudioComponentDescription desc;
-    AudioComponentGetDescription(audioUnitComponent, &desc);
-    result->isAUv2 = ((desc.componentFlags & kAudioComponentFlag_IsV3AudioUnit) == 0);
+    AudioComponentGetDescription(audioUnitComponent->component, &desc);
+    result->isAUv2 = AudioUnitIsV2 (audioUnitComponent);
 
     if (result->isAUv2)
     {
+        ARA_INTERNAL_ASSERT(!useIPC && "using is IPC not supported for AUv2");
         ARA_INTERNAL_ASSERT((desc.componentFlags & kAudioComponentFlag_RequiresAsyncInstantiation) == 0);
 //      \todo for some reason, the OS never sets this flag for v2 AUs, even though they naturally all support it.
 //      ARA_INTERNAL_ASSERT((desc.componentFlags & kAudioComponentFlag_CanLoadInProcess) != 0);
-        OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioComponentInstanceNew(audioUnitComponent, &result->v2AudioUnit);
+        OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioComponentInstanceNew(audioUnitComponent->component, &result->v2AudioUnit);
         ARA_INTERNAL_ASSERT(status == noErr);
         ARA_INTERNAL_ASSERT(result->v2AudioUnit != NULL);
     }
@@ -114,32 +149,48 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent)
         // ARA-capable Audio Units should be packaged to support in-process loading
         ARA_INTERNAL_ASSERT((desc.componentFlags & kAudioComponentFlag_CanLoadInProcess) != 0);
         result->v3AudioUnit = nil;
+
+#if !ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+        ARA_INTERNAL_ASSERT(!useIPC && "using IPC requires ARA_AUDIOUNITV3_IPC_IS_AVAILABLE");
+#endif
+
         @autoreleasepool
         {
             // simply blocking the thread is not allowed here, so we need to add proper NSRunLoop around the instantiation process
             NSRunLoop * runloop = [NSRunLoop currentRunLoop];
             [runloop performBlock:^void (void)
             {
-                [AUAudioUnit instantiateWithComponentDescription:desc options:kAudioComponentInstantiation_LoadInProcess
+                const AudioComponentInstantiationOptions options =
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+                                                                   (useIPC) ? kAudioComponentInstantiation_LoadOutOfProcess :
+#endif
+                                                                              kAudioComponentInstantiation_LoadInProcess;
+
+                [AUAudioUnit instantiateWithComponentDescription:desc options:options
                              completionHandler:^void (AUAudioUnit * _Nullable auAudioUnit, NSError * _Nullable ARA_MAYBE_UNUSED_ARG(error))
                 {
                     ARA_INTERNAL_ASSERT(auAudioUnit != nil);
                     ARA_INTERNAL_ASSERT(error == nil);
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
                     if (@available(macOS 10.15, *))
-                        ARA_INTERNAL_ASSERT([auAudioUnit isLoadedInProcess]);
+                        ARA_INTERNAL_ASSERT([auAudioUnit isLoadedInProcess] == !useIPC);
+#endif
                     result->v3AudioUnit = [auAudioUnit retain];
                 }];
             }];
-            [runloop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+            // loading out-of-process can take a considerable amount of time, so loop for up to a second if needed
+            for (int i = 0; (i < 100) && (result->v3AudioUnit == nil); ++i)
+                [runloop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
         }
         ARA_INTERNAL_ASSERT(result->v3AudioUnit != nil);
     }
     return result;
 }
 
-const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance)
+const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, struct ARAIPCMessageSender ** messageSender)
 {
     const ARAFactory * result = NULL;    // initially assume this plug-in doesn't support ARA
+    *messageSender = NULL;
 
     // check whether the AU supports ARA by trying to get the factory
     if (audioUnitInstance->isAUv2)
@@ -165,10 +216,31 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance)
     }
     else
     {
-        if ([audioUnitInstance->v3AudioUnit conformsToProtocol:@protocol(ARAAudioUnit)])
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+        if (audioUnitInstance->isOutOfProcess)
         {
-            result = [(AUAudioUnit<ARAAudioUnit> *)audioUnitInstance->v3AudioUnit araFactory];
-            ARA_VALIDATE_API_CONDITION(result != NULL);
+            if (@available(macOS 13.0, *))
+            {
+                if (!audioUnitInstance->audioUnitComponent->ipcFactory)
+                {
+                    audioUnitInstance->audioUnitComponent->lockingContextRef = ARAIPCCreateLockingContext();
+                    if (ARAIPCAUProxyPlugInInitializeFactoryMessageSender(&audioUnitInstance->audioUnitComponent->factoryMessageSender, audioUnitInstance->v3AudioUnit, audioUnitInstance->audioUnitComponent->lockingContextRef))
+                        audioUnitInstance->audioUnitComponent->ipcFactory = ARAIPCAUProxyPlugInGetFactory(audioUnitInstance->audioUnitComponent->factoryMessageSender);
+                    else
+                        ARAIPCDestroyLockingContext(audioUnitInstance->audioUnitComponent->lockingContextRef);
+                }
+                if ((result = audioUnitInstance->audioUnitComponent->ipcFactory))
+                    *messageSender = &audioUnitInstance->audioUnitComponent->factoryMessageSender;
+            }
+        }
+        else
+#endif
+        {
+            if ([audioUnitInstance->v3AudioUnit conformsToProtocol:@protocol(ARAAudioUnit)])
+            {
+                result = [(AUAudioUnit<ARAAudioUnit> *)audioUnitInstance->v3AudioUnit araFactory];
+                ARA_VALIDATE_API_CONDITION(result != NULL);
+            }
         }
     }
 
@@ -181,7 +253,7 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance)
             @autoreleasepool
             {
                 AudioComponentDescription desc;
-                OSStatus status = AudioComponentGetDescription(audioUnitInstance->audioUnitComponent, &desc);
+                OSStatus status = AudioComponentGetDescription(audioUnitInstance->audioUnitComponent->component, &desc);
                 ARA_INTERNAL_ASSERT(status == noErr);
                 AVAudioUnitComponent * avComponent = [[[AVAudioUnitComponentManager sharedAudioUnitComponentManager] componentsMatchingDescription:desc] firstObject];
                 ARA_INTERNAL_ASSERT(avComponent);
@@ -223,9 +295,22 @@ const ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUni
     }
     else
     {
-        ARA_INTERNAL_ASSERT ([audioUnitInstance->v3AudioUnit conformsToProtocol:@protocol(ARAAudioUnit)]);
-        const ARAPlugInExtensionInstance * instance = [(AUAudioUnit<ARAAudioUnit> *)audioUnitInstance->v3AudioUnit
-                                                        bindToDocumentController:controllerRef withRoles:assignedRoles knownRoles:knownRoles];
+        const ARAPlugInExtensionInstance * instance = NULL;
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+        if (audioUnitInstance->isOutOfProcess)
+        {
+            if (@available(macOS 13.0, *))
+            {
+                instance = ARAIPCAUProxyPlugInBindToDocumentController (audioUnitInstance->v3AudioUnit, audioUnitInstance->audioUnitComponent->lockingContextRef, controllerRef, knownRoles, assignedRoles, &audioUnitInstance->instanceSender);
+                audioUnitInstance->isBoundViaIPC = (instance != NULL);
+            }
+        }
+        else
+#endif
+        {
+            ARA_INTERNAL_ASSERT ([audioUnitInstance->v3AudioUnit conformsToProtocol:@protocol(ARAAudioUnit)]);
+            instance = [(AUAudioUnit<ARAAudioUnit> *)audioUnitInstance->v3AudioUnit bindToDocumentController:controllerRef withRoles:assignedRoles knownRoles:knownRoles];
+        }
         ARA_VALIDATE_API_CONDITION(instance != NULL);
         return instance;
     }
@@ -446,7 +531,31 @@ void AudioUnitCloseInstance(AudioUnitInstance audioUnitInstance)
     }
     else
     {
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+        if (@available(macOS 13.0, *))
+        {
+            if (audioUnitInstance->isBoundViaIPC)
+                ARAIPCAUProxyPlugInCleanupBinding(audioUnitInstance->instanceSender);
+        }
+#endif
         [audioUnitInstance->v3AudioUnit release];
     }
     free(audioUnitInstance);
+}
+
+void AudioUnitCleanupComponent(AudioUnitComponent audioUnitComponent)
+{
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+    if (@available(macOS 13.0, *))
+    {
+        if (audioUnitComponent->ipcFactory)
+        {
+            ARAIPCAUProxyPlugInUninitializeFactoryMessageSender(audioUnitComponent->factoryMessageSender);
+            ARAIPCDestroyLockingContext(audioUnitComponent->lockingContextRef);
+        }
+    }
+#endif
+
+    free (audioUnitComponent);
+    // Explicit unloading is not supported by the Audio Unit API.
 }

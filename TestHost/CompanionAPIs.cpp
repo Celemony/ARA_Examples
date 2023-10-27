@@ -437,28 +437,59 @@ std::string createAUEntryDescription (const std::string& type, const std::string
 class AUPlugInEntry : public PlugInEntry
 {
 public:
-    AUPlugInEntry (const std::string& type, const std::string& subType, const std::string& manufacturer)
+    AUPlugInEntry (const std::string& type, const std::string& subType, const std::string& manufacturer, bool useIPCIfPossible)
     : PlugInEntry { createAUEntryDescription (type, subType, manufacturer) },
       _audioUnitComponent { AudioUnitPrepareComponentWithIDs (parseOSType (type), parseOSType (subType), parseOSType (manufacturer)) }
     {
-        AudioUnitInstance audioUnitInstance = AudioUnitOpenInstance(_audioUnitComponent);
-        validateAndSetFactory (AudioUnitGetARAFactory (audioUnitInstance));
+        AudioUnitInstance audioUnitInstance = AudioUnitOpenInstance(_audioUnitComponent, useIPCIfPossible);
+        validateAndSetFactory (AudioUnitGetARAFactory (audioUnitInstance, &_hostCommandsSender));
         AudioUnitCloseInstance(audioUnitInstance);
     }
 
     ~AUPlugInEntry () override
     {
-        // unloading is not supported for Audio Units
+        AudioUnitCleanupComponent (_audioUnitComponent);
+    }
+
+    bool usesIPC () const override
+    {
+        return _hostCommandsSender != nullptr;
+    }
+
+    void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress) override
+    {
+        if (usesIPC ())
+            ARA::IPC::ARAIPCProxyPlugInInitializeARA(*_hostCommandsSender, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
+        else
+            PlugInEntry::initializeARA (assertFunctionAddress);
+    }
+
+    const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
+                                                                                    const ARA::ARADocumentProperties* properties) override
+    {
+        if (usesIPC ())
+            return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument(*_hostCommandsSender, ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex(*_hostCommandsSender, 0)->factoryID, hostInstance, properties);
+        else
+            return PlugInEntry::createDocumentControllerWithDocument (hostInstance, properties);
+    }
+
+    void uninitializeARA () override
+    {
+        if (usesIPC ())
+            ARA::IPC::ARAIPCProxyPlugInUninitializeARA(*_hostCommandsSender, getARAFactory ()->factoryID);
+        else
+            PlugInEntry::uninitializeARA ();
     }
 
     std::unique_ptr<PlugInInstance> createPlugInInstance () override
     {
-        auto audioUnit { AudioUnitOpenInstance (_audioUnitComponent) };
+        auto audioUnit { AudioUnitOpenInstance (_audioUnitComponent, usesIPC ()) };
         return std::make_unique<AUPlugInInstance> (audioUnit);
     }
 
 private:
     AudioUnitComponent const _audioUnitComponent;
+    ARA::IPC::ARAIPCMessageSender* _hostCommandsSender {};
 };
 
 #endif // defined (__APPLE__)
@@ -1026,12 +1057,24 @@ std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<st
     {
         auto it { std::find (args.begin (), args.end (), "-au") };
         if (it < args.end () - 3)   // we need 3 follow-up arguments
-            return std::make_unique<AUPlugInEntry> (*++it, *++it, *++it);
+            return std::make_unique<AUPlugInEntry> (*++it, *++it, *++it, false);
 
 #if ARA_ENABLE_IPC
         it = std::find (args.begin (), args.end (), "-ipc_au");
         if (it < args.end () - 3)   // we need 3 follow-up arguments
-            return std::make_unique<IPCAUPlugInEntry> (*++it, *++it, *++it);
+        {
+            const std::string type { *++it };
+            const std::string subType { *++it };
+            const std::string manufacturer { *++it };
+            AudioUnitComponent component { AudioUnitPrepareComponentWithIDs (parseOSType (type), parseOSType (subType), parseOSType (manufacturer)) };
+            const bool isAUV2 { AudioUnitIsV2 (component) };
+            AudioUnitCleanupComponent (component);
+
+            if (isAUV2)
+                return std::make_unique<IPCAUPlugInEntry> (type, subType, manufacturer);
+            else
+                return std::make_unique<AUPlugInEntry> (type, subType, manufacturer, true);
+        }
 #endif
     }
 #endif
