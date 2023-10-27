@@ -141,7 +141,7 @@ void IPCMessage::appendBytes (const MessageKey argKey, const uint8_t* argValue, 
         _appendEncodedArg (argKey, CFDataCreateWithBytesNoCopy (kCFAllocatorDefault, argValue, (CFIndex) argSize, kCFAllocatorNull));
 }
 
-ARA::IPC::MessageEncoder* IPCMessage::appendSubMessage (const MessageKey argKey)
+IPCMessage* IPCMessage::appendSubMessage (const MessageKey argKey)
 {
     auto subDictionary { CFDictionaryCreateMutable (kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks) };
     _appendEncodedArg (argKey, subDictionary);
@@ -301,7 +301,7 @@ void IPCMessage::readBytes (const MessageKey argKey, uint8_t* const argValue) co
     CFDataGetBytes (bytes, CFRangeMake (0, length), argValue);
 }
 
-ARA::IPC::MessageDecoder* IPCMessage::readSubMessage (const MessageKey argKey) const
+IPCMessage* IPCMessage::readSubMessage (const MessageKey argKey) const
 {
     ARA_INTERNAL_ASSERT (_dictionary);
     auto dictionary { (CFDictionaryRef) CFDictionaryGetValue (_dictionary, _getEncodedKey (argKey)) };
@@ -419,7 +419,7 @@ pugi::xml_attribute IPCMessage::_appendAttribute (const MessageKey argKey)
     return _root.append_attribute (_getEncodedKey (argKey));
 }
 
-ARA::IPC::MessageEncoder* IPCMessage::appendSubMessage (const MessageKey argKey)
+IPCMessage* IPCMessage::appendSubMessage (const MessageKey argKey)
 {
     ARA_INTERNAL_ASSERT (argKey >= 0);
 
@@ -597,7 +597,7 @@ void IPCMessage::readBytes (const MessageKey argKey, uint8_t* const argValue) co
     std::memcpy (argValue, decodedData.c_str (), decodedData.size ());
 }
 
-ARA::IPC::MessageDecoder* IPCMessage::readSubMessage (const MessageKey argKey) const
+IPCMessage* IPCMessage::readSubMessage (const MessageKey argKey) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto child { _root.child (_getEncodedKey (argKey)) };
