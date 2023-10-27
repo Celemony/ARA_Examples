@@ -1029,16 +1029,15 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& portID)
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
     ARA::IPC::ARAIPCProxyHostSetPlugInCallbacksSender (&plugInCallbacksSender);
-    ARA::IPC::ARAIPCBindingHandler bindingHandler { [] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef, ARA::ARADocumentControllerRef controllerRef,
+    ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef, ARA::ARADocumentControllerRef controllerRef,
                                                         ARA::ARAPlugInInstanceRoleFlags knownRoles, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
                                                         -> const ARA::ARAPlugInExtensionInstance*
-        {
-            // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
-            ARA_INTERNAL_ASSERT (knownRoles == (ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole) );
-            reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->bindToDocumentControllerWithRoles (controllerRef, assignedRoles);
-            return reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->getARAPlugInExtensionInstance ();
-        } };
-    ARA::IPC::ARAIPCProxyHostSetBindingHandler (bindingHandler);
+                                                {
+                                                    // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
+                                                    ARA_INTERNAL_ASSERT (knownRoles == (ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole) );
+                                                    reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->bindToDocumentControllerWithRoles (controllerRef, assignedRoles);
+                                                    return reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->getARAPlugInExtensionInstance ();
+                                                });
 
     while (!_shutDown)
         port.runReceiveLoop (100 /*ms*/);
