@@ -127,29 +127,17 @@ API_AVAILABLE(macos(13.0))
 
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     _araIPCPlugInExtensionMessageChannel = nil;
-    _araIPCPlugInExtensionInstance = nullptr;
 #endif
 
     return self;
 }
 
-- (void) destroyBindingIfNeeded {
+- (void)dealloc {
     if (_araPlugInExtension)
     {
         delete _araPlugInExtension;
         _araPlugInExtension = nullptr;
-#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
-        if (@available(macOS 13.0, *))
-        {
-            if (self.araIPCPlugInExtensionInstance)
-                ARA::IPC::ARAIPCAUProxyHostCleanupBinding(self.araIPCPlugInExtensionInstance);
-        }
-#endif
     }
-}
-
-- (void)dealloc {
-    [self destroyBindingIfNeeded];
 }
 
 
@@ -302,10 +290,6 @@ void destroy_sharedFactoryMessageChannel() {
                 TestAUv3AudioUnit * audioUnit = (TestAUv3AudioUnit *)auAudioUnit;
                 audioUnit.araIPCPlugInExtensionInstance = [audioUnit bindToDocumentController:controllerRef withRoles:assignedRoles knownRoles:knownRoles];
                 return audioUnit.araIPCPlugInExtensionInstance;
-            },
-            ^void (AUAudioUnit * _Nonnull auAudioUnit)
-            {
-                [(TestAUv3AudioUnit *)auAudioUnit destroyBindingIfNeeded];
             });
     }
 }

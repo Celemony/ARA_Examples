@@ -696,7 +696,6 @@ void remoteHostCommandHandler (const ARA::IPC::ARAIPCMessageID messageID,
         size_t plugInInstanceRef;
         ARA::IPC::decodeArguments (decoder, plugInInstanceRef);
 
-        ARA::IPC::ARAIPCProxyHostCleanupBinding (reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->getARAPlugInExtensionInstance ());
         delete reinterpret_cast<PlugInInstance*> (plugInInstanceRef);
     }
     else if (messageID == kIPCTerminateMethodID)
