@@ -246,7 +246,7 @@ private:
     {
         auto channel { static_cast<IPCMessageChannel*> (info) };
 #if USE_ARA_CF_ENCODING
-        const auto decoder { ARA::IPC::ARAIPCCFCreateMessageDecoder (messageData) };
+        const auto decoder { ARA::IPC::ARAIPCCFMessageDecoder::createWithMessageData (messageData) };
 #else
         const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
 #endif
@@ -331,7 +331,7 @@ IPCMessageChannel::~IPCMessageChannel ()
 void IPCMessageChannel::_sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder)
 {
 #if USE_ARA_CF_ENCODING
-    const auto messageData { ARAIPCCFCreateMessageEncoderData (encoder) };
+    const auto messageData { static_cast<ARA::IPC::ARAIPCCFMessageEncoder*> (encoder)->createMessageEncoderData () };
 #else
     const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder)->createEncodedMessage () };
 #endif
@@ -369,7 +369,7 @@ void IPCMessageChannel::loopUntilMessageReceived ()
 ARA::IPC::ARAIPCMessageEncoder* IPCMessageChannel::createEncoder ()
 {
 #if USE_ARA_CF_ENCODING
-    return ARA::IPC::ARAIPCCFCreateMessageEncoder ();
+    return new ARA::IPC::ARAIPCCFMessageEncoder {};
 #else
     return new IPCXMLMessageEncoder {};
 #endif
