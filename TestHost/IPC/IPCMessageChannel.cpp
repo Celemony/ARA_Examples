@@ -379,7 +379,7 @@ void IPCMessageChannel::_signalReceivedMessage (std::thread::id activeThread)
     if (activeThread == std::this_thread::get_id ())
         _sendAwaitsMessage = false;
     else
-        MultiThreadedChannel::_signalReceivedMessage (activeThread);
+        ARAIPCMessageChannel::_signalReceivedMessage (activeThread);
 }
 
 void IPCMessageChannel::_waitForReceivedMessage ()
@@ -392,7 +392,7 @@ void IPCMessageChannel::_waitForReceivedMessage ()
         } while (_sendAwaitsMessage);
     }
     else
-        MultiThreadedChannel::_waitForReceivedMessage ();
+        ARAIPCMessageChannel::_waitForReceivedMessage ();
 }
 
 ARA::IPC::ARAIPCMessageEncoder* IPCMessageChannel::createEncoder ()

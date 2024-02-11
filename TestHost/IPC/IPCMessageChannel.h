@@ -20,7 +20,7 @@
 #pragma once
 
 
-#include "ARA_Library/IPC/ARAIPCMultiThreadedChannel.h"
+#include "ARA_Library/IPC/ARAIPCMessageChannel.h"
 
 #if defined (_WIN32)
     #include <Windows.h>
@@ -52,7 +52,7 @@ class IPCSendPort;
 class IPCReceivePort;
 
 
-class IPCMessageChannel : public ARA::IPC::MultiThreadedChannel
+class IPCMessageChannel : public ARA::IPC::ARAIPCMessageChannel
 {
 public:
     ~IPCMessageChannel () override;
@@ -72,7 +72,7 @@ public:
     void runReceiveLoop (int32_t milliseconds);
 
 protected:
-    using ARA::IPC::MultiThreadedChannel::MultiThreadedChannel;
+    using ARA::IPC::ARAIPCMessageChannel::ARAIPCMessageChannel;
 
     void lockTransaction () override;
     void unlockTransaction () override;
