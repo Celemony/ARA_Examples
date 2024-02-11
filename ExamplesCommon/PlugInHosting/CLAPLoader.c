@@ -272,7 +272,7 @@ void CLAPStartRendering(CLAPPlugIn clapPlugIn, uint32_t maxBlockSize, double sam
         clap_audio_port_configuration_request_t requests[] = { { true, 0, 1, CLAP_PORT_MONO, NULL },
                                                                { false, 0, 1, CLAP_PORT_MONO, NULL } };
 
-        success = configurable_audio_ports->apply_configuration(clapPlugIn->plugin, requests, (uint32_t) sizeof(requests) / sizeof(requests[0]), false);
+        success = configurable_audio_ports->apply_configuration(clapPlugIn->plugin, requests, (uint32_t) sizeof(requests) / sizeof(requests[0]));
         ARA_INTERNAL_ASSERT(success);
     }
     else

@@ -26,10 +26,6 @@
 #include "ARA_Library/Utilities/ARASamplePositionConversion.h"
 
 
-// audio port configs have been replaced by configurable audio ports in recent CLAP drafts
-#define ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG 0
-
-
 // since we're actually using C++ not plain C, replace NULL with nullptr
 #if defined(NULL)
     #undef NULL
@@ -67,11 +63,7 @@ typedef struct my_plug {
    const clap_host_log_t          *host_log;
    const clap_host_thread_check_t *host_thread_check;
    const clap_host_state_t        *host_state;
-#if ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
-   const clap_host_audio_ports_t  *host_audio_ports_config;
 
-   clap_id  selected_audio_config_id = 0;
-#endif
    uint32_t channel_count = 1;
    double   sample_rate = 44100.0;
    uint32_t max_frames_count = 0;
@@ -109,122 +101,83 @@ static const clap_plugin_audio_ports_t s_my_plug_audio_ports = {
    .get = my_plug_audio_ports_get,
 };
 
-////////////////////////////////////
-// clap_plugin_audio_ports_config //
-////////////////////////////////////
-
-#if ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
-
-static const clap_audio_ports_config_t audio_port_config[] = {
-   { 0, "Mono", 1, 1, true, 1, CLAP_PORT_MONO, true, 1, CLAP_PORT_MONO },
-   { 1, "Stereo", 1, 1, true, 2, CLAP_PORT_STEREO, true, 2, CLAP_PORT_STEREO }
-};
-
-uint32_t my_plug_audio_ports_config_count(const clap_plugin_t *plugin) {
-   return sizeof(audio_port_config) / sizeof(audio_port_config[0]);
-}
-
-bool my_plug_audio_ports_config_get(const clap_plugin_t       *plugin,
-                                    uint32_t                   index,
-                                    clap_audio_ports_config_t *config) {
-   if (index >= my_plug_audio_ports_config_count(plugin))
-      return false;
-   *config = audio_port_config[index];
-   return true;
-}
-
-bool my_plug_audio_ports_config_select(const clap_plugin_t *plugin, clap_id config_id) {
-   my_plug_t *plug = (my_plug_t *)plugin->plugin_data;
-   if (config_id >= my_plug_audio_ports_config_count(plugin))
-      return false;
-   plug->selected_audio_config_id = config_id;
-   plug->channel_count = audio_port_config[config_id].main_output_channel_count;
-
-   if (plug->host_audio_ports_config) {
-      uint32_t flags = 0;
-      const uint32_t desired_flags[] = { CLAP_AUDIO_PORTS_RESCAN_NAMES, CLAP_AUDIO_PORTS_RESCAN_FLAGS,
-                                         CLAP_AUDIO_PORTS_RESCAN_CHANNEL_COUNT, CLAP_AUDIO_PORTS_RESCAN_PORT_TYPE };
-      const int N = sizeof(desired_flags) / sizeof(desired_flags[0]);
-      for (int i = 0; i < N; ++i)
-         if (plug->host_audio_ports_config->is_rescan_flag_supported(plug->host, desired_flags[i]))
-            flags |= desired_flags[i];
-      if (flags)
-          plug->host_audio_ports_config->rescan(plug->host, flags);
-   }
-   return true;
-}
-
-static clap_plugin_audio_ports_config_t s_my_plug_audio_ports_config =
-{
-   .count = my_plug_audio_ports_config_count,
-   .get = my_plug_audio_ports_config_get,
-   .select = my_plug_audio_ports_config_select
-};
-
-#else   // ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
-
 //////////////////////////////////////////
 // clap_plugin_configurable_audio_ports //
 //////////////////////////////////////////
 
-bool my_plug_configurable_audio_ports_apply_configuration(const clap_plugin_t                                *plugin,
-                                                          const struct clap_audio_port_configuration_request *requests,
-                                                          uint32_t request_count,
-                                                          bool     is_dry_run) {
-   my_plug_t *plug = (my_plug_t *)plugin->plugin_data;
+// internal helper that makes sure the requests describes a valid configuration with ins == outs
+// returns 0 on failure
+uint32_t my_plug_get_validated_channel_count_for_configuration(const my_plug_t                                    *plugin,
+                                                               const struct clap_audio_port_configuration_request *requests,
+                                                               uint32_t                                            request_count) {
    if (request_count > 2)
-      return false;
+      return 0;
+
    uint32_t input_channel_count = 0;
    uint32_t output_channel_count = 0;
    for (uint32_t i = 0; i < request_count; ++i) {
       if (requests[i].port_index != 0)
-         return false;
+         return 0;
 
       if (!strcmp(requests[i].port_type, CLAP_PORT_MONO)) {
          if (requests[i].channel_count != 1)
-            return false;
+            return 0;
          if (requests[i].port_details != nullptr)
-            return false;
+            return 0;
       } else if (!strcmp(requests[i].port_type, CLAP_PORT_STEREO)) {
          if (requests[i].channel_count != 2)
-            return false;
+            return 0;
          if (requests[i].port_details != nullptr)
-            return false;
+            return 0;
       }
 
       if (requests[i].is_input) {
          if (input_channel_count != 0)
-            return false;
+            return 0;
          input_channel_count = requests[i].channel_count;
       }
       else {
          if (output_channel_count != 0)
-            return false;
+            return 0;
          output_channel_count = requests[i].channel_count;
       }
    }
 
    if (input_channel_count != output_channel_count)
-     return false;
+     return 0;
 
-   if (!is_dry_run)
-      plug->channel_count = output_channel_count;
+   return output_channel_count;
+}
+
+static bool my_plug_configurable_audio_ports_can_apply_configuration(const clap_plugin_t                                *plugin,
+                                                                     const struct clap_audio_port_configuration_request *requests,
+                                                                     uint32_t                                            request_count) {
+   my_plug_t *plug = (my_plug_t *)plugin->plugin_data;
+   return my_plug_get_validated_channel_count_for_configuration(plug, requests, request_count) != 0;
+}
+
+static bool my_plug_configurable_audio_ports_apply_configuration(const clap_plugin_t                                *plugin,
+                                                                 const struct clap_audio_port_configuration_request *requests,
+                                                                 uint32_t                                            request_count) {
+   my_plug_t *plug = (my_plug_t *)plugin->plugin_data;
+   uint32_t channel_count = my_plug_get_validated_channel_count_for_configuration(plug, requests, request_count);
+   if (channel_count == 0)
+      return false;
+    plug->channel_count = channel_count;
    return true;
 }
 
-static clap_plugin_configurable_audio_ports_t s_my_plug_configurable_audio_ports =
-{
+static clap_plugin_configurable_audio_ports_t s_my_plug_configurable_audio_ports = {
+   .can_apply_configuration = my_plug_configurable_audio_ports_can_apply_configuration,
    .apply_configuration = my_plug_configurable_audio_ports_apply_configuration,
 };
-
-#endif  // !ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
 
 //////////////////
 // clap_latency //
 //////////////////
 
-uint32_t my_plug_latency_get(const clap_plugin_t *plugin) {
-   return 0;   // ARA plug-ins have no latency because they can compensate it internally via to random access
+static uint32_t my_plug_latency_get(const clap_plugin_t *plugin) {
+   return 0;   // ARA plug-ins have no latency because they can compensate it internally via random access
 }
 
 static const clap_plugin_latency_t s_my_plug_latency = {
@@ -235,22 +188,21 @@ static const clap_plugin_latency_t s_my_plug_latency = {
 // ARA extension //
 ///////////////////
 
-const ARA::ARAFactory *my_plug_ara_get_factory(const clap_plugin_t *plugin) {
+static const ARA::ARAFactory *my_plug_ara_get_factory(const clap_plugin_t *plugin) {
    return ARATestDocumentController::getARAFactory();
 }
 
-const ARA::ARAPlugInExtensionInstance *my_plug_ara_bind_to_document_controller(const clap_plugin_t            *plugin,
-                                                                               ARA::ARADocumentControllerRef   documentControllerRef,
-                                                                               ARA::ARAPlugInInstanceRoleFlags knownRoles,
-                                                                               ARA::ARAPlugInInstanceRoleFlags assignedRoles) {
+static const ARA::ARAPlugInExtensionInstance *my_plug_ara_bind_to_document_controller(const clap_plugin_t            *plugin,
+                                                                                      ARA::ARADocumentControllerRef   documentControllerRef,
+                                                                                      ARA::ARAPlugInInstanceRoleFlags knownRoles,
+                                                                                      ARA::ARAPlugInInstanceRoleFlags assignedRoles) {
    my_plug_t *plug = (my_plug_t *)plugin->plugin_data;
    return plug->ara_extension.bindToARA(documentControllerRef, knownRoles, assignedRoles);
 }
 
-static clap_ara_plugin_extension_t ara_plugin_extension =
-{
+static clap_ara_plugin_extension_t ara_plugin_extension = {
    .get_factory = my_plug_ara_get_factory,
-   .bind_to_document_controller = my_plug_ara_bind_to_document_controller
+   .bind_to_document_controller = my_plug_ara_bind_to_document_controller,
 };
 
 /////////////////
@@ -266,9 +218,6 @@ static bool my_plug_init(const struct clap_plugin *plugin) {
    plug->host_thread_check = (const clap_host_thread_check_t *)plug->host->get_extension(plug->host, CLAP_EXT_THREAD_CHECK);
    plug->host_latency = (const clap_host_latency_t *)plug->host->get_extension(plug->host, CLAP_EXT_LATENCY);
    plug->host_state = (const clap_host_state_t *)plug->host->get_extension(plug->host, CLAP_EXT_STATE);
-#if ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
-   plug->host_audio_ports_config = (const clap_host_audio_ports_t *)plug->host->get_extension(plug->host, CLAP_EXT_AUDIO_PORTS);
-#endif
    return true;
 }
 
@@ -333,13 +282,8 @@ static const void *my_plug_get_extension(const struct clap_plugin *plugin, const
       return &s_my_plug_latency;
    if (!strcmp(id, CLAP_EXT_AUDIO_PORTS))
       return &s_my_plug_audio_ports;
-#if ARA_CLAP_SUPPPORT_AUDIO_PORTS_CONFIG
-   if (!strcmp(id, CLAP_EXT_AUDIO_PORTS_CONFIG))
-      return &s_my_plug_audio_ports_config;
-#else
    if (!strcmp(id, CLAP_EXT_CONFIGURABLE_AUDIO_PORTS))
       return &s_my_plug_configurable_audio_ports;
-#endif
    if (!strcmp(id, CLAP_EXT_ARA_PLUGINEXTENSION))
       return &ara_plugin_extension;
    return NULL;
@@ -347,7 +291,7 @@ static const void *my_plug_get_extension(const struct clap_plugin *plugin, const
 
 static void my_plug_on_main_thread(const struct clap_plugin *plugin) {}
 
-clap_plugin_t *my_plug_create(const clap_host_t *host) {
+static clap_plugin_t *my_plug_create(const clap_host_t *host) {
    my_plug_t *p = new my_plug_t;
    p->host = host;
    p->plugin.desc = &s_my_plug_desc;
@@ -456,6 +400,7 @@ static const void *entry_get_factory(const char *factory_id) {
    return NULL;
 }
 
+// This symbol will be resolved by the host
 CLAP_EXPORT const clap_plugin_entry_t clap_entry = {
    .clap_version = CLAP_VERSION_INIT,
    .init = entry_init,
