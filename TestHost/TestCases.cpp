@@ -688,6 +688,11 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
         }
 
         plugInInstance->stopRendering ();
+        for (const auto& regionSequence : document->getRegionSequences ())
+        {
+            for (const auto& playbackRegion : regionSequence->getPlaybackRegions ())
+                playbackRenderer.removePlaybackRegion (araDocumentController->getRef (playbackRegion));
+        }
     }
 }
 
