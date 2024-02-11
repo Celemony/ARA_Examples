@@ -356,9 +356,9 @@ int main(int argc, const char * argv[])
     ARA_INTERNAL_ASSERT(audioUnitComponent != NULL);
     AudioUnitInstance audioUnit = AudioUnitOpenInstance(audioUnitComponent, false);
 
-    ARAIPCMessageChannel * messageChannel;
-    factory = AudioUnitGetARAFactory(audioUnit, &messageChannel);
-    if (messageChannel != NULL)
+    ARAIPCMessageChannelRef messageChannelRef;
+    factory = AudioUnitGetARAFactory(audioUnit, &messageChannelRef);
+    if (messageChannelRef != NULL)
     {
         ARA_WARN("this plug-in requires to use IPC, which is not supported in this simple example.");
         return -1;

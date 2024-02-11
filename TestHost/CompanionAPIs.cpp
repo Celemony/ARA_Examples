@@ -72,6 +72,7 @@
     #include "IPC/IPCXMLEncoding.h"
 #endif
 
+
 std::string executablePath {};
 
 // minimal set of commands to run a companion API plug-in through IPC
@@ -81,6 +82,18 @@ constexpr auto kIPCRenderSamplesMethodID { ARA::IPC::MethodID::createWithNonARAM
 constexpr auto kIPCStopRenderingMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-4> () };
 constexpr auto kIPCDestroyEffectMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-5> () };
 constexpr auto kIPCTerminateMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-6> () };
+
+
+#if defined (__GNUC__)
+    _Pragma ("GCC diagnostic push")
+    _Pragma ("GCC diagnostic ignored \"-Wunused-template\"")
+#endif
+
+ARA_MAP_IPC_REF (ARA::IPC::ARAIPCMessageChannel, ARA::IPC::ARAIPCMessageChannelRef)
+
+#if defined (__GNUC__)
+    _Pragma ("GCC diagnostic pop")
+#endif
 
 
 // helper function to create unique IPC message channel IDs for each run
@@ -311,7 +324,7 @@ public:
       _audioUnitComponent { AudioUnitPrepareComponentWithIDs (parseOSType (type), parseOSType (subType), parseOSType (manufacturer)) }
     {
         AudioUnitInstance audioUnitInstance = AudioUnitOpenInstance (_audioUnitComponent, useIPCIfPossible);
-        validateAndSetFactory (AudioUnitGetARAFactory (audioUnitInstance, &_messageChannel));
+        validateAndSetFactory (AudioUnitGetARAFactory (audioUnitInstance, &_messageChannelRef));
         AudioUnitCloseInstance (audioUnitInstance);
     }
 
@@ -322,13 +335,13 @@ public:
 
     bool usesIPC () const override
     {
-        return _messageChannel != nullptr;
+        return _messageChannelRef != nullptr;
     }
 
     void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress) override
     {
         if (usesIPC ())
-            ARA::IPC::ARAIPCProxyPlugInInitializeARA (_messageChannel, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
+            ARA::IPC::ARAIPCProxyPlugInInitializeARA (_messageChannelRef, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
         else
             PlugInEntry::initializeARA (assertFunctionAddress);
     }
@@ -337,8 +350,8 @@ public:
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
         if (usesIPC ())
-            return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_messageChannel,
-                                                                                    ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (_messageChannel, 0)->factoryID,
+            return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_messageChannelRef,
+                                                                                    ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (_messageChannelRef, 0)->factoryID,
                                                                                     hostInstance, properties);
         else
             return PlugInEntry::createDocumentControllerWithDocument (hostInstance, properties);
@@ -347,7 +360,7 @@ public:
     void uninitializeARA () override
     {
         if (usesIPC ())
-            ARA::IPC::ARAIPCProxyPlugInUninitializeARA (_messageChannel, getARAFactory ()->factoryID);
+            ARA::IPC::ARAIPCProxyPlugInUninitializeARA (_messageChannelRef, getARAFactory ()->factoryID);
         else
             PlugInEntry::uninitializeARA ();
     }
@@ -360,7 +373,7 @@ public:
 
 private:
     AudioUnitComponent const _audioUnitComponent;
-    ARA::IPC::ARAIPCMessageChannel* _messageChannel {};
+    ARA::IPC::ARAIPCMessageChannelRef _messageChannelRef {};
 };
 
 #endif // defined (__APPLE__)
@@ -443,7 +456,7 @@ private:
 class IPCPlugInInstance : public PlugInInstance, protected ARA::IPC::RemoteCaller
 {
 public:
-    IPCPlugInInstance (size_t remoteRef, ARA::IPC::ARAIPCMessageChannel* messageChannel)
+    IPCPlugInInstance (ARA::IPC::ARAIPCPlugInInstanceRef remoteRef, ARA::IPC::ARAIPCMessageChannel* messageChannel)
     : RemoteCaller { messageChannel },
       _remoteRef { remoteRef }
     {}
@@ -459,7 +472,7 @@ public:
     {
         // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
         const ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
-        auto plugInExtension { ARA::IPC::ARAIPCProxyPlugInBindToDocumentController (_remoteRef, getMessageChannel (), documentControllerRef, knownRoles, assignedRoles) };
+        auto plugInExtension { ARA::IPC::ARAIPCProxyPlugInBindToDocumentController (_remoteRef, toIPCRef (getMessageChannel ()), documentControllerRef, knownRoles, assignedRoles) };
         validateAndSetPlugInExtensionInstance (plugInExtension, assignedRoles);
     }
 
@@ -484,7 +497,7 @@ public:
     }
 
 private:
-    size_t const _remoteRef;
+    ARA::IPC::ARAIPCPlugInInstanceRef const _remoteRef;
 };
 
 
@@ -511,7 +524,7 @@ struct RemoteLauncher
 class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher, protected ARA::IPC::RemoteCaller, public ARA::IPC::ARAIPCProxyPlugInMessageHandler
 {
 private:
-    static const ARA::ARAFactory* defaultGetFactory (ARA::IPC::ARAIPCMessageChannel* messageChannel)
+    static const ARA::ARAFactory* defaultGetFactory (ARA::IPC::ARAIPCMessageChannelRef messageChannel)
     {
         const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (messageChannel) };
         ARA_INTERNAL_ASSERT (count > 0);
@@ -520,18 +533,18 @@ private:
 
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
                     const std::string channelID,
-                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCMessageChannel*)>& getFactoryFunction)
+                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCMessageChannelRef)>& getFactoryFunction)
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, channelID },
       ARA::IPC::RemoteCaller { IPCMessageChannel::createConnectedToID (channelID, this) }
     {
-        validateAndSetFactory (getFactoryFunction (static_cast<IPCMessageChannel*> (getMessageChannel ())));
+        validateAndSetFactory (getFactoryFunction (toIPCRef (getMessageChannel ())));
     }
 
 public:
     // \todo the current ARA IPC implementation does not support sending ARA asserts to the host...
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
-                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCMessageChannel*)>& getFactoryFunction = defaultGetFactory)
+                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCMessageChannelRef)>& getFactoryFunction = defaultGetFactory)
     : IPCPlugInEntry { std::move (description), launchArgs, _createChannelID (), getFactoryFunction }
     {}
 
@@ -556,23 +569,23 @@ public:
 
     void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
     {
-        ARA::IPC::ARAIPCProxyPlugInInitializeARA (getMessageChannel (), getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
+        ARA::IPC::ARAIPCProxyPlugInInitializeARA (toIPCRef (getMessageChannel ()), getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
     }
 
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
-        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (getMessageChannel (), getARAFactory ()->factoryID, hostInstance, properties);
+        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (toIPCRef (getMessageChannel ()), getARAFactory ()->factoryID, hostInstance, properties);
     }
 
     void uninitializeARA () override
     {
-        ARA::IPC::ARAIPCProxyPlugInUninitializeARA (getMessageChannel (), getARAFactory ()->factoryID);
+        ARA::IPC::ARAIPCProxyPlugInUninitializeARA (toIPCRef (getMessageChannel ()), getARAFactory ()->factoryID);
     }
 
     std::unique_ptr<PlugInInstance> createPlugInInstance () override
     {
-        size_t remoteInstanceRef {};
+        ARA::IPC::ARAIPCPlugInInstanceRef remoteInstanceRef {};
         remoteCall (remoteInstanceRef, kIPCCreateEffectMethodID);
         return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, getMessageChannel ());
     }
@@ -586,7 +599,7 @@ protected:
     IPCGenericPlugInEntry (const std::string& commandLineArg, const std::string& apiName, const std::string& binaryName, const std::string& optionalPlugInName)
     : IPCPlugInEntry { createEntryDescription (apiName, binaryName, optionalPlugInName),
                         commandLineArg + " " + binaryName + " " + optionalPlugInName,
-                        [&optionalPlugInName] (ARA::IPC::ARAIPCMessageChannel* messageChannel) -> const ARA::ARAFactory*
+                        [&optionalPlugInName] (ARA::IPC::ARAIPCMessageChannelRef messageChannel) -> const ARA::ARAFactory*
                         {
                             const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (messageChannel) };
                             ARA_INTERNAL_ASSERT (count > 0);
@@ -720,7 +733,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
     auto plugInCallbacksChannel { IPCMessageChannel::createPublishingID (channelID, &handler) };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
-    ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCMessageChannel* /*messageChannel*/, ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef,
+    ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCMessageChannelRef /*messageChannel*/, ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef,
                                                     ARA::ARADocumentControllerRef controllerRef,
                                                     ARA::ARAPlugInInstanceRoleFlags knownRoles, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
                                                         -> const ARA::ARAPlugInExtensionInstance*

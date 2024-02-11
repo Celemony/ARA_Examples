@@ -36,8 +36,8 @@ AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype,
 bool AudioUnitIsV2(AudioUnitComponent audioUnitComponent);
 AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, bool useIPC);
 // On return, *messageChannel will be NULL if Audio Unit does not use IPC, otherwise it will point to
-// a valid ARAIPCMessageChannel for all factory-related calls until AudioUnitCleanupComponent() is called.
-const ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnit, ARA_IPC_NAMESPACE ARAIPCMessageChannel ** messageChannel);
+// a valid message channel for all factory-related calls until AudioUnitCleanupComponent() is called.
+const ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnit, ARA_IPC_NAMESPACE ARAIPCMessageChannelRef * messageChannelRef);
 const ARA_NAMESPACE ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnit, ARA_NAMESPACE ARADocumentControllerRef controllerRef, ARA_NAMESPACE ARAPlugInInstanceRoleFlags assignedRoles);
 void AudioUnitStartRendering(AudioUnitInstance audioUnit, UInt32 maxBlockSize, double sampleRate);
 void AudioUnitRenderBuffer(AudioUnitInstance audioUnit, UInt32 blockSize, SInt64 samplePosition, float * buffer);
