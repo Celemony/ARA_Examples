@@ -86,20 +86,31 @@ AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype,
             AVAudioUnitComponent * avComponent = [[[AVAudioUnitComponentManager sharedAudioUnitComponentManager] componentsMatchingDescription:compDesc] firstObject];
             if (avComponent)
             {
+                // ensure we pass auval
                 ARA_VALIDATE_API_CONDITION([avComponent passesAUVal]);
+
                 result->component = [avComponent audioComponent];
 
-#if ARA_CPU_ARM
-                // when migrating to ARM machines, we suggest to also add App Sandbox safety
-//              ARA_VALIDATE_API_CONDITION([avComponent isSandboxSafe]);
-                if (![avComponent isSandboxSafe])
-                    ARA_WARN("This Audio Unit is not sandbox-safe, and thus might not work in future macOS releases.");
+                // validate we provide a proper icon
+                if (@available(macOS 11.0, *))
+                {
+                    NSImage * icon = AudioComponentCopyIcon(result->component);
+                    ARA_INTERNAL_ASSERT(icon != nil);
+                    [(NSObject *)icon release];     // cast is necessary because NSImage is only forward-declared here
+                }
 
-                // when migrating to ARM machines, we suggest to also move to Audio Unit v3 (AUv2 is deprecated)
-//              ARA_VALIDATE_API_CONDITION(([avComponent audioComponentDescription].componentFlags & kAudioComponentFlag_IsV3AudioUnit) != 0);
-//              if (([avComponent audioComponentDescription].componentFlags & kAudioComponentFlag_IsV3AudioUnit) == 0)
-//                  ARA_WARN("This Audio Unit has not yet been updated to version 3 of the Audio Unit API, and thus might not work in future macOS releases.");
+                if (([avComponent audioComponentDescription].componentFlags & kAudioComponentFlag_IsV3AudioUnit) != 0)
+                {
+                    // when migrating to Audio Unit v3, plug-ins should also adopt App Sandbox safety
+                    ARA_VALIDATE_API_CONDITION([avComponent isSandboxSafe]);
+                }
+                else
+                {
+#if ARA_CPU_ARM
+                    // on ARM machines, adopting Audio Unit v3 is required for proper ARA support due to out-of-process operation
+                    ARA_WARN("This Audio Unit has not yet been updated to version 3 of the Audio Unit API, and therefore cannot use ARA when loaded out-of-process.");
 #endif
+                }
             }
         }
     }
