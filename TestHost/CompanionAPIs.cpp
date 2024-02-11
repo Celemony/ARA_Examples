@@ -547,10 +547,12 @@ public:
         return true;
     }
 
+#if !USE_ARA_BACKGROUND_IPC
     void idleThreadForDuration (int32_t milliseconds) override
     {
         static_cast<IPCMessageChannel*> (getMessageChannel ())->runReceiveLoop (milliseconds);
     }
+#endif
 
     void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
     {

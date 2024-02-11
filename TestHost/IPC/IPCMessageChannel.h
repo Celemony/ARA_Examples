@@ -48,6 +48,12 @@
 #endif
 
 
+// run IPC either on main thread or on background thread
+#ifndef USE_ARA_BACKGROUND_IPC
+    #define USE_ARA_BACKGROUND_IPC 1
+#endif
+
+
 class IPCSendPort;
 class IPCReceivePort;
 
@@ -76,13 +82,19 @@ protected:
     using ARA::IPC::ARAIPCMessageChannel::ARAIPCMessageChannel;
 
     void _sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder) override;
+
+#if !USE_ARA_BACKGROUND_IPC
     bool runsReceiveLoopOnCurrentThread () override;
     void loopUntilMessageReceived () override;
+#endif
 
 private:
     friend class IPCReceivePort;
 
+#if !USE_ARA_BACKGROUND_IPC
     std::thread::id _receiveThread { std::this_thread::get_id () };
+#endif
+
     IPCSendPort* _sendPort {};
     IPCReceivePort* _receivePort {};
 };
