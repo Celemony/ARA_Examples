@@ -285,7 +285,6 @@ void destroy_sharedFactoryMessageChannel() {
             {
                 ARA::IPC::ARAIPCProxyHostAddFactory(ARATestDocumentController::getARAFactory());
                 _sharedFactoryMessageChannel = [TestAUv3ARAIPCMessageChannel new];
-                ARA::IPC::ARAIPCAUProxyHostInitialize(_sharedFactoryMessageChannel);
             }
 
             return _sharedFactoryMessageChannel;

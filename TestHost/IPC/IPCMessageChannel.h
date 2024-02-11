@@ -67,14 +67,8 @@ public:
     ~IPCMessageChannel () override;
 
     // factory functions for send and receive channels
-    static IPCMessageChannel* createPublishingID (const std::string& channelID, ARA::IPC::MessageHandler* handler);
-    static IPCMessageChannel* createConnectedToID (const std::string& channelID, ARA::IPC::MessageHandler* handler);
-
-    ARA::IPC::MessageEncoder* createEncoder () override;
-
-    // \todo currently not implemented, we rely on running on the same machine for now
-    //       C++20 offers std::endian which allows for a simple implementation upon connecting...
-    bool receiverEndianessMatches ()  override { return true; }
+    static IPCMessageChannel* createPublishingID (const std::string& channelID, ARA::IPC::Connection* connection);
+    static IPCMessageChannel* createConnectedToID (const std::string& channelID, ARA::IPC::Connection* connection);
 
     // message receiving
     // waits up to the specified amount of milliseconds for an incoming event and processes it

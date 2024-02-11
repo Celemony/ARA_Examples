@@ -306,17 +306,17 @@ private:
 //------------------------------------------------------------------------------
 
 
-IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID, ARA::IPC::MessageHandler* handler)
+IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID, ARA::IPC::Connection* connection)
 {
-    auto channel { new IPCMessageChannel { handler } };
+    auto channel { new IPCMessageChannel { connection } };
     channel->_sendPort = new IPCSendPort { channelID + ".from_server" };
     channel->_receivePort = new IPCReceivePort { channelID + ".to_server", channel };
     return channel;
 }
 
-IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID, ARA::IPC::MessageHandler* handler)
+IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID, ARA::IPC::Connection* connection)
 {
-    auto channel { new IPCMessageChannel { handler } };
+    auto channel { new IPCMessageChannel { connection } };
     channel->_receivePort = new IPCReceivePort { channelID + ".from_server", channel };
     channel->_sendPort = new IPCSendPort { channelID + ".to_server" };
     return channel;
@@ -366,11 +366,3 @@ void IPCMessageChannel::loopUntilMessageReceived ()
 }
 #endif
 
-ARA::IPC::MessageEncoder* IPCMessageChannel::createEncoder ()
-{
-#if USE_ARA_CF_ENCODING
-    return new ARA::IPC::CFMessageEncoder {};
-#else
-    return new IPCXMLMessageEncoder {};
-#endif
-}

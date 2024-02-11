@@ -204,10 +204,10 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, b
     return result;
 }
 
-const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, ARAIPCMessageChannelRef * messageChannelRef)
+const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, ARAIPCConnectionRef * connectionRef)
 {
     const ARAFactory * result = NULL;    // initially assume this plug-in doesn't support ARA
-    *messageChannelRef = NULL;
+    *connectionRef = NULL;
 
     // check whether the AU supports ARA by trying to get the factory
     if (audioUnitInstance->isAUv2)
@@ -242,10 +242,10 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, A
                     audioUnitInstance->audioUnitComponent->araProxy = ARAIPCAUProxyPlugInInitialize(audioUnitInstance->v3AudioUnit);
                 if (audioUnitInstance->audioUnitComponent->araProxy)
                 {
-                    *messageChannelRef = ARAIPCAUProxyPlugInGetMainMessageChannel(audioUnitInstance->audioUnitComponent->araProxy);
+                    *connectionRef = audioUnitInstance->audioUnitComponent->araProxy;
      
-                    ARA_VALIDATE_API_CONDITION(ARAIPCProxyPlugInGetFactoriesCount(*messageChannelRef) == 1);
-                    result = ARAIPCProxyPlugInGetFactoryAtIndex (*messageChannelRef, 0);
+                    ARA_VALIDATE_API_CONDITION(ARAIPCProxyPlugInGetFactoriesCount(*connectionRef) == 1);
+                    result = ARAIPCProxyPlugInGetFactoryAtIndex (*connectionRef, 0);
                     ARA_VALIDATE_API_CONDITION(result != NULL);
                 }
             }
