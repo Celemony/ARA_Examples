@@ -55,8 +55,7 @@ struct _AudioUnitInstance
     AURenderBlock v3RenderBlock;                    // only for AUv3: cache of render block outside ObjC runtime
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     BOOL isOutOfProcess;                            // loaded in- or out-of-process
-    BOOL isBoundViaIPC;                             // YES if extensionIPCChannelRef has been initialized via ARA binding
-    ARAIPCMessageChannelRef extensionIPCChannelRef; // only valid when isBoundViaIPC is YES
+    const ARAPlugInExtensionInstance * ipcInstance; // != NULL when bound to ARA via IPC
 #endif
 };
 
@@ -135,12 +134,12 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, b
     result->audioUnitComponent = audioUnitComponent;
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     result->isOutOfProcess = useIPC;
-    result->isBoundViaIPC = NO;
+    result->ipcInstance = NULL;
 #endif
 
     AudioComponentDescription desc;
     AudioComponentGetDescription(audioUnitComponent->component, &desc);
-    result->isAUv2 = AudioUnitIsV2 (audioUnitComponent);
+    result->isAUv2 = AudioUnitIsV2(audioUnitComponent);
 
     if (result->isAUv2)
     {
@@ -309,14 +308,14 @@ const ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUni
         {
             if (@available(macOS 13.0, *))
             {
-                instance = ARAIPCAUProxyPlugInBindToDocumentController (audioUnitInstance->v3AudioUnit, controllerRef, knownRoles, assignedRoles, &audioUnitInstance->extensionIPCChannelRef);
-                audioUnitInstance->isBoundViaIPC = (instance != NULL);
+                instance = ARAIPCAUProxyPlugInBindToDocumentController(audioUnitInstance->v3AudioUnit, controllerRef, knownRoles, assignedRoles);
+                audioUnitInstance->ipcInstance = instance;
             }
         }
         else
 #endif
         {
-            ARA_INTERNAL_ASSERT ([audioUnitInstance->v3AudioUnit conformsToProtocol:@protocol(ARAAudioUnit)]);
+            ARA_INTERNAL_ASSERT([audioUnitInstance->v3AudioUnit conformsToProtocol:@protocol(ARAAudioUnit)]);
             instance = [(AUAudioUnit<ARAAudioUnit> *)audioUnitInstance->v3AudioUnit bindToDocumentController:controllerRef withRoles:assignedRoles knownRoles:knownRoles];
         }
         ARA_VALIDATE_API_CONDITION(instance != NULL);
@@ -510,7 +509,7 @@ void AudioUnitRenderBuffer(AudioUnitInstance audioUnitInstance, UInt32 blockSize
             ^AUAudioUnitStatus (AudioUnitRenderActionFlags *actionFlags, const AudioTimeStamp *timestamp,
                                 AUAudioFrameCount frameCount, NSInteger inputBusNumber, AudioBufferList *inputData)
             {
-                return RenderCallback (NULL, actionFlags, timestamp, (UInt32)inputBusNumber, frameCount, inputData);
+                return RenderCallback(NULL, actionFlags, timestamp, (UInt32)inputBusNumber, frameCount, inputData);
             });
         ARA_INTERNAL_ASSERT(status == noErr);
     }
@@ -542,8 +541,8 @@ void AudioUnitCloseInstance(AudioUnitInstance audioUnitInstance)
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
         if (@available(macOS 13.0, *))
         {
-            if (audioUnitInstance->isBoundViaIPC)
-                ARAIPCAUProxyPlugInCleanupBinding(audioUnitInstance->extensionIPCChannelRef);
+            if (audioUnitInstance->ipcInstance)
+                ARAIPCAUProxyPlugInCleanupBinding(audioUnitInstance->ipcInstance);
         }
 #endif
         [audioUnitInstance->v3AudioUnit release];
@@ -561,6 +560,6 @@ void AudioUnitCleanupComponent(AudioUnitComponent audioUnitComponent)
     }
 #endif
 
-    free (audioUnitComponent);
+    free(audioUnitComponent);
     // Explicit unloading is not supported by the Audio Unit API.
 }

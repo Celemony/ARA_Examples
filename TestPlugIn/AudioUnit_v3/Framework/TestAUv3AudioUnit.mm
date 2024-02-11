@@ -34,7 +34,7 @@
 //       The IPC-related additions to TestAUv3AudioUnit could also be moved to a reusable base class
 //       from which TestAUv3AudioUnit and others could derive.
 //       A workaround might be a set of macros that can be used to provide the code with adjusted
-//       class names for client projects, but since the some methods may be implemented in the client
+//       class names for client projects, but since some methods may be implemented in the client
 //       this is somewhat messy.
 
 API_AVAILABLE(macos(13.0))
@@ -48,13 +48,13 @@ API_AVAILABLE(macos(13.0))
 
 @synthesize callHostBlock = _callHostBlock;
 
-- (instancetype)initWithAudioUnit:(AUAudioUnit * _Nullable)audioUnit {
+- (instancetype)init {
     self = [super init];
 
     if (self == nil) { return nil; }
 
     _callHostBlock = nil;
-    _messageChannelRef = ARA::IPC::ARAIPCAUProxyHostInitializeMessageChannel(audioUnit, self);
+    _messageChannelRef = ARA::IPC::ARAIPCAUProxyHostInitializeMessageChannel(self);
 
     return self;
 }
@@ -77,11 +77,6 @@ API_AVAILABLE(macos(13.0))
 @property AUAudioUnitBusArray *inputBusArray;
 @property AUAudioUnitBusArray *outputBusArray;
 @property (nonatomic, readonly) AUAudioUnitBus *outputBus;
-@property (nonatomic, readonly, nonnull) const ARA::ARAFactory * araFactory;
-
-#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
-@property (nonatomic, nullable, retain) NSObject<AUMessageChannel> * araIPCPlugInExtensionMessageChannel API_AVAILABLE(macos(13.0));
-#endif
 
 @end
 
@@ -92,6 +87,11 @@ API_AVAILABLE(macos(13.0))
     TestAUv3DSPKernel  _kernel;
     ARA::PlugIn::PlugInExtension * _araPlugInExtension;
 }
+
+@synthesize araFactory = _araFactory;
+#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
+@synthesize araRemoteInstanceRef = _araRemoteInstanceRef;
+#endif
 
 // MARK: -  AUAudioUnit Overrides
 
@@ -125,7 +125,8 @@ API_AVAILABLE(macos(13.0))
     _araPlugInExtension = nullptr;
 
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
-    _araIPCPlugInExtensionMessageChannel = nil;
+    static_assert(sizeof(self) == sizeof(NSUInteger), "opaque ref type size mismatch");
+    _araRemoteInstanceRef = (NSUInteger)self;
 #endif
 
     return self;
@@ -273,31 +274,20 @@ void destroy_sharedFactoryMessageChannel() {
     }
 }
 
-+ (void)initialize {
-    if (self != [TestAUv3AudioUnit class]) { return; }
-
-    if (@available(macOS 13.0, *))
-    {
-        ARA::IPC::ARAIPCAUProxyHostAddFactory(ARATestDocumentController::getARAFactory());
-
-        _sharedFactoryMessageChannel = [[TestAUv3ARAIPCMessageChannel alloc] initWithAudioUnit:nil];
-
-        ARA::IPC::ARAIPCAUProxyHostInitialize(_sharedFactoryMessageChannel);
-    }
-}
-
 // \todo the return value should be _Nullable!
 - (id<AUMessageChannel> _Nonnull)messageChannelFor:(NSString * _Nonnull)channelName {
     if (@available(macOS 13.0, *))
     {
         if ([channelName isEqualTo:ARA_AUDIOUNIT_FACTORY_CUSTOM_MESSAGES_UTI])
-            return _sharedFactoryMessageChannel;
-
-        if ([channelName isEqualTo:ARA_AUDIOUNIT_PLUGINEXTENSION_CUSTOM_MESSAGES_UTI])
         {
-            if (!self.araIPCPlugInExtensionMessageChannel)
-                self.araIPCPlugInExtensionMessageChannel = [[TestAUv3ARAIPCMessageChannel alloc] initWithAudioUnit:self];
-            return self.araIPCPlugInExtensionMessageChannel;
+            if (!_sharedFactoryMessageChannel)
+            {
+                ARA::IPC::ARAIPCAUProxyHostAddFactory(ARATestDocumentController::getARAFactory());
+                _sharedFactoryMessageChannel = [TestAUv3ARAIPCMessageChannel new];
+                ARA::IPC::ARAIPCAUProxyHostInitialize(_sharedFactoryMessageChannel);
+            }
+
+            return _sharedFactoryMessageChannel;
         }
     }
     return nil;

@@ -350,9 +350,7 @@ public:
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
         if (usesIPC ())
-            return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_messageChannelRef,
-                                                                                    ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (_messageChannelRef, 0)->factoryID,
-                                                                                    hostInstance, properties);
+            return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_messageChannelRef, getARAFactory ()->factoryID, hostInstance, properties);
         else
             return PlugInEntry::createDocumentControllerWithDocument (hostInstance, properties);
     }
@@ -472,7 +470,7 @@ public:
     {
         // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
         const ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
-        auto plugInExtension { ARA::IPC::ARAIPCProxyPlugInBindToDocumentController (_remoteRef, toIPCRef (getMessageChannel ()), documentControllerRef, knownRoles, assignedRoles) };
+        auto plugInExtension { ARA::IPC::ARAIPCProxyPlugInBindToDocumentController (_remoteRef, documentControllerRef, knownRoles, assignedRoles) };
         validateAndSetPlugInExtensionInstance (plugInExtension, assignedRoles);
     }
 
@@ -733,7 +731,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
     auto plugInCallbacksChannel { IPCMessageChannel::createPublishingID (channelID, &handler) };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
-    ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCMessageChannelRef /*messageChannel*/, ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef,
+    ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef,
                                                     ARA::ARADocumentControllerRef controllerRef,
                                                     ARA::ARAPlugInInstanceRoleFlags knownRoles, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
                                                         -> const ARA::ARAPlugInExtensionInstance*
