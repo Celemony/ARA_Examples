@@ -2,7 +2,7 @@
 //! \file       TestPlugInConfig.h
 //!             IDs and other shared definitions for the ARATestPlugIn
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2012-2023, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2012-2024, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
