@@ -660,8 +660,7 @@ bool _shutDown { false };
 class ProxyMessageHandler : public ARA::IPC::ProxyHostMessageHandler
 {
 public:
-    void handleReceivedMessage (ARA::IPC::MessageChannel* messageChannel,
-                                const ARA::IPC::MessageID messageID,
+    void handleReceivedMessage (const ARA::IPC::MessageID messageID,
                                 const ARA::IPC::MessageDecoder* decoder,
                                 ARA::IPC::MessageEncoder* const replyEncoder) override
     {
@@ -716,9 +715,23 @@ public:
         }
         else
         {
-            ARA::IPC::ProxyHostMessageHandler::handleReceivedMessage (messageChannel, messageID, decoder, replyEncoder);
+            ARA::IPC::ProxyHostMessageHandler::handleReceivedMessage (messageID, decoder, replyEncoder);
         }
     }
+
+    void setMessageChannel (ARA::IPC::MessageChannel* channel)
+    {
+        _messageChannel = channel;
+    }
+    
+protected:
+    ARA::IPC::MessageChannel* getMessageChannel () override
+    {
+        return _messageChannel;
+    }
+
+private:
+    ARA::IPC::MessageChannel * _messageChannel;
 };
 
 namespace RemoteHost
@@ -729,6 +742,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
 
     ProxyMessageHandler handler;
     auto plugInCallbacksChannel { IPCMessageChannel::createPublishingID (channelID, &handler) };
+    handler.setMessageChannel (plugInCallbacksChannel);
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
     ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef,
