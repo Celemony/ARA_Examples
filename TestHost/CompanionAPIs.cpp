@@ -83,12 +83,6 @@ constexpr auto kIPCDestroyEffectMethodID { ARA::IPC::MethodID::createWithNonARAM
 constexpr auto kIPCTerminateMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-6> () };
 
 
-void remoteHostCommandHandler (ARA::IPC::ARAIPCMessageChannel* channel,
-                               const ARA::IPC::ARAIPCMessageID messageID,
-                               const ARA::IPC::ARAIPCMessageDecoder* decoder,
-                               ARA::IPC::ARAIPCMessageEncoder* const replyEncoder);
-
-
 // helper function to create unique IPC message channel IDs for each run
 static const std::string _createChannelID ()
 {
@@ -514,7 +508,7 @@ struct RemoteLauncher
 
 /*******************************************************************************/
 
-class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher, protected ARA::IPC::RemoteCaller
+class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher, protected ARA::IPC::RemoteCaller, public ARA::IPC::ARAIPCProxyPlugInMessageHandler
 {
 private:
     static const ARA::ARAFactory* defaultGetFactory (ARA::IPC::ARAIPCMessageChannel* messageChannel)
@@ -529,7 +523,7 @@ private:
                     const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCMessageChannel*)>& getFactoryFunction)
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, channelID },
-      ARA::IPC::RemoteCaller { IPCMessageChannel::createConnectedToID (channelID, ARA::IPC::ARAIPCProxyPlugInCallbacksDispatcher) }
+      ARA::IPC::RemoteCaller { IPCMessageChannel::createConnectedToID (channelID, this) }
     {
         validateAndSetFactory (getFactoryFunction (static_cast<IPCMessageChannel*> (getMessageChannel ())));
     }
@@ -650,65 +644,69 @@ public:
 std::unique_ptr<PlugInEntry> _plugInEntry {};
 bool _shutDown { false };
 
-void remoteHostCommandHandler (ARA::IPC::ARAIPCMessageChannel* messageChannel,
-                               const ARA::IPC::ARAIPCMessageID messageID,
-                               const ARA::IPC::ARAIPCMessageDecoder* decoder,
-                               ARA::IPC::ARAIPCMessageEncoder* const replyEncoder)
+class ProxyMessageHandler : public ARA::IPC::ARAIPCProxyHostMessageHandler
 {
-    if (messageID == kIPCCreateEffectMethodID)
+public:
+    void handleReceivedMessage (ARA::IPC::ARAIPCMessageChannel* messageChannel,
+                                const ARA::IPC::ARAIPCMessageID messageID,
+                                const ARA::IPC::ARAIPCMessageDecoder* decoder,
+                                ARA::IPC::ARAIPCMessageEncoder* const replyEncoder) override
     {
-        auto plugInInstance { _plugInEntry->createPlugInInstance () };
-        const auto plugInInstanceRef { reinterpret_cast<size_t> (plugInInstance.get ()) };
-        plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
-        ARA::IPC::encodeArguments (replyEncoder, plugInInstanceRef);
-    }
-    else if (messageID == kIPCStartRenderingMethodID)
-    {
-        size_t plugInInstanceRef;
-        int32_t maxBlockSize;
-        double sampleRate;
-        ARA::IPC::decodeArguments (decoder, plugInInstanceRef, maxBlockSize, sampleRate);
+        if (messageID == kIPCCreateEffectMethodID)
+        {
+            auto plugInInstance { _plugInEntry->createPlugInInstance () };
+            const auto plugInInstanceRef { reinterpret_cast<size_t> (plugInInstance.get ()) };
+            plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
+            ARA::IPC::encodeArguments (replyEncoder, plugInInstanceRef);
+        }
+        else if (messageID == kIPCStartRenderingMethodID)
+        {
+            size_t plugInInstanceRef;
+            int32_t maxBlockSize;
+            double sampleRate;
+            ARA::IPC::decodeArguments (decoder, plugInInstanceRef, maxBlockSize, sampleRate);
 
-        reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->startRendering (maxBlockSize, sampleRate);
-    }
-    else if (messageID == kIPCRenderSamplesMethodID)
-    {
-        size_t plugInInstanceRef;
-        int64_t samplePosition;
-        // \todo using static (plus not copy bytes) here assumes single-threaded callbacks, but currently this is a valid requirement
-        static std::vector<uint8_t> buffer;
-        ARA::IPC::BytesDecoder writer { buffer };
-        ARA::IPC::decodeArguments (decoder, plugInInstanceRef, samplePosition, writer);
-        ARA_INTERNAL_ASSERT (buffer.size () > 0);
+            reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->startRendering (maxBlockSize, sampleRate);
+        }
+        else if (messageID == kIPCRenderSamplesMethodID)
+        {
+            size_t plugInInstanceRef;
+            int64_t samplePosition;
+            // \todo using static (plus not copy bytes) here assumes single-threaded callbacks, but currently this is a valid requirement
+            static std::vector<uint8_t> buffer;
+            ARA::IPC::BytesDecoder writer { buffer };
+            ARA::IPC::decodeArguments (decoder, plugInInstanceRef, samplePosition, writer);
+            ARA_INTERNAL_ASSERT (buffer.size () > 0);
 
-        // \todo this ignores potential float data alignment or byte order issues...
-        reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->renderSamples (static_cast<int> (buffer.size () / sizeof (float)),
-                                                                        samplePosition, reinterpret_cast<float*> (buffer.data ()));
-        ARA::IPC::encodeReply (replyEncoder, ARA::IPC::BytesEncoder { buffer, false });
-    }
-    else if (messageID == kIPCStopRenderingMethodID)
-    {
-        size_t plugInInstanceRef;
-        ARA::IPC::decodeArguments (decoder, plugInInstanceRef);
+            // \todo this ignores potential float data alignment or byte order issues...
+            reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->renderSamples (static_cast<int> (buffer.size () / sizeof (float)),
+                                                                            samplePosition, reinterpret_cast<float*> (buffer.data ()));
+            ARA::IPC::encodeReply (replyEncoder, ARA::IPC::BytesEncoder { buffer, false });
+        }
+        else if (messageID == kIPCStopRenderingMethodID)
+        {
+            size_t plugInInstanceRef;
+            ARA::IPC::decodeArguments (decoder, plugInInstanceRef);
 
-        reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->stopRendering ();
-    }
-    else if (messageID == kIPCDestroyEffectMethodID)
-    {
-        size_t plugInInstanceRef;
-        ARA::IPC::decodeArguments (decoder, plugInInstanceRef);
+            reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->stopRendering ();
+        }
+        else if (messageID == kIPCDestroyEffectMethodID)
+        {
+            size_t plugInInstanceRef;
+            ARA::IPC::decodeArguments (decoder, plugInInstanceRef);
 
-        delete reinterpret_cast<PlugInInstance*> (plugInInstanceRef);
+            delete reinterpret_cast<PlugInInstance*> (plugInInstanceRef);
+        }
+        else if (messageID == kIPCTerminateMethodID)
+        {
+            _shutDown = true;
+        }
+        else
+        {
+            ARAIPCProxyHostMessageHandler::handleReceivedMessage (messageChannel, messageID, decoder, replyEncoder);
+        }
     }
-    else if (messageID == kIPCTerminateMethodID)
-    {
-        _shutDown = true;
-    }
-    else
-    {
-        ARA::IPC::ARAIPCProxyHostCommandHandler (messageChannel, messageID, decoder, replyEncoder);
-    }
-}
+};
 
 namespace RemoteHost
 {
@@ -716,7 +714,8 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
 {
     _plugInEntry = std::move (plugInEntry);
 
-    auto plugInCallbacksChannel { IPCMessageChannel::createPublishingID (channelID, remoteHostCommandHandler) };
+    ProxyMessageHandler handler;
+    auto plugInCallbacksChannel { IPCMessageChannel::createPublishingID (channelID, &handler) };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
     ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCMessageChannel* /*messageChannel*/, ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef,

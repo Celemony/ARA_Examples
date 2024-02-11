@@ -20,7 +20,7 @@
 #pragma once
 
 
-#include "ARA_Library/IPC/ARAIPC.h"
+#include "ARA_Library/IPC/ARAIPCMultiThreadedChannel.h"
 
 #if defined (_WIN32)
     #include <Windows.h>
@@ -52,23 +52,16 @@ class IPCSendPort;
 class IPCReceivePort;
 
 
-class IPCMessageChannel : public ARA::IPC::ARAIPCMessageChannel
+class IPCMessageChannel : public ARA::IPC::MultiThreadedChannel
 {
 public:
     ~IPCMessageChannel () override;
 
     // factory functions for send and receive channels
-    using ReceiveCallback = void (*) (ARAIPCMessageChannel* messageChannel,
-                                      const ARA::IPC::ARAIPCMessageID messageID,
-                                      const ARA::IPC::ARAIPCMessageDecoder* decoder,
-                                      ARA::IPC::ARAIPCMessageEncoder* const replyEncoder);
-    static IPCMessageChannel* createPublishingID (const std::string& channelID, const ReceiveCallback& callback);
-    static IPCMessageChannel* createConnectedToID (const std::string& channelID, const ReceiveCallback& callback);
+    static IPCMessageChannel* createPublishingID (const std::string& channelID, ARA::IPC::ARAIPCMessageHandler* handler);
+    static IPCMessageChannel* createConnectedToID (const std::string& channelID, ARA::IPC::ARAIPCMessageHandler* handler);
 
     ARA::IPC::ARAIPCMessageEncoder* createEncoder () override;
-
-    void sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder,
-                      ReplyHandler const replyHandler, void* replyHandlerUserData) override;
 
     // \todo currently not implemented, we rely on running on the same machine for now
     //       C++20 offers std::endian which allows for a simple implementation upon connecting...
@@ -78,23 +71,20 @@ public:
     // waits up to the specified amount of milliseconds for an incoming event and processes it
     void runReceiveLoop (int32_t milliseconds);
 
-    // callbacks for the _receivePort
-    const ARA::IPC::ARAIPCMessageDecoder* createDecoderForMessage (ARA::IPC::ARAIPCMessageID messageID,
-#if defined (_WIN32)
-                                                                                                        const char* data, const size_t dataSize);
-#elif defined (__APPLE__)
-                                                                                                        CFDataRef messageData);
-#endif
-    void routeReceivedMessage (ARA::IPC::ARAIPCMessageID messageID, const ARA::IPC::ARAIPCMessageDecoder* decoder);
+protected:
+    using ARA::IPC::MultiThreadedChannel::MultiThreadedChannel;
+
+    void lockTransaction () override;
+    void unlockTransaction () override;
+    void _sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder) override;
+    void _signalReceivedMessage (std::thread::id activeThread) override;
+    void _waitForReceivedMessage () override;
 
 private:
-    IPCMessageChannel (const ReceiveCallback& callback);
-    void _lockTransaction (bool isOnCreationThread);
-    void _unlockTransaction ();
-    void _sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder);
-    void _handleReceivedMessage (ARA::IPC::ARAIPCMessageID messageID, const ARA::IPC::ARAIPCMessageDecoder* decoder);
+    friend class IPCReceivePort;
 
-private:
+    std::thread::id _receiveThread { std::this_thread::get_id () };
+    bool _sendAwaitsMessage { false };
 #if defined (_WIN32)
     HANDLE
 #elif defined (__APPLE__)
@@ -104,11 +94,4 @@ private:
 
     IPCSendPort* _sendPort {};
     IPCReceivePort* _receivePort {};
-
-    std::thread::id _creationThreadID { std::this_thread::get_id () };
-    ReceiveCallback const _receiveCallback {};
-    int32_t _callbackLevel { 0 };
-    bool _awaitsReply {};
-    ReplyHandler _replyHandler {};
-    void* _replyHandlerUserData {};
 };
