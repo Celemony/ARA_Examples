@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------
 //! \file       IPCMessageChannel.h
-//!             Proof-of-concept implementation of ARAIPCMessageChannel
+//!             Proof-of-concept implementation of MessageChannel
 //!             for the ARA SDK TestHost (error handling is limited to assertions).
 //! \project    ARA SDK Examples
 //! \copyright  Copyright (c) 2012-2023, Celemony Software GmbH, All Rights Reserved.
@@ -61,16 +61,16 @@ class IPCSendPort;
 class IPCReceivePort;
 
 
-class IPCMessageChannel : public ARA::IPC::ARAIPCMessageChannel
+class IPCMessageChannel : public ARA::IPC::MessageChannel
 {
 public:
     ~IPCMessageChannel () override;
 
     // factory functions for send and receive channels
-    static IPCMessageChannel* createPublishingID (const std::string& channelID, ARA::IPC::ARAIPCMessageHandler* handler);
-    static IPCMessageChannel* createConnectedToID (const std::string& channelID, ARA::IPC::ARAIPCMessageHandler* handler);
+    static IPCMessageChannel* createPublishingID (const std::string& channelID, ARA::IPC::MessageHandler* handler);
+    static IPCMessageChannel* createConnectedToID (const std::string& channelID, ARA::IPC::MessageHandler* handler);
 
-    ARA::IPC::ARAIPCMessageEncoder* createEncoder () override;
+    ARA::IPC::MessageEncoder* createEncoder () override;
 
     // \todo currently not implemented, we rely on running on the same machine for now
     //       C++20 offers std::endian which allows for a simple implementation upon connecting...
@@ -82,9 +82,9 @@ public:
     bool runReceiveLoop (int32_t milliseconds);
 
 protected:
-    using ARA::IPC::ARAIPCMessageChannel::ARAIPCMessageChannel;
+    using ARA::IPC::MessageChannel::MessageChannel;
 
-    void _sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder) override;
+    void _sendMessage (ARA::IPC::MessageID messageID, ARA::IPC::MessageEncoder* encoder) override;
 
 #if !USE_ARA_BACKGROUND_IPC
     bool runsReceiveLoopOnCurrentThread () override;

@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------
 //! \file       IPCMessageChannel.cpp
-//!             Proof-of-concept implementation of ARAIPCMessageChannel
+//!             Proof-of-concept implementation of MessageChannel
 //!             for the ARA SDK TestHost (error handling is limited to assertions).
 //! \project    ARA SDK Examples
 //! \copyright  Copyright (c) 2012-2023, Celemony Software GmbH, All Rights Reserved.
@@ -73,7 +73,7 @@ protected:
         static constexpr DWORD maxMessageSize { 4 * 1024 * 1024L - 64};
 
         size_t messageSize;
-        ARA::IPC::ARAIPCMessageID messageID;
+        ARA::IPC::MessageID messageID;
         char messageData[maxMessageSize];
     };
 
@@ -168,7 +168,7 @@ public:
         ARA_INTERNAL_ASSERT (_sharedMemory != nullptr);
     }
 
-    void sendMessage (ARA::IPC::ARAIPCMessageID messageID, const std::string& messageData)
+    void sendMessage (ARA::IPC::MessageID messageID, const std::string& messageData)
     {
         ARA_INTERNAL_ASSERT (messageData.size () <= SharedMemory::maxMessageSize);
 
@@ -246,7 +246,7 @@ private:
     {
         auto channel { static_cast<IPCMessageChannel*> (info) };
 #if USE_ARA_CF_ENCODING
-        const auto decoder { ARA::IPC::ARAIPCCFMessageDecoder::createWithMessageData (messageData) };
+        const auto decoder { ARA::IPC::CFMessageDecoder::createWithMessageData (messageData) };
 #else
         const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
 #endif
@@ -290,7 +290,7 @@ public:
         CFRelease (_port);
     }
 
-    void sendMessage (ARA::IPC::ARAIPCMessageID messageID, CFDataRef messageData)
+    void sendMessage (ARA::IPC::MessageID messageID, CFDataRef messageData)
     {
         const auto ARA_MAYBE_UNUSED_VAR (result) { CFMessagePortSendRequest (_port, messageID, messageData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
         ARA_INTERNAL_ASSERT (result == kCFMessagePortSuccess);
@@ -306,7 +306,7 @@ private:
 //------------------------------------------------------------------------------
 
 
-IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID, ARA::IPC::ARAIPCMessageHandler* handler)
+IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID, ARA::IPC::MessageHandler* handler)
 {
     auto channel { new IPCMessageChannel { handler } };
     channel->_sendPort = new IPCSendPort { channelID + ".from_server" };
@@ -314,7 +314,7 @@ IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& cha
     return channel;
 }
 
-IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID, ARA::IPC::ARAIPCMessageHandler* handler)
+IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID, ARA::IPC::MessageHandler* handler)
 {
     auto channel { new IPCMessageChannel { handler } };
     channel->_receivePort = new IPCReceivePort { channelID + ".from_server", channel };
@@ -328,10 +328,10 @@ IPCMessageChannel::~IPCMessageChannel ()
     delete _receivePort;
 }
 
-void IPCMessageChannel::_sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder)
+void IPCMessageChannel::_sendMessage (ARA::IPC::MessageID messageID, ARA::IPC::MessageEncoder* encoder)
 {
 #if USE_ARA_CF_ENCODING
-    const auto messageData { static_cast<ARA::IPC::ARAIPCCFMessageEncoder*> (encoder)->createMessageEncoderData () };
+    const auto messageData { static_cast<ARA::IPC::CFMessageEncoder*> (encoder)->createMessageEncoderData () };
 #else
     const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder)->createEncodedMessage () };
 #endif
@@ -366,10 +366,10 @@ void IPCMessageChannel::loopUntilMessageReceived ()
 }
 #endif
 
-ARA::IPC::ARAIPCMessageEncoder* IPCMessageChannel::createEncoder ()
+ARA::IPC::MessageEncoder* IPCMessageChannel::createEncoder ()
 {
 #if USE_ARA_CF_ENCODING
-    return new ARA::IPC::ARAIPCCFMessageEncoder {};
+    return new ARA::IPC::CFMessageEncoder {};
 #else
     return new IPCXMLMessageEncoder {};
 #endif

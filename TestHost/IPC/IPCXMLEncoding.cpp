@@ -49,9 +49,9 @@ IPCXMLMessage::IPCXMLMessage (std::shared_ptr<pugi::xml_document> dictionary, pu
   _root { root }
 {}
 
-const char* IPCXMLMessage::_getEncodedKey (const MessageKey argKey)
+const char* IPCXMLMessage::_getEncodedKey (const MessageArgumentKey argKey)
 {
-    static std::map<MessageKey, std::string> cache;
+    static std::map<MessageArgumentKey, std::string> cache;
     auto existingEntry { cache.find (argKey) };
     if (existingEntry != cache.end ())
         return existingEntry->second.c_str ();
@@ -60,48 +60,48 @@ const char* IPCXMLMessage::_getEncodedKey (const MessageKey argKey)
 }
 
 
-void IPCXMLMessageEncoder::appendInt32 (const MessageKey argKey, const int32_t argValue)
+void IPCXMLMessageEncoder::appendInt32 (const MessageArgumentKey argKey, const int32_t argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendInt64 (const MessageKey argKey, const int64_t argValue)
+void IPCXMLMessageEncoder::appendInt64 (const MessageArgumentKey argKey, const int64_t argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendSize (const MessageKey argKey, const size_t argValue)
+void IPCXMLMessageEncoder::appendSize (const MessageArgumentKey argKey, const size_t argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendFloat (const MessageKey argKey, const float argValue)
+void IPCXMLMessageEncoder::appendFloat (const MessageArgumentKey argKey, const float argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendDouble (const MessageKey argKey, const double argValue)
+void IPCXMLMessageEncoder::appendDouble (const MessageArgumentKey argKey, const double argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendString (const MessageKey argKey, const char* const argValue)
+void IPCXMLMessageEncoder::appendString (const MessageArgumentKey argKey, const char* const argValue)
 {
     _appendAttribute (argKey).set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendBytes (const MessageKey argKey, const uint8_t* argValue, const size_t argSize, const bool /*copy*/)
+void IPCXMLMessageEncoder::appendBytes (const MessageArgumentKey argKey, const uint8_t* argValue, const size_t argSize, const bool /*copy*/)
 {
     const auto encodedData { base64_encode (argValue, argSize, false) };
     _appendAttribute (argKey).set_value (encodedData.c_str ());
 }
 
-pugi::xml_attribute IPCXMLMessageEncoder::_appendAttribute (const MessageKey argKey)
+pugi::xml_attribute IPCXMLMessageEncoder::_appendAttribute (const MessageArgumentKey argKey)
 {
     return _root.append_attribute (_getEncodedKey (argKey));
 }
 
-ARA::IPC::ARAIPCMessageEncoder* IPCXMLMessageEncoder::appendSubMessage (const MessageKey argKey)
+ARA::IPC::MessageEncoder* IPCXMLMessageEncoder::appendSubMessage (const MessageArgumentKey argKey)
 {
     return new IPCXMLMessageEncoder { _dictionary, _root.append_child (_getEncodedKey (argKey)) };
 }
@@ -160,7 +160,7 @@ IPCXMLMessageDecoder* IPCXMLMessageDecoder::createWithMessageData (const char* d
 }
 #endif
 
-bool IPCXMLMessageDecoder::readInt32 (const MessageKey argKey, int32_t* argValue) const
+bool IPCXMLMessageDecoder::readInt32 (const MessageArgumentKey argKey, int32_t* argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
@@ -174,7 +174,7 @@ bool IPCXMLMessageDecoder::readInt32 (const MessageKey argKey, int32_t* argValue
     return true;
 }
 
-bool IPCXMLMessageDecoder::readInt64 (const MessageKey argKey, int64_t* argValue) const
+bool IPCXMLMessageDecoder::readInt64 (const MessageArgumentKey argKey, int64_t* argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
@@ -188,7 +188,7 @@ bool IPCXMLMessageDecoder::readInt64 (const MessageKey argKey, int64_t* argValue
     return true;
 }
 
-bool IPCXMLMessageDecoder::readSize (const MessageKey argKey, size_t* argValue) const
+bool IPCXMLMessageDecoder::readSize (const MessageArgumentKey argKey, size_t* argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
@@ -202,7 +202,7 @@ bool IPCXMLMessageDecoder::readSize (const MessageKey argKey, size_t* argValue) 
     return true;
 }
 
-bool IPCXMLMessageDecoder::readFloat (const MessageKey argKey, float* argValue) const
+bool IPCXMLMessageDecoder::readFloat (const MessageArgumentKey argKey, float* argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
@@ -215,7 +215,7 @@ bool IPCXMLMessageDecoder::readFloat (const MessageKey argKey, float* argValue) 
     return true;
 }
 
-bool IPCXMLMessageDecoder::readDouble (const MessageKey argKey, double* argValue) const
+bool IPCXMLMessageDecoder::readDouble (const MessageArgumentKey argKey, double* argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
@@ -228,7 +228,7 @@ bool IPCXMLMessageDecoder::readDouble (const MessageKey argKey, double* argValue
     return true;
 }
 
-bool IPCXMLMessageDecoder::readString (const MessageKey argKey, const char** argValue) const
+bool IPCXMLMessageDecoder::readString (const MessageArgumentKey argKey, const char** argValue) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
@@ -241,7 +241,7 @@ bool IPCXMLMessageDecoder::readString (const MessageKey argKey, const char** arg
     return true;
 }
 
-bool IPCXMLMessageDecoder::readBytesSize (const MessageKey argKey, size_t* argSize) const
+bool IPCXMLMessageDecoder::readBytesSize (const MessageArgumentKey argKey, size_t* argSize) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
@@ -260,7 +260,7 @@ bool IPCXMLMessageDecoder::readBytesSize (const MessageKey argKey, size_t* argSi
     return true;
 }
 
-void IPCXMLMessageDecoder::readBytes (const MessageKey argKey, uint8_t* const argValue) const
+void IPCXMLMessageDecoder::readBytes (const MessageArgumentKey argKey, uint8_t* const argValue) const
 {
     if (argKey == _bytesCacheKey)
         std::memcpy (argValue, _bytesCacheData.data (), _bytesCacheData.size ());
@@ -277,7 +277,7 @@ void IPCXMLMessageDecoder::readBytes (const MessageKey argKey, uint8_t* const ar
     std::memcpy (argValue, decodedData.c_str (), decodedData.size ());
 }
 
-ARA::IPC::ARAIPCMessageDecoder* IPCXMLMessageDecoder::readSubMessage (const MessageKey argKey) const
+ARA::IPC::MessageDecoder* IPCXMLMessageDecoder::readSubMessage (const MessageArgumentKey argKey) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto child { _root.child (_getEncodedKey (argKey)) };
@@ -287,7 +287,7 @@ ARA::IPC::ARAIPCMessageDecoder* IPCXMLMessageDecoder::readSubMessage (const Mess
     return new IPCXMLMessageDecoder { _dictionary, child };
 }
 
-bool IPCXMLMessageDecoder::hasDataForKey (const MessageKey argKey) const
+bool IPCXMLMessageDecoder::hasDataForKey (const MessageArgumentKey argKey) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto encodedKey { _getEncodedKey (argKey) };

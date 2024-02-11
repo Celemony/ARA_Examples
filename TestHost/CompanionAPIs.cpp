@@ -89,7 +89,7 @@ constexpr auto kIPCTerminateMethodID { ARA::IPC::MethodID::createWithNonARAMetho
     _Pragma ("GCC diagnostic ignored \"-Wunused-template\"")
 #endif
 
-ARA_MAP_IPC_REF (ARA::IPC::ARAIPCMessageChannel, ARA::IPC::ARAIPCMessageChannelRef)
+ARA_MAP_IPC_REF (ARA::IPC::MessageChannel, ARA::IPC::ARAIPCMessageChannelRef)
 
 #if defined (__GNUC__)
     _Pragma ("GCC diagnostic pop")
@@ -456,7 +456,7 @@ private:
 class IPCPlugInInstance : public PlugInInstance, protected ARA::IPC::RemoteCaller
 {
 public:
-    IPCPlugInInstance (ARA::IPC::ARAIPCPlugInInstanceRef remoteRef, ARA::IPC::ARAIPCMessageChannel* messageChannel)
+    IPCPlugInInstance (ARA::IPC::ARAIPCPlugInInstanceRef remoteRef, ARA::IPC::MessageChannel* messageChannel)
     : RemoteCaller { messageChannel },
       _remoteRef { remoteRef }
     {}
@@ -521,7 +521,7 @@ struct RemoteLauncher
 
 /*******************************************************************************/
 
-class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher, protected ARA::IPC::RemoteCaller, public ARA::IPC::ARAIPCProxyPlugInMessageHandler
+class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher, protected ARA::IPC::RemoteCaller, public ARA::IPC::ProxyPlugInMessageHandler
 {
 private:
     static const ARA::ARAFactory* defaultGetFactory (ARA::IPC::ARAIPCMessageChannelRef messageChannel)
@@ -659,13 +659,13 @@ public:
 std::unique_ptr<PlugInEntry> _plugInEntry {};
 bool _shutDown { false };
 
-class ProxyMessageHandler : public ARA::IPC::ARAIPCProxyHostMessageHandler
+class ProxyMessageHandler : public ARA::IPC::ProxyHostMessageHandler
 {
 public:
-    void handleReceivedMessage (ARA::IPC::ARAIPCMessageChannel* messageChannel,
-                                const ARA::IPC::ARAIPCMessageID messageID,
-                                const ARA::IPC::ARAIPCMessageDecoder* decoder,
-                                ARA::IPC::ARAIPCMessageEncoder* const replyEncoder) override
+    void handleReceivedMessage (ARA::IPC::MessageChannel* messageChannel,
+                                const ARA::IPC::MessageID messageID,
+                                const ARA::IPC::MessageDecoder* decoder,
+                                ARA::IPC::MessageEncoder* const replyEncoder) override
     {
         if (messageID == kIPCCreateEffectMethodID)
         {
@@ -718,7 +718,7 @@ public:
         }
         else
         {
-            ARAIPCProxyHostMessageHandler::handleReceivedMessage (messageChannel, messageID, decoder, replyEncoder);
+            ARA::IPC::ProxyHostMessageHandler::handleReceivedMessage (messageChannel, messageID, decoder, replyEncoder);
         }
     }
 };
