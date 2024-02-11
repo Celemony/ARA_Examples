@@ -20,15 +20,13 @@
 
 #include "ARA_API/ARAInterface.h"
 #include "ARA_Library/Debug/ARADebug.h"
+#include "ARA_Library/IPC/ARAIPC.h"
 
 #include <MacTypes.h>
 
 #if defined(__cplusplus)
-namespace ARA { namespace IPC { class ARAIPCMessageChannel; } }
 extern "C"
 {
-#else
-struct ARAIPCMessageChannel;
 #endif
 
 typedef struct _AudioUnitComponent * AudioUnitComponent;
@@ -39,11 +37,7 @@ bool AudioUnitIsV2(AudioUnitComponent audioUnitComponent);
 AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, bool useIPC);
 // On return, *messageChannel will be NULL if Audio Unit does not use IPC, otherwise it will point to
 // a valid ARAIPCMessageChannel for all factory-related calls until AudioUnitCleanupComponent() is called.
-#if defined(__cplusplus)
-const ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnit, ARA_NAMESPACE IPC::ARAIPCMessageChannel ** messageChannel);
-#else
-const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnit, struct ARAIPCMessageChannel ** messageChannel);
-#endif
+const ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnit, ARA_IPC_NAMESPACE ARAIPCMessageChannel ** messageChannel);
 const ARA_NAMESPACE ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnit, ARA_NAMESPACE ARADocumentControllerRef controllerRef, ARA_NAMESPACE ARAPlugInInstanceRoleFlags assignedRoles);
 void AudioUnitStartRendering(AudioUnitInstance audioUnit, UInt32 maxBlockSize, double sampleRate);
 void AudioUnitRenderBuffer(AudioUnitInstance audioUnit, UInt32 blockSize, SInt64 samplePosition, float * buffer);

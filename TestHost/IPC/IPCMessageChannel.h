@@ -22,6 +22,9 @@
 
 #include "ARA_Library/IPC/ARAIPCMessageChannel.h"
 
+#if ARA_ENABLE_IPC
+
+
 #if defined (_WIN32)
     #include <Windows.h>
     #include <utility>
@@ -98,3 +101,5 @@ private:
     IPCSendPort* _sendPort {};
     IPCReceivePort* _receivePort {};
 };
+
+#endif // ARA_ENABLE_IPC

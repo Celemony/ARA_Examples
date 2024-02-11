@@ -20,7 +20,9 @@
 #pragma once
 
 
-#include "ARA_Library/IPC/ARAIPC.h"
+#include "ARA_Library/IPC/ARAIPCMessage.h"
+
+#if ARA_ENABLE_IPC
 
 
 #include <memory>
@@ -106,3 +108,5 @@ private:
     mutable std::string _bytesCacheData {};
     mutable MessageKey _bytesCacheKey { std::numeric_limits<MessageKey>::max () };
 };
+
+#endif // ARA_ENABLE_IPC

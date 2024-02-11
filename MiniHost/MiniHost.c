@@ -356,7 +356,7 @@ int main(int argc, const char * argv[])
     ARA_INTERNAL_ASSERT(audioUnitComponent != NULL);
     AudioUnitInstance audioUnit = AudioUnitOpenInstance(audioUnitComponent, false);
 
-    struct ARAIPCMessageChannel * messageChannel;
+    ARAIPCMessageChannel * messageChannel;
     factory = AudioUnitGetARAFactory(audioUnit, &messageChannel);
     if (messageChannel != NULL)
     {
