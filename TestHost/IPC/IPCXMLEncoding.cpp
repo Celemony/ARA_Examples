@@ -51,7 +51,6 @@ IPCXMLMessage::IPCXMLMessage (std::shared_ptr<pugi::xml_document> dictionary, pu
 
 const char* IPCXMLMessage::_getEncodedKey (const MessageKey argKey)
 {
-    ARA_INTERNAL_ASSERT (argKey >= 0);
     static std::map<MessageKey, std::string> cache;
     auto existingEntry { cache.find (argKey) };
     if (existingEntry != cache.end ())
@@ -99,15 +98,11 @@ void IPCXMLMessageEncoder::appendBytes (const MessageKey argKey, const uint8_t* 
 
 pugi::xml_attribute IPCXMLMessageEncoder::_appendAttribute (const MessageKey argKey)
 {
-    ARA_INTERNAL_ASSERT (argKey >= 0);
-
     return _root.append_attribute (_getEncodedKey (argKey));
 }
 
 ARA::IPC::ARAIPCMessageEncoder* IPCXMLMessageEncoder::appendSubMessage (const MessageKey argKey)
 {
-    ARA_INTERNAL_ASSERT (argKey >= 0);
-
     return new IPCXMLMessageEncoder { _dictionary, _root.append_child (_getEncodedKey (argKey)) };
 }
 
@@ -290,4 +285,18 @@ ARA::IPC::ARAIPCMessageDecoder* IPCXMLMessageDecoder::readSubMessage (const Mess
         return nullptr;
 
     return new IPCXMLMessageDecoder { _dictionary, child };
+}
+
+bool IPCXMLMessageDecoder::hasDataForKey (const MessageKey argKey) const
+{
+    ARA_INTERNAL_ASSERT (!_root.empty ());
+    const auto encodedKey { _getEncodedKey (argKey) };
+
+    if (!_root.attribute (encodedKey).empty ())
+        return true;
+
+    if (!_root.child (encodedKey).empty ())
+        return true;
+
+    return false;
 }

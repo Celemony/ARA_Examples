@@ -98,6 +98,7 @@ public:
     bool readBytesSize (MessageKey argKey, size_t* argSize) const override;
     void readBytes (MessageKey argKey, uint8_t* argValue) const override;
     ARAIPCMessageDecoder* readSubMessage (const MessageKey argKey) const override;
+    bool hasDataForKey (MessageKey argKey) const override;
 
 private:
     using IPCXMLMessage::IPCXMLMessage;

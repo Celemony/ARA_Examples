@@ -69,29 +69,20 @@ public:
 
     // message receiving
     // waits up to the specified amount of milliseconds for an incoming event and processes it
-    void runReceiveLoop (int32_t milliseconds);
+    // returns true if some event was processed during that time
+    bool runReceiveLoop (int32_t milliseconds);
 
 protected:
     using ARA::IPC::ARAIPCMessageChannel::ARAIPCMessageChannel;
 
-    void lockTransaction () override;
-    void unlockTransaction () override;
     void _sendMessage (ARA::IPC::ARAIPCMessageID messageID, ARA::IPC::ARAIPCMessageEncoder* encoder) override;
-    void _signalReceivedMessage (std::thread::id activeThread) override;
-    void _waitForReceivedMessage () override;
+    bool runsReceiveLoopOnCurrentThread () override;
+    void loopUntilMessageReceived () override;
 
 private:
     friend class IPCReceivePort;
 
     std::thread::id _receiveThread { std::this_thread::get_id () };
-    bool _sendAwaitsMessage { false };
-#if defined (_WIN32)
-    HANDLE
-#elif defined (__APPLE__)
-    sem_t*
-#endif
-           _transactionLock {};     // global lock shared between both processes, taken when starting a new transaction
-
     IPCSendPort* _sendPort {};
     IPCReceivePort* _receivePort {};
 };
