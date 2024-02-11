@@ -24,6 +24,7 @@
 #import "ARATestDocumentController.h"
 
 #import "ARA_Library/IPC/ARAIPCAudioUnit_v3.h"
+#import "ARA_Library/IPC/ARAIPCProxyHost.h"
 
 
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
@@ -282,7 +283,7 @@ void destroy_sharedFactoryMessageChannel() {
         {
             if (!_sharedFactoryMessageChannel)
             {
-                ARA::IPC::ARAIPCAUProxyHostAddFactory(ARATestDocumentController::getARAFactory());
+                ARA::IPC::ARAIPCProxyHostAddFactory(ARATestDocumentController::getARAFactory());
                 _sharedFactoryMessageChannel = [TestAUv3ARAIPCMessageChannel new];
                 ARA::IPC::ARAIPCAUProxyHostInitialize(_sharedFactoryMessageChannel);
             }

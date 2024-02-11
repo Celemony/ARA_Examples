@@ -30,16 +30,25 @@
 #include "ARA_API/ARAAudioUnit_v3.h"
 #include "ARA_Library/Debug/ARADebug.h"
 #include "ARA_Library/IPC/ARAIPCAudioUnit_v3.h"
+#include "ARA_Library/IPC/ARAIPCProxyPlugIn.h"
 
+
+#if defined (__GNUC__)
+    _Pragma ("GCC diagnostic push")
+    _Pragma ("GCC diagnostic ignored \"-Wunguarded-availability\"")
+#endif
 
 struct _AudioUnitComponent
 {
     AudioComponent component;
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
-    const ARAFactory * ipcFactory;                  // cache - NULL until read via IPC
-    ARAIPCMessageChannelRef factoryIPCChannelRef;   // invalid until ipcFactory has been read via IPC
+    ARAIPCConnectionRef araProxy;
 #endif
 };
+
+#if defined (__GNUC__)
+    _Pragma ("GCC diagnostic pop")
+#endif
 
 
 struct _AudioUnitInstance
@@ -65,7 +74,7 @@ AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype,
     AudioUnitComponent result = malloc(sizeof(struct _AudioUnitComponent));
     result->component = NULL;
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
-    result->ipcFactory = NULL;
+    result->araProxy = NULL;
 #endif
 
     AudioComponentDescription compDesc = { type, subtype, manufacturer, 0, 0 };
@@ -229,14 +238,16 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, A
         {
             if (@available(macOS 13.0, *))
             {
-                if (!audioUnitInstance->audioUnitComponent->ipcFactory)
+                if (!audioUnitInstance->audioUnitComponent->araProxy)
+                    audioUnitInstance->audioUnitComponent->araProxy = ARAIPCAUProxyPlugInInitialize(audioUnitInstance->v3AudioUnit);
+                if (audioUnitInstance->audioUnitComponent->araProxy)
                 {
-                    if ((audioUnitInstance->audioUnitComponent->factoryIPCChannelRef =
-                            ARAIPCAUProxyPlugInInitializeFactoryMessageChannel(audioUnitInstance->v3AudioUnit)))
-                        audioUnitInstance->audioUnitComponent->ipcFactory = ARAIPCAUProxyPlugInGetFactory(audioUnitInstance->audioUnitComponent->factoryIPCChannelRef);
+                    *messageChannelRef = ARAIPCAUProxyPlugInGetMainMessageChannel(audioUnitInstance->audioUnitComponent->araProxy);
+     
+                    ARA_VALIDATE_API_CONDITION(ARAIPCProxyPlugInGetFactoriesCount(*messageChannelRef) == 1);
+                    result = ARAIPCProxyPlugInGetFactoryAtIndex (*messageChannelRef, 0);
+                    ARA_VALIDATE_API_CONDITION(result != NULL);
                 }
-                if ((result = audioUnitInstance->audioUnitComponent->ipcFactory))
-                    *messageChannelRef = audioUnitInstance->audioUnitComponent->factoryIPCChannelRef;
             }
         }
         else
@@ -542,7 +553,7 @@ void AudioUnitCloseInstance(AudioUnitInstance audioUnitInstance)
         if (@available(macOS 13.0, *))
         {
             if (audioUnitInstance->ipcInstance)
-                ARAIPCAUProxyPlugInCleanupBinding(audioUnitInstance->ipcInstance);
+                ARAIPCProxyPlugInCleanupBinding(audioUnitInstance->ipcInstance);
         }
 #endif
         [audioUnitInstance->v3AudioUnit release];
@@ -555,8 +566,8 @@ void AudioUnitCleanupComponent(AudioUnitComponent audioUnitComponent)
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     if (@available(macOS 13.0, *))
     {
-        if (audioUnitComponent->ipcFactory)
-            ARAIPCAUProxyPlugInUninitializeFactoryMessageChannel(audioUnitComponent->factoryIPCChannelRef);
+        if (audioUnitComponent->araProxy)
+            ARAIPCAUProxyPlugInUninitialize(audioUnitComponent->araProxy);
     }
 #endif
 
