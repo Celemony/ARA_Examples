@@ -84,6 +84,10 @@ constexpr auto kIPCDestroyEffectMethodID { ARA::IPC::MethodID::createWithNonARAM
 constexpr auto kIPCTerminateMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-6> () };
 
 
+constexpr auto mainChannelIDSuffix { ".main" };
+constexpr auto otherChannelIDSuffix { ".other" };
+
+
 #if defined (__GNUC__)
     _Pragma ("GCC diagnostic push")
     _Pragma ("GCC diagnostic ignored \"-Wunused-template\"")
@@ -552,7 +556,8 @@ private:
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, channelID },
       ARA::IPC::ProxyPlugIn { this },
-      Connection { this, IPCMessageChannel::createConnectedToID (channelID, this) }
+      Connection { this, IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix, this),
+                         IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix, this) }
     {
         validateAndSetFactory (getFactoryFunction (toIPCRef (getConnection ())));
     }
@@ -678,7 +683,9 @@ class ProxyHost : public ARA::IPC::ProxyHost, public Connection
 public:
     ProxyHost (const std::string& channelID)
     : ARA::IPC::ProxyHost { this },
-      Connection { this, IPCMessageChannel::createPublishingID (channelID, this) }
+      Connection { this, IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix, this),
+                         IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix, this)
+      }
     {}
 
     void handleReceivedMessage (const ARA::IPC::MessageID messageID,

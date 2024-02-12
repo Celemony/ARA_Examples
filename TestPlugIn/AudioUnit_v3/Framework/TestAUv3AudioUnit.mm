@@ -49,13 +49,13 @@ API_AVAILABLE(macos(13.0))
 
 @synthesize callHostBlock = _callHostBlock;
 
-- (instancetype)init {
+- (instancetype)initAsMainThreadChannel:(BOOL) isMainThreadChannel {
     self = [super init];
 
     if (self == nil) { return nil; }
 
     _callHostBlock = nil;
-    _messageChannelRef = ARA::IPC::ARAIPCAUProxyHostInitializeMessageChannel(self);
+    _messageChannelRef = ARA::IPC::ARAIPCAUProxyHostInitializeMessageChannel(self, isMainThreadChannel);
 
     return self;
 }
@@ -261,17 +261,17 @@ API_AVAILABLE(macos(13.0))
 
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
 
-NSObject<AUMessageChannel> * __strong _sharedFactoryMessageChannel API_AVAILABLE(macos(13.0)) = nil;
+NSObject<AUMessageChannel> * __strong _mainMessageChannel API_AVAILABLE(macos(13.0)) = nil;
+NSObject<AUMessageChannel> * __strong _otherMessageChannel API_AVAILABLE(macos(13.0)) = nil;
 
 __attribute__((destructor))
-void destroy_sharedFactoryMessageChannel() {
+void destroy_sharedMessageChannels() {
     if (@available(macOS 13.0, *))
     {
-        if (_sharedFactoryMessageChannel)
-        {
+        if (_mainMessageChannel || _otherMessageChannel)
             ARA::IPC::ARAIPCAUProxyHostUninitialize();
-            _sharedFactoryMessageChannel = nil;
-        }
+        _mainMessageChannel = nil;
+        _otherMessageChannel = nil;
     }
 }
 
@@ -279,15 +279,27 @@ void destroy_sharedFactoryMessageChannel() {
 - (id<AUMessageChannel> _Nonnull)messageChannelFor:(NSString * _Nonnull)channelName {
     if (@available(macOS 13.0, *))
     {
-        if ([channelName isEqualTo:ARA_AUDIOUNIT_FACTORY_CUSTOM_MESSAGES_UTI])
+        if ([channelName isEqualTo:ARA_AUDIOUNIT_MAIN_THREAD_MESSAGES_UTI])
         {
-            if (!_sharedFactoryMessageChannel)
+            if (!_mainMessageChannel)
             {
-                ARA::IPC::ARAIPCProxyHostAddFactory(ARATestDocumentController::getARAFactory());
-                _sharedFactoryMessageChannel = [TestAUv3ARAIPCMessageChannel new];
+                if (!_otherMessageChannel)
+                    ARA::IPC::ARAIPCProxyHostAddFactory(ARATestDocumentController::getARAFactory());
+                _mainMessageChannel = [[TestAUv3ARAIPCMessageChannel alloc] initAsMainThreadChannel:YES];
             }
 
-            return _sharedFactoryMessageChannel;
+            return _mainMessageChannel;
+        }
+        if ([channelName isEqualTo:ARA_AUDIOUNIT_OTHER_THREADS_MESSAGES_UTI])
+        {
+            if (!_otherMessageChannel)
+            {
+                if (!_mainMessageChannel)
+                    ARA::IPC::ARAIPCProxyHostAddFactory(ARATestDocumentController::getARAFactory());
+                _otherMessageChannel = [[TestAUv3ARAIPCMessageChannel alloc] initAsMainThreadChannel:NO];
+            }
+
+            return _otherMessageChannel;
         }
     }
     return nil;
