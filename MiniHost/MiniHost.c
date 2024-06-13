@@ -62,7 +62,7 @@
 #endif
 
 
-// Companion API includes
+// companion API includes
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
     #include "ExamplesCommon/PlugInHosting/AudioUnitLoader.h"
 

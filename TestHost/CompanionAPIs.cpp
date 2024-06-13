@@ -494,7 +494,7 @@ public:
 
     void bindToDocumentControllerWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) override
     {
-        // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
+        // \todo these are the roles that our companion API Loaders implicitly assume - they should be published properly
         const ARA::ARAPlugInInstanceRoleFlags knownRoles { ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole };
         auto plugInExtension { ARA::IPC::ARAIPCProxyPlugInBindToDocumentController (_remoteRef, documentControllerRef, knownRoles, assignedRoles) };
         validateAndSetPlugInExtensionInstance (plugInExtension, assignedRoles);
@@ -767,7 +767,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
                                                     ARA::ARAPlugInInstanceRoleFlags knownRoles, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
                                                         -> const ARA::ARAPlugInExtensionInstance*
                                                 {
-                                                    // \todo these are the roles that our Companion API Loaders implicitly assume - they should be published properly
+                                                    // \todo these are the roles that our companion API Loaders implicitly assume - they should be published properly
                                                     ARA_INTERNAL_ASSERT (knownRoles == (ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole) );
                                                     reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->bindToDocumentControllerWithRoles (controllerRef, assignedRoles);
                                                     return reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->getARAPlugInExtensionInstance ();
