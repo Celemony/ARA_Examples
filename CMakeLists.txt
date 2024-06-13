@@ -181,8 +181,7 @@ endif()
 
 project(ARA_Examples
     DESCRIPTION "ARA Audio Random Access: Examples"
-    #only added in CMake 3.12, we still support 3.10 on some platforms:
-    #HOMEPAGE_URL https://www.celemony.com/ara
+    HOMEPAGE_URL "https://github.com/Celemony/ARA_Examples"
     VERSION ${ARA_MAJOR_VERSION}.${ARA_MINOR_VERSION}.${ARA_PATCH_VERSION}.${ARA_BUILD_VERSION}
     LANGUAGES C CXX
 )
