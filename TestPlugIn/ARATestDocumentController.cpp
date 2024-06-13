@@ -133,7 +133,7 @@ class AlgorithmPropertiesWrapper
 private:
     AlgorithmPropertiesWrapper (const TestProcessingAlgorithm* algorithm)
     : _algorithm { algorithm },
-      _algorithmProperties { _algorithm->getIdentifier ().c_str (), _algorithm->getName ().c_str () }
+      _algorithmProperties { _algorithm->getIdentifier (), _algorithm->getName () }
     {}
 
 public:
@@ -476,7 +476,7 @@ bool ARATestDocumentController::doRestoreObjectsFromArchive (ARA::PlugIn::HostAr
         cancelAnalysisOfAudioSource (testAudioSource);
 
         // set the algorithm from the restored persistent ID
-        const auto algorithm { TestProcessingAlgorithm::getAlgorithmWithIdentifier (algorithmID) };
+        const auto algorithm { TestProcessingAlgorithm::getAlgorithmWithIdentifier (algorithmID.c_str ()) };
         ARA_INTERNAL_ASSERT (algorithm != nullptr);     // if we ever add or remove algorithms, we need some proper migration here
         testAudioSource->setProcessingAlgorithm (algorithm);
 

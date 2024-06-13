@@ -27,6 +27,7 @@
 #include <chrono>
 #include <thread>
 #include <cmath>
+#include <cstring>
 
 // The test plug-in pretends to be able to do a kARAContentTypeNotes analysis:
 // To simulate this, it reads all samples and creates a note with invalid pitch for each range of
@@ -96,22 +97,10 @@ std::unique_ptr<TestNoteContent> decodeTestNoteContent (TestUnarchiver& unarchiv
 
 /*******************************************************************************/
 
-class DefaultProcessingAlgorithm : public TestProcessingAlgorithm
+class PseudoAnalysisProcessingAlgorithm : public TestProcessingAlgorithm
 {
 public:
     using TestProcessingAlgorithm::TestProcessingAlgorithm;
-
-    const std::string& getName () const override
-    {
-        static const std::string name { "default algorithm" };
-        return name;
-    }
-
-    const std::string& getIdentifier () const override
-    {
-        static const std::string identifier { "org.ara-audio.examples.testplugin.algorithm.default" };
-        return identifier;
-    }
 
     std::unique_ptr<TestNoteContent> analyzeNoteContent (TestAnalysisCallbacks* analysisCallbacks, const int64_t sampleCount, const double sampleRate, const uint32_t channelCount) const noexcept override
     {
@@ -175,8 +164,8 @@ public:
                         // found end of note - construct note
                         const double noteStartTime { static_cast<double> (lastNoteStartIndex) / sampleRate };
                         const double noteDuration { static_cast<double> (index - lastNoteStartIndex) / sampleRate };
-                        TestNote foundNote { ARA::kARAInvalidFrequency, volume, noteStartTime, noteDuration };
-                        foundNotes.push_back (foundNote);
+                        addNotesForSignalRange (foundNotes, volume, noteStartTime, noteDuration);
+
                         volume = 0.0f;
                     }
                     else
@@ -209,34 +198,79 @@ public:
             // last note continued until the end of the audio source - construct last note
             const double noteStartTime { static_cast<double> (lastNoteStartIndex) / sampleRate };
             const double noteDuration { static_cast<double> (sampleCount - lastNoteStartIndex) / sampleRate };
-            TestNote foundNote { ARA::kARAInvalidFrequency, volume, noteStartTime, noteDuration };
-            foundNotes.push_back (foundNote);
+            addNotesForSignalRange (foundNotes, volume, noteStartTime, noteDuration);
         }
 
         // complete analysis and store result
         analysisCallbacks->notifyAnalysisProgressCompleted ();
         return std::make_unique<TestNoteContent> (foundNotes);
     }
+
+protected:
+    virtual void addNotesForSignalRange (TestNoteContent& foundNotes, const float volume, const double startTime, const double duration) const = 0;
 };
 
 /*******************************************************************************/
 
+static const
+class PercussiveProcessingAlgorithm : public PseudoAnalysisProcessingAlgorithm
+{
+public:
+    PercussiveProcessingAlgorithm ()
+    : PseudoAnalysisProcessingAlgorithm { "Percussive", "org.ara-audio.examples.testplugin.algorithm.percussive" }
+    {}
+
+protected:
+    void addNotesForSignalRange (TestNoteContent& foundNotes, const float volume, const double startTime, const double duration) const override
+    {
+        foundNotes.emplace_back (TestNote { ARA::kARAInvalidFrequency, volume, startTime, duration });
+    }
+} percussiveAlgorithm;
+
+/*******************************************************************************/
+
+static const
+class MonophonicProcessingAlgorithm : public PseudoAnalysisProcessingAlgorithm
+{
+public:
+    MonophonicProcessingAlgorithm ()
+    : PseudoAnalysisProcessingAlgorithm { "Monophonic", "org.ara-audio.examples.testplugin.algorithm.monophonic" }
+    {}
+
+protected:
+    void addNotesForSignalRange (TestNoteContent& foundNotes, const float volume, const double startTime, const double duration) const override
+    {
+        foundNotes.emplace_back (TestNote { 440.0f, volume, startTime, duration }); // standard tuning A
+    }
+} monophonicAlgorithm;
+
+/*******************************************************************************/
+
+static const
+class PolyphonicProcessingAlgorithm : public PseudoAnalysisProcessingAlgorithm
+{
+public:
+    PolyphonicProcessingAlgorithm ()
+    : PseudoAnalysisProcessingAlgorithm { "Polyphonic", "org.ara-audio.examples.testplugin.algorithm.polyphonic" }
+    {}
+
+protected:
+    void addNotesForSignalRange (TestNoteContent& foundNotes, const float volume, const double startTime, const double duration) const override
+    {
+        foundNotes.emplace_back (TestNote { 523.2511f, volume, startTime, duration });  // standard tuning C
+        foundNotes.emplace_back (TestNote { 659.2551f, volume, startTime, duration });  // standard tuning E
+    }
+} polyphonicAlgorithm;
+
+/*******************************************************************************/
+
+static const
 class SingleNoteProcessingAlgorithm : public TestProcessingAlgorithm
 {
 public:
-    using TestProcessingAlgorithm::TestProcessingAlgorithm;
-
-    const std::string& getName () const override
-    {
-        static const std::string name { "single note algorithm" };
-        return name;
-    }
-
-    const std::string& getIdentifier () const override
-    {
-        static const std::string identifier { "org.ara-audio.examples.testplugin.algorithm.singlenote" };
-        return identifier;
-    }
+    SingleNoteProcessingAlgorithm ()
+    : TestProcessingAlgorithm { "Single Note", "org.ara-audio.examples.testplugin.algorithm.singlenote" }
+    {}
 
     std::unique_ptr<TestNoteContent> analyzeNoteContent (TestAnalysisCallbacks* analysisCallbacks, const int64_t sampleCount, const double sampleRate, uint32_t /*channelCount*/) const override
     {
@@ -265,29 +299,26 @@ public:
         analysisCallbacks->notifyAnalysisProgressCompleted ();
         return std::make_unique<TestNoteContent> (std::vector<TestNote> { foundNote });
     }
-};
+} singleNoteAlgorithm;
 
 /*******************************************************************************/
 
-static const DefaultProcessingAlgorithm defaultAlgorithm;
-static const SingleNoteProcessingAlgorithm singleNoteAlgorithm;
-
 std::vector<const TestProcessingAlgorithm*> const& TestProcessingAlgorithm::getAlgorithms ()
 {
-    static const std::vector<const TestProcessingAlgorithm*> algorithms { &defaultAlgorithm, &singleNoteAlgorithm };
+    static const std::vector<const TestProcessingAlgorithm*> algorithms { &percussiveAlgorithm, &monophonicAlgorithm, &polyphonicAlgorithm, &singleNoteAlgorithm };
     return algorithms;
 }
 
 const TestProcessingAlgorithm* TestProcessingAlgorithm::getDefaultAlgorithm ()
 {
-    return getAlgorithmWithIdentifier (defaultAlgorithm.getIdentifier ());
+    return &percussiveAlgorithm;
 }
 
-const TestProcessingAlgorithm* TestProcessingAlgorithm::getAlgorithmWithIdentifier (const std::string& identifier)
+const TestProcessingAlgorithm* TestProcessingAlgorithm::getAlgorithmWithIdentifier (const char* identifier)
 {
     const auto begin { getAlgorithms ().begin () };
     const auto end { getAlgorithms ().end () };
     const auto it { std::find_if (begin, end, [identifier] (const TestProcessingAlgorithm* algorithm)
-                                                    { return algorithm->getIdentifier ().compare (identifier) == 0; } ) };
+                                                    { return std::strcmp (algorithm->getIdentifier (), identifier) == 0; } ) };
     return (it != end) ? *it : nullptr;
 }

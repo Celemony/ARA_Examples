@@ -56,17 +56,24 @@ public:
 class TestProcessingAlgorithm
 {
 protected:
-    inline TestProcessingAlgorithm () = default;
+    TestProcessingAlgorithm (const char* name, const char* identifier)
+    : _name { name },
+      _identifier { identifier }
+    {}
 
 public:
     virtual ~TestProcessingAlgorithm () = default;
 
     static std::vector<const TestProcessingAlgorithm*> const& getAlgorithms ();
     static const TestProcessingAlgorithm* getDefaultAlgorithm ();
-    static const TestProcessingAlgorithm* getAlgorithmWithIdentifier (const std::string& identifier);
+    static const TestProcessingAlgorithm* getAlgorithmWithIdentifier (const char* identifier);
 
-    virtual const std::string& getName () const = 0;
-    virtual const std::string& getIdentifier () const = 0;
+    const char* getName () const { return _name; }
+    const char* getIdentifier () const { return _identifier; }
 
     virtual std::unique_ptr<TestNoteContent> analyzeNoteContent (TestAnalysisCallbacks* analysisCallbacks, int64_t sampleCount, double sampleRate, uint32_t channelCount) const = 0;
+
+private:
+    const char* _name;
+    const char* _identifier;
 };
