@@ -278,9 +278,14 @@ static void ARA_CALL ARANotifyPlaybackRegionContentChanged(ARAModelUpdateControl
     else
         ARA_LOG("playback region content was updated from start-head to start+duration+tail, flags %X", contentFlags);
 }
-static const ARAModelUpdateControllerInterface hostModelUpdateControllerInterface = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAModelUpdateControllerInterface, notifyPlaybackRegionContentChanged),
+static void ARA_CALL ARANotifyDocumentDataChanged(ARAModelUpdateControllerHostRef controllerHostRef)
+{
+    ARA_LOG("document data was updated");
+}
+static const ARAModelUpdateControllerInterface hostModelUpdateControllerInterface = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAModelUpdateControllerInterface, notifyDocumentDataChanged),
                                                                                         &ARANotifyAudioSourceAnalysisProgress, &ARANotifyAudioSourceContentChanged,
-                                                                                        &ARANotifyAudioModificationContentChanged, &ARANotifyPlaybackRegionContentChanged };
+                                                                                        &ARANotifyAudioModificationContentChanged, &ARANotifyPlaybackRegionContentChanged,
+                                                                                        &ARANotifyDocumentDataChanged };
 
 // asserts
 #if ARA_VALIDATE_API_CALLS

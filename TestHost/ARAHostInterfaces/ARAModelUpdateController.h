@@ -54,6 +54,8 @@ public:
     // Similar to notifyAudioSourceContentChanged but with a change in scope - now it's limited to a change with a playback region
     void notifyPlaybackRegionContentChanged (ARA::ARAPlaybackRegionHostRef playbackRegionHostRef, const ARA::ARAContentTimeRange* range, ARA::ContentUpdateScopes scopeFlags) noexcept override;
 
+    void notifyDocumentDataChanged () noexcept override;
+
     void setMinimalContentUpdateLogging (bool flag) { _minimalContentUpdateLogging = flag; }
 
 private:

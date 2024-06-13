@@ -121,3 +121,11 @@ void ARAModelUpdateController::notifyPlaybackRegionContentChanged (ARA::ARAPlayb
     else
         ARA::ContentLogger::logUpdatedContent (*_araDocumentController->getDocumentController (), _araDocumentController->getRef (playbackRegion), range, scopeFlags);
 }
+
+void ARAModelUpdateController::notifyDocumentDataChanged () noexcept
+{
+    ARA_VALIDATE_API_STATE (_araDocumentController->isPollingModelUpdates ());
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
+
+    ARA_LOG ("document data was updated");
+}
