@@ -49,7 +49,7 @@ private:
 /*******************************************************************************/
 
 // In-memory archive, using the optional provided std::string as initial data.
-// \todo With C++20 the interface could be much more like in the file case:
+// \todo With C++20, this could be optimized:
 //       an external string would always be required and it would be directly used
 //       as backing for the stream, preventing all the current temporary copies.
 class MemoryArchive : public ArchiveBase
@@ -65,16 +65,4 @@ public:
 
 private:
     std::stringstream _stream;
-};
-
-/*******************************************************************************/
-
-// File-based archive, using the file at the provided path as backing.
-class FileArchive : public ArchiveBase
-{
-public:
-    FileArchive (std::string path, const std::string& documentArchiveID);
-
-private:
-    std::fstream _stream;
 };

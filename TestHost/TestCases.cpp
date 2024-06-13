@@ -348,20 +348,11 @@ void testModificationCloning (PlugInEntry* plugInEntry, const AudioFileList& aud
 // Demonstrates how to store and restore plug-in document archives
 void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
-    // By default, this code stores the plug-in archivesin memory -
-    // define ARA_TEST_ARCHIVE_FILENAME here to specify an archive file that should be stored on disk.
-    //#define ARA_TEST_ARCHIVE_FILENAME "TestARAPersistence.dat"
-
     ARA_LOG_TEST_HOST_FUNC ("archiving");
 
     bool supportsARA2Persistency { false };                 // will be properly set after creating document controller
 
-#if defined (ARA_TEST_ARCHIVE_FILENAME)
-    std::remove (ARA_TEST_ARCHIVE_FILENAME);
-    auto archive = new FileArchive { ARA_TEST_ARCHIVE_FILENAME, plugInEntry->getARAFactory ()->documentArchiveID };
-#else
     auto archive = new MemoryArchive { plugInEntry->getARAFactory ()->documentArchiveID };
-#endif
 
     // create and archive the document,
     // caching the audio source / modification persistent IDs
@@ -482,11 +473,6 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     }
 
     delete archive;
-#if defined (ARA_TEST_ARCHIVE_FILENAME)
-    std::remove (ARA_TEST_ARCHIVE_FILENAME);
-
-    #undef ARA_TEST_ARCHIVE_FILENAME
-#endif
 }
 
 /*******************************************************************************/

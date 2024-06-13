@@ -94,25 +94,3 @@ bool ArchiveBase::writeBytes (std::streamoff position, std::streamsize length, c
         return false;
     }
 }
-
-/*******************************************************************************/
-
-FileArchive::FileArchive (std::string path, const std::string& documentArchiveID)
-  : ArchiveBase { _stream, documentArchiveID }
-{
-    try
-    {
-        // create the file if not yet existing
-        _stream.open (path, std::ios::app | std::ios::binary);
-        _stream.close ();
-
-        // open the file for reading and writing
-        _stream.open (path.c_str (), std::ios::out | std::ios::in | std::ios::binary);
-        ARA_INTERNAL_ASSERT (_stream.good ());
-    }
-    catch (std::exception& e)
-    {
-        ARA_WARN ("%s", e.what ());
-        ARA_INTERNAL_ASSERT (false);
-    }
-}
