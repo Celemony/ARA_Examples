@@ -163,6 +163,8 @@ set(CMAKE_SUPPRESS_REGENERATION ON)
 set(CMAKE_XCODE_GENERATE_TOP_LEVEL_PROJECT_ONLY ON)
 set(CMAKE_XCODE_GENERATE_SCHEME ${ARA_SETUP_DEBUGGING})
 
+set(CMAKE_SKIP_INSTALL_RULES YES)
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # https://stackoverflow.com/questions/41695993/ignore-warnings-in-external-modules-when-using-cmake
