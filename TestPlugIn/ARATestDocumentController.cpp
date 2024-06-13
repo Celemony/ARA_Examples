@@ -434,6 +434,8 @@ void ARATestDocumentController::didEndEditing () noexcept
 
 bool ARATestDocumentController::doRestoreObjectsFromArchive (ARA::PlugIn::HostArchiveReader* archiveReader, const ARA::PlugIn::RestoreObjectsFilter* filter) noexcept
 {
+    archiveReader->notifyDocumentUnarchivingProgress (0.0f);
+
     TestUnarchiver unarchiver { [archiveReader] (size_t position, size_t length, uint8_t buffer[]) noexcept -> bool
                                 {
                                     return archiveReader->readBytesFromArchive (position, length, buffer);
@@ -447,7 +449,8 @@ bool ARATestDocumentController::doRestoreObjectsFromArchive (ARA::PlugIn::HostAr
     for (size_t i = 0; i < numAudioSources; ++i)
     {
         const float progressVal { static_cast<float> (i) / static_cast<float> (numAudioSources) };
-        archiveReader->notifyDocumentUnarchivingProgress (progressVal);
+        if (i != 0)
+            archiveReader->notifyDocumentUnarchivingProgress (progressVal);
 
         // read audio source persistent ID
         const auto persistentID { unarchiver.readString () };
@@ -488,6 +491,8 @@ bool ARATestDocumentController::doRestoreObjectsFromArchive (ARA::PlugIn::HostAr
 
 bool ARATestDocumentController::doStoreObjectsToArchive (ARA::PlugIn::HostArchiveWriter* archiveWriter, const ARA::PlugIn::StoreObjectsFilter* filter) noexcept
 {
+    archiveWriter->notifyDocumentArchivingProgress (0.0f);
+
     // make sure to capture any pending analysis result
     processCompletedAnalysisTasks ();
 
@@ -508,7 +513,8 @@ bool ARATestDocumentController::doStoreObjectsToArchive (ARA::PlugIn::HostArchiv
     for (size_t i { 0 }; i < numAudioSources; ++i)
     {
         const float progressVal { static_cast<float> (i) / static_cast<float> (numAudioSources) };
-        archiveWriter->notifyDocumentArchivingProgress (progressVal);
+        if (i != 0)
+            archiveWriter->notifyDocumentArchivingProgress (progressVal);
 
         // write persistent ID
         archiver.writeString (audioSourcesToPersist[i]->getPersistentID ());
