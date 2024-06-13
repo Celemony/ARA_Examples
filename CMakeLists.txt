@@ -336,10 +336,14 @@ if(ARA_ENABLE_VST3)
 
     if(POLICY CMP0077)
         set(SMTG_RENAME_ASSERT OFF)
-        set(SMTG_ADD_VSTGUI OFF)
+        set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF)
+        set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES OFF)
+        set(SMTG_ENABLE_VSTGUI_SUPPORT OFF)
     else()
         set(SMTG_RENAME_ASSERT OFF CACHE BOOL "Disable SMTG_RENAME_ASSERT per default")
-        set(SMTG_ADD_VSTGUI OFF CACHE BOOL "Disable SMTG_ADD_VSTGUI per default")
+        set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF CACHE BOOL "Disable SMTG_ENABLE_VST3_PLUGIN_EXAMPLES per default")
+        set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES OFF CACHE BOOL "Disable SMTG_ENABLE_VST3_HOSTING_EXAMPLES per default")
+        set(SMTG_ENABLE_VSTGUI_SUPPORT OFF CACHE BOOL "Disable SMTG_ENABLE_VSTGUI_SUPPORT per default")
     endif()
 
     # when adding these paths, the VST3 SDK CMake file implicitly adds the corresponding wrapper targets,
@@ -348,36 +352,44 @@ if(ARA_ENABLE_VST3)
     #set(SMTG_AAX_SDK_PATH "${ARA_AAX_SDK_DIR}")
     add_subdirectory("${ARA_VST3_SDK_DIR}" "${PROJECT_BINARY_DIR}/vst3sdk" EXCLUDE_FROM_ALL)
 
-    set_target_properties(base cmake_modules cmake_VST_modules pluginterfaces sdk_hosting sdk_common sdk validator PROPERTIES
-        FOLDER "3rdParty/vst3sdk"
-        XCODE_GENERATE_SCHEME OFF
-        XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
-    )
+    macro(get_all_targets_recursive targets dir)
+        get_directory_property(subdirectories DIRECTORY ${dir} SUBDIRECTORIES)
+        foreach(subdir ${subdirectories})
+            get_all_targets_recursive(${targets} ${subdir})
+        endforeach()
 
-    set_target_properties(validator PROPERTIES
-        CXX_STANDARD 14
-        # \todo workaround for having to globally set the entitlements, see CMAKE_XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME above
-        XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME NO
-    )
+        get_property(current_targets DIRECTORY ${dir} PROPERTY BUILDSYSTEM_TARGETS)
+        list(APPEND ${targets} ${current_targets})
+    endmacro()
 
-    # disable some warnings that do not go along with the VST3 coding style
-    if(MSVC)
-        target_compile_options(base PUBLIC
-            "/wd4127"
+    set(vst3_sdk_targets)
+    get_all_targets_recursive(vst3_sdk_targets ${ARA_VST3_SDK_DIR})
+    foreach(target ${vst3_sdk_targets})
+        set_target_properties(${target} PROPERTIES
+            FOLDER "3rdParty/vst3sdk"
+            XCODE_GENERATE_SCHEME OFF
+            XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
+            # \todo workaround for having to globally set the entitlements, see CMAKE_XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME above
+            XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME NO
         )
-    else()
-        target_compile_options(base PUBLIC
-            "-Wno-undef"
-            "$<$<COMPILE_LANGUAGE:CXX>:-Wno-non-virtual-dtor>"
-        )
-    endif()
 
-    # hotfix to silence Steinberg's "DEPRECATED No Linux implementation" warnings
-    if(UNIX AND NOT APPLE)
-        target_compile_options(base PRIVATE
-            "-Wno-cpp"
-        )
-    endif()
+        # disable some warnings that do not go along with the VST3 coding style
+        get_target_property(type ${target} TYPE)
+        if(NOT ${type} MATCHES "UTILITY")
+            if(MSVC)
+                target_compile_options(${target}
+                    PRIVATE
+                        "/wd4127"
+                )
+            endif()
+            if(GCC_STYLE_COMPILER)
+                target_compile_options(${target}
+                    PRIVATE
+                        -Wno-deprecated
+                )
+            endif()
+        endif()
+    endforeach()
 
     function(ara_add_vst3_main target)
         get_target_property(source_dir ${target} SOURCE_DIR)
@@ -393,13 +405,13 @@ if(ARA_ENABLE_VST3)
         foreach(source ${sources_new})
             if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
                 set_source_files_properties("${source}" PROPERTIES COMPILE_FLAGS
-                    "$<$<COMPILE_LANGUAGE:CXX>:-Wno-old-style-cast> -Wno-zero-as-null-pointer-constant -Wno-reserved-id-macro"
+                    "$<$<COMPILE_LANGUAGE:CXX>:-Wno-old-style-cast> -Wno-zero-as-null-pointer-constant -Wno-reserved-id-macro -Wno-undef"
                 )
             elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
                 set_source_files_properties("${source}" PROPERTIES COMPILE_FLAGS
                     # \todo CMake 3.10 on Linux struggles with this, but since the SDK only adds .cpp files we can skip the generator expression for now
-                    #$<$<COMPILE_LANGUAGE:CXX>:-Wno-old-style-cast>
-                    -Wno-old-style-cast
+                    #"$<$<COMPILE_LANGUAGE:CXX>:-Wno-old-style-cast>  -Wno-undef"
+                    "-Wno-old-style-cast -Wno-undef"
                 )
             endif()
         endforeach()
