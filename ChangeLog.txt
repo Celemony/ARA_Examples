@@ -14,6 +14,7 @@ Changes since previous releases:
 - IPC now also supports using VST3 or CLAP (was previously limited to Audio Units)
 - IPC now also works on Windows (was previously limited to macOS)
 - IPC now also supports using pugixml as encoder (was previously limited to the macOS-only CFDictionary)
+- added new partial persistency split archives test case to TestHost
 - added various threading and state validations to TestHost
 - various cleanups in macOS info.plist files
 - added script target to remove ARATestPlugIn from where it was installed for debugging

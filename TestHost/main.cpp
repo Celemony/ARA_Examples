@@ -223,6 +223,8 @@ int main (int argc, const char* argv[])
         testModificationCloning (plugInEntry.get (), audioFiles);
     if (shouldTest ("Archiving"))
         testArchiving (plugInEntry.get (), audioFiles);
+    if (shouldTest ("SplitArchives"))
+        testSplitArchives (plugInEntry.get (), audioFiles);
     if (shouldTest ("DragAndDrop"))
         testDragAndDrop (plugInEntry.get (), audioFiles);
     if (shouldTest ("PlaybackRendering"))

@@ -50,6 +50,10 @@ void testModificationCloning (PlugInEntry* plugInEntry, const AudioFileList& aud
 // Demonstrates how to store and restore plug-in document archives
 void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
 
+// For ARA 2 plug-ins, instead of a monolithic archive for the entire document this test uses
+// multiple smaller archives, each containing specific parts of the graph.
+void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
+
 // Simulates a "drag & drop" operation by archiving one source and its modification in a
 // two source/modification document with a StoreObjectsFilter, and restoring them in another document
 void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);
