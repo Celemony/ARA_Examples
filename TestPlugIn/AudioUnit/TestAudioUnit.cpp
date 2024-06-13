@@ -39,7 +39,7 @@ OSStatus TestAudioUnit::Initialize()
     OSStatus result = AUEffectBase::Initialize();
 
     if (ARATestPlaybackRenderer* playbackRenderer = _araPlugInExtension.getPlaybackRenderer<ARATestPlaybackRenderer>())
-        playbackRenderer->enableRendering(GetSampleRate(), GetNumberOfChannels(), GetMaxFramesPerSlice());
+        playbackRenderer->enableRendering(GetSampleRate(), GetNumberOfChannels(), GetMaxFramesPerSlice(), true);
 
     return result;
 }

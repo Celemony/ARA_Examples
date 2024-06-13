@@ -113,7 +113,7 @@ void ARATestPlaybackRenderer::renderPlaybackRegions (float* const* ppOutput, ARA
     }
 }
 
-void ARATestPlaybackRenderer::enableRendering (ARA::ARASampleRate sampleRate, ARA::ARAChannelCount channelCount, ARA::ARASampleCount maxSamplesToRender) noexcept
+void ARATestPlaybackRenderer::enableRendering (ARA::ARASampleRate sampleRate, ARA::ARAChannelCount channelCount, ARA::ARASampleCount maxSamplesToRender, bool apiSupportsToggleRendering) noexcept
 {
     // proper plug-ins would use this call to manage the resources which they need for rendering,
     // but our test plug-in caches everything it needs in-memory anyways, so this method is near-empty
@@ -122,6 +122,7 @@ void ARATestPlaybackRenderer::enableRendering (ARA::ARASampleRate sampleRate, AR
     _maxSamplesToRender = maxSamplesToRender;
 #if ARA_VALIDATE_API_CALLS
     _isRenderingEnabled = true;
+    _apiSupportsToggleRendering = apiSupportsToggleRendering;
 #endif
 }
 
@@ -135,11 +136,18 @@ void ARATestPlaybackRenderer::disableRendering () noexcept
 #if ARA_VALIDATE_API_CALLS
 void ARATestPlaybackRenderer::willAddPlaybackRegion (ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
 {
-    ARA_VALIDATE_API_STATE (!_isRenderingEnabled);
+    if (_apiSupportsToggleRendering)
+        ARA_VALIDATE_API_STATE (!_isRenderingEnabled);
+//  else
+//      proper plug-ins would check _isRenderingEnabled here and toggle it off on demand, toggling it back on in didAddPlaybackRegion()
+//      this works because hosts using such APIs implicitly guarantee that they do not concurrently render the plug-in while making this call
 }
 
 void ARATestPlaybackRenderer::willRemovePlaybackRegion (ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
 {
-    ARA_VALIDATE_API_STATE (!_isRenderingEnabled);
+    if (_apiSupportsToggleRendering)
+        ARA_VALIDATE_API_STATE (!_isRenderingEnabled);
+//  else
+//      see willAddPlaybackRegion(), same pattern applies here
 }
 #endif

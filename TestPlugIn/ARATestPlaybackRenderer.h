@@ -29,7 +29,7 @@ public:
 
     void renderPlaybackRegions (float* const* ppOutput, ARA::ARASamplePosition samplePosition, ARA::ARASampleCount samplesToRender, bool isPlayingBack);
 
-    void enableRendering (ARA::ARASampleRate sampleRate, ARA::ARAChannelCount channelCount, ARA::ARASampleCount maxSamplesToRender) noexcept;
+    void enableRendering (ARA::ARASampleRate sampleRate, ARA::ARAChannelCount channelCount, ARA::ARASampleCount maxSamplesToRender, bool apiSupportsToggleRendering) noexcept;
     void disableRendering () noexcept;
 
 protected:
@@ -44,5 +44,6 @@ private:
     ARA::ARAChannelCount _channelCount { 1 };
 #if ARA_VALIDATE_API_CALLS
     bool _isRenderingEnabled { false };
+    bool _apiSupportsToggleRendering { true };  // AAX enables rendering only once upon init, but does not allow to toggle it later like VST3, AU, CLAP etc.
 #endif
 };

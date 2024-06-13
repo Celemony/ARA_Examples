@@ -235,7 +235,7 @@ static bool my_plug_activate(const struct clap_plugin *plugin,
    plug->max_frames_count = max_frames_count;
 
    if (auto *playbackRenderer = plug->ara_extension.getPlaybackRenderer<ARATestPlaybackRenderer>())
-      playbackRenderer->enableRendering(sample_rate, (ARA::ARAChannelCount)plug->channel_count, max_frames_count);
+      playbackRenderer->enableRendering(sample_rate, (ARA::ARAChannelCount)plug->channel_count, max_frames_count, true);
 
    return true;
 }

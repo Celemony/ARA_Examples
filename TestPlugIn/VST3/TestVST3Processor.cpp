@@ -101,7 +101,7 @@ tresult PLUGIN_API TestVST3Processor::setActive (TBool state)
     if (ARATestPlaybackRenderer* playbackRenderer = _araPlugInExtension.getPlaybackRenderer<ARATestPlaybackRenderer> ())
     {
         if (state)
-            playbackRenderer->enableRendering (processSetup.sampleRate, getAudioBusChannelCount (audioOutputs[0]), processSetup.maxSamplesPerBlock);
+            playbackRenderer->enableRendering (processSetup.sampleRate, getAudioBusChannelCount (audioOutputs[0]), processSetup.maxSamplesPerBlock, true);
         else
             playbackRenderer->disableRendering ();
     }
