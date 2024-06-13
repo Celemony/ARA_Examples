@@ -15,6 +15,7 @@ Changes since previous releases:
 - IPC now also supports using pugixml as encoder (was previously limited to the macOS-only CFDictionary)
 - added various threading and state validations to TestHost
 - various cleanups in macOS info.plist files
+- added script target to remove ARATestPlugIn from where it was installed for debugging
 - updated Audio Unit SDK from the old CoreAudioUtilityClasses.zip sample code download to
   Apple's current release on github (note: requires update to C++17 for affected targets)
 - updated VST3 SDK to version 3.7.11 build 10

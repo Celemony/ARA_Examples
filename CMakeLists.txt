@@ -143,7 +143,7 @@ else()
 endif()
 
 if(NOT (ARA_ENABLE_VST3 OR ARA_ENABLE_AUDIO_UNIT OR ARA_ENABLE_CLAP))
-    message(FATAL_ERROR "No Companion API SDK installed - at least one of VST3, Audio Unit or CLAP SDK is required.")
+    message(FATAL_ERROR "No companion API SDK installed - at least one of VST3, Audio Unit or CLAP SDK is required.")
 endif()
 
 
@@ -1066,32 +1066,41 @@ endfunction()
 # ======================
 # add post-build step that installs an audio plug-in into the system so that it can be debugged w/ various hosts
 # this may require building as admin, depending on the access rights needed to write to the plug-in folder
-function(ara_postbuild_install_for_debugging target install_target_dir create_symlink)
+if(ARA_SETUP_DEBUGGING)
+    function(ara_postbuild_install_for_debugging target install_target_dir create_symlink)
 
-    if(APPLE)
-        set(source_package "$<TARGET_BUNDLE_DIR:${target}>")
-        set(package_name "$<TARGET_FILE_NAME:${target}>.$<TARGET_PROPERTY:${target},BUNDLE_EXTENSION>")
-    else()
-        set(source_package "$<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_NAME:${target}>")
-        set(package_name "$<TARGET_FILE_NAME:${target}>")
-    endif()
+        if(APPLE)
+            set(source_package "$<TARGET_BUNDLE_DIR:${target}>")
+            set(package_name "$<TARGET_FILE_NAME:${target}>.$<TARGET_PROPERTY:${target},BUNDLE_EXTENSION>")
+        else()
+            set(source_package "$<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_NAME:${target}>")
+            set(package_name "$<TARGET_FILE_NAME:${target}>")
+        endif()
 
-    if (create_symlink)
-        set(install_command create_symlink)
-    else()
-        set(install_command copy_directory)
-    endif()
+        if(create_symlink)
+            set(install_command create_symlink)
+        else()
+            set(install_command copy_directory)
+        endif()
 
-    add_custom_command(TARGET ${target} POST_BUILD
-        COMMAND "${CMAKE_COMMAND}" -E
-            make_directory "${install_target_dir}"
-        COMMAND "${CMAKE_COMMAND}" -E
-            rm -Rf "${install_target_dir}${package_name}"
-        COMMAND "${CMAKE_COMMAND}" -E
-            ${install_command} "${source_package}" "${install_target_dir}${package_name}"
-    )
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E
+                make_directory "${install_target_dir}"
+            COMMAND "${CMAKE_COMMAND}" -E
+                rm -Rf "${install_target_dir}${package_name}"
+            COMMAND "${CMAKE_COMMAND}" -E
+                ${install_command} "${source_package}" "${install_target_dir}${package_name}"
+        )
 
-endfunction()
+        add_custom_command(TARGET ARATestPlugInUninstall POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E
+                make_directory "${install_target_dir}"
+            COMMAND "${CMAKE_COMMAND}" -E
+                rm -Rf "${install_target_dir}${package_name}"
+        )
+        
+    endfunction()
+endif()
 
 
 # ======================
@@ -1231,6 +1240,19 @@ target_include_directories(ARATestPlugInCommon PUBLIC
 )
 
 configure_ARA_Examples_target(ARATestPlugInCommon)
+
+
+# ======================
+# debug uninstall target for all variants of the Test Plug-In
+
+if(ARA_SETUP_DEBUGGING)
+    add_custom_target(ARATestPlugInUninstall)
+    set_target_properties(ARATestPlugInUninstall PROPERTIES
+        FOLDER "Examples/ARATestPlugIn"
+        XCODE_GENERATE_SCHEME ON
+        EXCLUDE_FROM_ALL ON
+    )
+endif()
 
 
 # ======================
@@ -1501,6 +1523,13 @@ if(APPLE)
     unset(source_name)
     unset(source_dir)
     unset(app_dir)
+
+    if(ARA_SETUP_DEBUGGING)
+        add_custom_command(TARGET ARATestPlugInUninstall POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E
+                rm -Rf "$<TARGET_BUNDLE_DIR:ARATestPlugInAUv3App>"
+        )
+    endif()
 
 endif(APPLE)
 
