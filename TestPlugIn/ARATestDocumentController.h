@@ -58,6 +58,13 @@ protected:
     // Musical Context Management
     void doUpdateMusicalContextContent (ARA::PlugIn::MusicalContext* musicalContext, const ARA::ARAContentTimeRange* range, ARA::ContentUpdateScopes scopeFlags) noexcept override;
 
+    // Region Sequence Management
+    void didAddPlaybackRegionToRegionSequence (ARA::PlugIn::RegionSequence* /*regionSequence*/, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept override;
+    void willRemovePlaybackRegionFromRegionSequence (ARA::PlugIn::RegionSequence* /*regionSequence*/, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept override;
+
+    // Playback Region Management
+    void willUpdatePlaybackRegionProperties (ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::PlugIn::PropertiesPtr<ARA::ARAPlaybackRegionProperties> newProperties) noexcept override;
+
     // Audio Source Management
     ARA::PlugIn::AudioSource* doCreateAudioSource (ARA::PlugIn::Document* document, ARA::ARAAudioSourceHostRef hostRef) noexcept override;
     void willUpdateAudioSourceProperties (ARA::PlugIn::AudioSource* audioSource, ARA::PlugIn::PropertiesPtr<ARA::ARAAudioSourceProperties> newProperties) noexcept override;

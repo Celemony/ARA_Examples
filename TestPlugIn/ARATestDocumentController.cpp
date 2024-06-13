@@ -541,6 +541,32 @@ void ARATestDocumentController::doUpdateMusicalContextContent (ARA::PlugIn::Musi
 }
 
 /*******************************************************************************/
+// Here we're simulating to have some document data that depends on the playback region positioning,
+// just like some alignment plug-in would have - this state would be updated when adding or removing
+// regions to the arrangement or when their time ranges or stretching mode changes.
+
+void ARATestDocumentController::didAddPlaybackRegionToRegionSequence (ARA::PlugIn::RegionSequence* /*regionSequence*/, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
+{
+    notifyDocumentDataChanged ();
+}
+
+void ARATestDocumentController::willRemovePlaybackRegionFromRegionSequence (ARA::PlugIn::RegionSequence* /*regionSequence*/, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
+{
+    notifyDocumentDataChanged ();
+}
+
+void ARATestDocumentController::willUpdatePlaybackRegionProperties (ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::PlugIn::PropertiesPtr<ARA::ARAPlaybackRegionProperties> newProperties) noexcept
+{
+    if ((playbackRegion->isTimestretchEnabled () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretch) != 0) ) ||
+        (playbackRegion->isTimeStretchReflectingTempo () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretchReflectingTempo) != 0) ) ||
+        (playbackRegion->getStartInAudioModificationTime () != newProperties->startInModificationTime) ||
+        (playbackRegion->getDurationInAudioModificationTime () != newProperties->durationInModificationTime) ||
+        (playbackRegion->getStartInPlaybackTime () != newProperties->startInPlaybackTime) ||
+        (playbackRegion->getDurationInPlaybackTime () != newProperties->durationInPlaybackTime))
+        notifyDocumentDataChanged ();
+}
+
+/*******************************************************************************/
 
 ARA::PlugIn::AudioSource* ARATestDocumentController::doCreateAudioSource (ARA::PlugIn::Document* document, ARA::ARAAudioSourceHostRef hostRef) noexcept
 {
