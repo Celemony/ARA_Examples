@@ -401,7 +401,7 @@ static const void *entry_get_factory(const char *factory_id) {
 }
 
 // This symbol will be resolved by the host
-CLAP_EXPORT const clap_plugin_entry_t clap_entry = {
+CLAP_EXPORT extern const clap_plugin_entry_t clap_entry = {
    .clap_version = CLAP_VERSION_INIT,
    .init = entry_init,
    .deinit = entry_deinit,

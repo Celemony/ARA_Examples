@@ -22,9 +22,9 @@
 #include "ARA_API/ARAVST3.h"
 
 ARA_DISABLE_VST3_WARNINGS_BEGIN
-    #include "public.sdk/source/vst/vstaudioeffect.h"
-    #include "public.sdk/source/vst/vsteditcontroller.h"
-ARA_DISABLE_VST3_WARNINGS_END
+
+#include "public.sdk/source/vst/vstaudioeffect.h"
+#include "public.sdk/source/vst/vsteditcontroller.h"
 
 #include "ARA_Library/PlugIn/ARAPlug.h"
 
@@ -100,16 +100,16 @@ public:
     //------------------------------------------------------------------------
     // Interface
     //------------------------------------------------------------------------
-ARA_DISABLE_VST3_WARNINGS_BEGIN
     OBJ_METHODS (TestVST3Processor, AudioEffect)
         DEFINE_INTERFACES
         DEF_INTERFACE (IPlugInEntryPoint)
         DEF_INTERFACE (IPlugInEntryPoint2)
         END_DEFINE_INTERFACES (AudioEffect)
         REFCOUNT_METHODS (AudioEffect)
-ARA_DISABLE_VST3_WARNINGS_END
 
 //------------------------------------------------------------------------
 protected:
     ARA::PlugIn::PlugInExtension _araPlugInExtension;
 };
+
+ARA_DISABLE_VST3_WARNINGS_END

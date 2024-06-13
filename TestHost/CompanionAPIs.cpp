@@ -551,7 +551,7 @@ private:
     }
 
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
-                    const std::string channelID,
+                    const std::string& channelID,
                     const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCConnectionRef)>& getFactoryFunction)
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, channelID },

@@ -39,6 +39,7 @@
 
 #if defined(_MSC_VER)
    __pragma(warning(disable : 4100)) /*unreferenced formal parameter*/
+   __pragma(warning(disable : 4201)) /*nonstandard extension used : nameless struct/union*/
 #elif defined(__GNUC__)
    _Pragma("GCC diagnostic ignored \"-Wunused-parameter\"")
 #endif
