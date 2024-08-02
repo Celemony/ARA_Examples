@@ -854,6 +854,7 @@ static constexpr std::array<ARA::ARAContentType, 1> analyzeableContentTypes { { 
 class ARATestFactoryConfig : public ARA::PlugIn::FactoryConfig
 {
 public:
+    ARA::ARAAPIGeneration getHighestSupportedApiGeneration () const noexcept override { return ARA::kARAAPIGeneration_2_3_Final; }
     const char* getFactoryID () const noexcept override { return TEST_FACTORY_ID; }
     const char* getPlugInName () const noexcept override { return TEST_PLUGIN_NAME; }
     const char* getManufacturerName () const noexcept override { return TEST_MANUFACTURER_NAME; }
