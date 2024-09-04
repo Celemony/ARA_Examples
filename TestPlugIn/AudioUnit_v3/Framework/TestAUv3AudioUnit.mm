@@ -172,9 +172,11 @@ API_AVAILABLE(macos(13.0))
     [super allocateRenderResourcesAndReturnError:outError];
 
     _inputBus.allocateRenderResources(self.maximumFramesToRender);
+
     _kernel.init(self.outputBus.format.channelCount, self.outputBus.format.sampleRate);
     _kernel.setMaximumFramesToRender(self.maximumFramesToRender);
     _kernel.setTransportStateBlock(self.transportStateBlock);
+    _kernel.enableRendering();
 
     return YES;
 }
@@ -182,6 +184,8 @@ API_AVAILABLE(macos(13.0))
 // Deallocate resources allocated in allocateRenderResourcesAndReturnError:
 // Subclassers should call the superclass implementation.
 - (void)deallocateRenderResources {
+    _kernel.disableRendering();
+
     _inputBus.deallocateRenderResources();
 
     [super deallocateRenderResources];

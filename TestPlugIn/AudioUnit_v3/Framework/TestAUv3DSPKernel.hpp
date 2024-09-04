@@ -61,6 +61,16 @@ public:
         outBufferListPtr = outBufferList;
     }
 
+    void enableRendering() {
+        if (auto playbackRenderer = (araPlugInExtension) ? araPlugInExtension->getPlaybackRenderer<ARATestPlaybackRenderer>() : nullptr)
+            playbackRenderer->enableRendering(sampleRate, chanCount, maxFramesToRender, true);
+    }
+
+    void disableRendering() {
+        if (auto playbackRenderer = (araPlugInExtension) ? araPlugInExtension->getPlaybackRenderer<ARATestPlaybackRenderer>() : nullptr)
+            playbackRenderer->disableRendering();
+    }
+
     /**
      This function handles the event list processing and rendering loop for you.
      Call it inside your internalRenderBlock.
