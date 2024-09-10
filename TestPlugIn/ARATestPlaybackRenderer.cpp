@@ -41,7 +41,10 @@ void ARATestPlaybackRenderer::renderPlaybackRegions (float* const* ppOutput, ARA
         const auto sampleEnd { samplePosition + samplesToRender };
         for (const auto& playbackRegion : getPlaybackRegions ())
         {
-            const auto audioSource { playbackRegion->getAudioModification ()->getAudioSource<const ARATestAudioSource> () };
+            const auto audioModification { playbackRegion->getAudioModification () };
+            ARA_VALIDATE_API_STATE (!audioModification->isDeactivatedForUndoHistory ());
+            const auto audioSource { audioModification->getAudioSource<const ARATestAudioSource> () };
+            ARA_VALIDATE_API_STATE (!audioSource->isDeactivatedForUndoHistory ());
 
             // render silence if access is currently disabled
             // (this is done here only to ease host debugging - actual plug-ins would have at least
