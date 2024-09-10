@@ -38,7 +38,7 @@
 //       class names for client projects, but since some methods may be implemented in the client
 //       this is somewhat messy.
 
-API_AVAILABLE(macos(13.0))
+API_AVAILABLE(macos(13.0), ios(16.0))
 @interface TestAUv3ARAIPCMessageChannel : NSObject<AUMessageChannel>
 @end
 
@@ -265,12 +265,12 @@ API_AVAILABLE(macos(13.0))
 
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
 
-NSObject<AUMessageChannel> * __strong _mainMessageChannel API_AVAILABLE(macos(13.0)) = nil;
-NSObject<AUMessageChannel> * __strong _otherMessageChannel API_AVAILABLE(macos(13.0)) = nil;
+NSObject<AUMessageChannel> * __strong _mainMessageChannel API_AVAILABLE(macos(13.0), ios(16.0)) = nil;
+NSObject<AUMessageChannel> * __strong _otherMessageChannel API_AVAILABLE(macos(13.0), ios(16.0)) = nil;
 
 __attribute__((destructor))
 void destroy_sharedMessageChannels() {
-    if (@available(macOS 13.0, *))
+    if (@available(macOS 13.0, iOS 16.0, *))
     {
         if (_mainMessageChannel || _otherMessageChannel)
             ARA::IPC::ARAIPCAUProxyHostUninitialize();
@@ -281,7 +281,7 @@ void destroy_sharedMessageChannels() {
 
 // \todo the return value should be _Nullable!
 - (id<AUMessageChannel> _Nonnull)messageChannelFor:(NSString * _Nonnull)channelName {
-    if (@available(macOS 13.0, *))
+    if (@available(macOS 13.0, iOS 16.0, *))
     {
         if ([channelName isEqualTo:ARA_AUDIOUNIT_MAIN_THREAD_MESSAGES_UTI])
         {

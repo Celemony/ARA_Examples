@@ -78,7 +78,7 @@ AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype,
 #endif
 
     AudioComponentDescription compDesc = { type, subtype, manufacturer, 0, 0 };
-    if (@available(macOS 10.10, *))
+    if (@available(macOS 10.10, iOS 9.0, *))
     {
         @autoreleasepool
         {
@@ -236,7 +236,7 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, A
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
         if (audioUnitInstance->isOutOfProcess)
         {
-            if (@available(macOS 13.0, *))
+            if (@available(macOS 13.0, iOS 16.0, *))
             {
                 if (!audioUnitInstance->audioUnitComponent->araProxy)
                     audioUnitInstance->audioUnitComponent->araProxy = ARAIPCAUProxyPlugInInitialize(audioUnitInstance->v3AudioUnit);
@@ -265,7 +265,7 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, A
 #if ARA_VALIDATE_API_CALLS
     if (result)
     {
-        if (@available(macOS 10.10, *))
+        if (@available(macOS 10.10, iOS 9.0, *))
         {
             @autoreleasepool
             {
@@ -317,7 +317,7 @@ const ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUni
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
         if (audioUnitInstance->isOutOfProcess)
         {
-            if (@available(macOS 13.0, *))
+            if (@available(macOS 13.0, iOS 16.0, *))
             {
                 instance = ARAIPCAUProxyPlugInBindToDocumentController(audioUnitInstance->v3AudioUnit, controllerRef, knownRoles, assignedRoles);
                 audioUnitInstance->ipcInstance = instance;
@@ -550,7 +550,7 @@ void AudioUnitCloseInstance(AudioUnitInstance audioUnitInstance)
     else
     {
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
-        if (@available(macOS 13.0, *))
+        if (@available(macOS 13.0, iOS 16.0, *))
         {
             if (audioUnitInstance->ipcInstance)
                 ARAIPCProxyPlugInCleanupBinding(audioUnitInstance->ipcInstance);
@@ -564,7 +564,7 @@ void AudioUnitCloseInstance(AudioUnitInstance audioUnitInstance)
 void AudioUnitCleanupComponent(AudioUnitComponent audioUnitComponent)
 {
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
-    if (@available(macOS 13.0, *))
+    if (@available(macOS 13.0, iOS 16.0, *))
     {
         if (audioUnitComponent->araProxy)
             ARAIPCAUProxyPlugInUninitialize(audioUnitComponent->araProxy);
