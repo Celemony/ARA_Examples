@@ -76,12 +76,12 @@
 std::string executablePath {};
 
 // minimal set of commands to run a companion API plug-in through IPC
-constexpr auto kIPCCreateEffectMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-1> () };
-constexpr auto kIPCStartRenderingMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-2> () };
-constexpr auto kIPCRenderSamplesMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-3> () };
-constexpr auto kIPCStopRenderingMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-4> () };
-constexpr auto kIPCDestroyEffectMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-5> () };
-constexpr auto kIPCTerminateMethodID { ARA::IPC::MethodID::createWithNonARAMethodID<-6> () };
+constexpr auto kIPCCreateEffectMethodID { ARA::IPC::MethodID::createWithCustomMessageID<-1> () };
+constexpr auto kIPCStartRenderingMethodID { ARA::IPC::MethodID::createWithCustomMessageID<-2> () };
+constexpr auto kIPCRenderSamplesMethodID { ARA::IPC::MethodID::createWithCustomMessageID<-3> () };
+constexpr auto kIPCStopRenderingMethodID { ARA::IPC::MethodID::createWithCustomMessageID<-4> () };
+constexpr auto kIPCDestroyEffectMethodID { ARA::IPC::MethodID::createWithCustomMessageID<-5> () };
+constexpr auto kIPCTerminateMethodID { ARA::IPC::MethodID::createWithCustomMessageID<-6> () };
 
 
 constexpr auto mainChannelIDSuffix { ".main" };
