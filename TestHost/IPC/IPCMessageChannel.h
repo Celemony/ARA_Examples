@@ -67,8 +67,8 @@ public:
     ~IPCMessageChannel () override;
 
     // factory functions for send and receive channels
-    static IPCMessageChannel* createPublishingID (const std::string& channelID, ARA::IPC::Connection* connection);
-    static IPCMessageChannel* createConnectedToID (const std::string& channelID, ARA::IPC::Connection* connection);
+    static IPCMessageChannel* createPublishingID (const std::string& channelID, ARA::IPC::MessageHandler* messageHandler);
+    static IPCMessageChannel* createConnectedToID (const std::string& channelID, ARA::IPC::MessageHandler* messageHandler);
 
     // message receiving
     // waits up to the specified amount of milliseconds for an incoming event and processes it
