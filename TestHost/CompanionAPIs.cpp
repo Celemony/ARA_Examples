@@ -3,7 +3,7 @@
 //!             used by the test host to load a companion API plug-in binary
 //!             and create / destroy plug-in instances with ARA2 roles
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2024, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
