@@ -67,23 +67,23 @@ public:
     ~IPCMessageChannel () override;
 
     // factory functions for send and receive channels
-    static IPCMessageChannel* createPublishingID (const std::string& channelID, ARA::IPC::MessageHandler* messageHandler);
-    static IPCMessageChannel* createConnectedToID (const std::string& channelID, ARA::IPC::MessageHandler* messageHandler);
+    static IPCMessageChannel* createPublishingID (const std::string& channelID);
+    static IPCMessageChannel* createConnectedToID (const std::string& channelID);
 
     // message receiving
     // waits up to the specified amount of milliseconds for an incoming event and processes it
     // returns true if some event was processed during that time
     bool runReceiveLoop (int32_t milliseconds);
 
-protected:
-    using ARA::IPC::MessageChannel::MessageChannel;
-
-    void _sendMessage (ARA::IPC::MessageID messageID, ARA::IPC::MessageEncoder* encoder) override;
+    void sendMessage (ARA::IPC::MessageID messageID, ARA::IPC::MessageEncoder* encoder) override;
 
 #if !USE_ARA_BACKGROUND_IPC
     bool runsReceiveLoopOnCurrentThread () override;
     void loopUntilMessageReceived () override;
 #endif
+
+protected:
+    using ARA::IPC::MessageChannel::MessageChannel;
 
 private:
     friend class IPCReceivePort;

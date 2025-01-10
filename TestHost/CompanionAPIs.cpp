@@ -458,7 +458,16 @@ private:
 class Connection : public ARA::IPC::Connection
 {
 public:
-    using ARA::IPC::Connection::Connection;
+    Connection (IPCMessageChannel* mainThreadChannel, IPCMessageChannel* otherThreadsChannel)
+    : _mainChannel { mainThreadChannel },
+      _otherThreadsChannel { otherThreadsChannel }
+    {}
+
+    void setupWithMessageHandler (ARA::IPC::MessageHandler* messageHandler)
+    {
+        setupMainThreadChannel (_mainChannel, messageHandler);
+        setupOtherThreadsChannel (_otherThreadsChannel, messageHandler);
+    }
 
     ARA::IPC::MessageEncoder* createEncoder () override
     {
@@ -475,6 +484,15 @@ public:
     {
         return true;
     }
+
+   bool runReceiveLoop (int32_t milliseconds)
+    {
+        return _mainChannel->runReceiveLoop (milliseconds);
+    }
+
+private:
+    IPCMessageChannel* const _mainChannel;
+    IPCMessageChannel* const _otherThreadsChannel;
 };
 
 class IPCPlugInInstance : public PlugInInstance, protected ARA::IPC::RemoteCaller
@@ -540,7 +558,7 @@ struct RemoteLauncher
     }
 };
 
-class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher, public ARA::IPC::ProxyPlugIn, public Connection
+class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher, public Connection, public ARA::IPC::ProxyPlugIn
 {
 private:
     static const ARA::ARAFactory* defaultGetFactory (ARA::IPC::ARAIPCConnectionRef connection)
@@ -555,10 +573,11 @@ private:
                     const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCConnectionRef)>& getFactoryFunction)
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, channelID },
+      Connection { IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix),
+                   IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix) },
       ARA::IPC::ProxyPlugIn { this }
     {
-        setMainThreadChannel (IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix, this));
-        setOtherThreadsChannel (IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix, this));
+        setupWithMessageHandler (this);
         validateAndSetFactory (getFactoryFunction (toIPCRef (getConnection ())));
     }
 
@@ -582,7 +601,7 @@ public:
 #if !USE_ARA_BACKGROUND_IPC
     void idleThreadForDuration (int32_t milliseconds) override
     {
-        static_cast<IPCMessageChannel*> (getMessageChannel ())->runReceiveLoop (milliseconds);
+        runReceiveLoop (milliseconds);
     }
 #endif
 
@@ -678,14 +697,13 @@ public:
 std::unique_ptr<PlugInEntry> _plugInEntry {};
 bool _shutDown { false };
 
-class ProxyHost : public ARA::IPC::ProxyHost, public Connection
+class ProxyHost : public ARA::IPC::ProxyHost
 {
 public:
-    ProxyHost (const std::string& channelID)
-    : ARA::IPC::ProxyHost { this }
+    ProxyHost (Connection* connection)
+    : ARA::IPC::ProxyHost { connection }
     {
-        setMainThreadChannel (IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix, this));
-        setOtherThreadsChannel (IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix, this));
+        connection->setupWithMessageHandler (this);
     }
 
     ARA::IPC::MessageEncoder* handleReceivedMessage (const ARA::IPC::MessageID messageID,
@@ -694,7 +712,7 @@ public:
         if (!ARA::IPC::MethodID::isCustomMessageID (messageID))
             return ARA::IPC::ProxyHost::handleReceivedMessage (messageID, decoder);
 
-        ARA::IPC::MessageEncoder* replyEncoder { createEncoder() };
+        ARA::IPC::MessageEncoder* replyEncoder { getConnection ()->createEncoder() };
         if (messageID == kIPCCreateEffectMethodID)
         {
             auto plugInInstance { _plugInEntry->createPlugInInstance () };
@@ -750,11 +768,6 @@ public:
         }
         return replyEncoder;
     }
-
-    bool runReceiveLoop (int32_t milliseconds)
-    {
-        return static_cast<IPCMessageChannel *> (getMainChannel ())->runReceiveLoop (milliseconds);
-    }
 };
 
 namespace RemoteHost
@@ -763,7 +776,9 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
 {
     _plugInEntry = std::move (plugInEntry);
 
-    ProxyHost proxy { channelID };
+    Connection connection { IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix),
+                            IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix) };
+    ProxyHost proxy { &connection };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
     ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef,
@@ -778,7 +793,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
                                                 });
 
     while (!_shutDown)
-        proxy.runReceiveLoop (100 /*ms*/);
+        connection.runReceiveLoop (100 /*ms*/);
 
     _plugInEntry.reset ();
 
