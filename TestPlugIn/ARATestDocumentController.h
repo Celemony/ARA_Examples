@@ -26,9 +26,31 @@
 #include <unordered_set>
 
 
+// By default, the test plug-in only analyzes audio sources when explicitly requested by the host,
+// or if the user opens its (empty) UI and selects playback regions or region sequences in the host
+// for which there is no content data available yet.
+// The define below allows to always trigger audio source analysis when a new audio source instance
+// is created (and the host does not provide all supported content for it), which is closer to the
+// behavior of actual plug-ins like Melodyne, and also allows for testing analysis and related
+// notifications in hosts that never request audio source analysis.
+#if !defined (ARA_ALWAYS_PERFORM_ANALYSIS)
+    #define ARA_ALWAYS_PERFORM_ANALYSIS 0
+#endif
+
+
 class ARATestAudioSource;
 class ARATestPlaybackRenderer;
 class ARATestAnalysisTask;
+
+/*******************************************************************************/
+class ARATestEditorView : public ARA::PlugIn::EditorView
+{
+public:
+    using ARA::PlugIn::EditorView::EditorView;
+
+protected:
+    virtual void doNotifySelection (const ARA::PlugIn::ViewSelection* selection) noexcept;
+};
 
 /*******************************************************************************/
 class ARATestDocumentController : public ARA::PlugIn::DocumentController
@@ -99,6 +121,7 @@ protected:
 
     // Plug-In Instance Management
     ARA::PlugIn::PlaybackRenderer* doCreatePlaybackRenderer () noexcept override;
+    ARA::PlugIn::EditorView* doCreateEditorView () noexcept override;
 
 public:
     // Render thread synchronization:
@@ -109,12 +132,12 @@ public:
     bool rendererWillAccessModelGraph (ARATestPlaybackRenderer* playbackRenderer) noexcept;
     void rendererDidAccessModelGraph (ARATestPlaybackRenderer* playbackRenderer) noexcept;
 
+    void startOrScheduleAnalysisOfAudioSource (ARATestAudioSource* audioSource);    // does nothing if already analyzing
+    bool cancelAnalysisOfAudioSource (ARATestAudioSource* audioSource);
+
 private:
     void disableRendererModelGraphAccess () noexcept;
     void enableRendererModelGraphAccess () noexcept;
-
-    void startOrScheduleAnalysisOfAudioSource (ARATestAudioSource* audioSource);    // does nothing if already analyzing
-    bool cancelAnalysisOfAudioSource (ARATestAudioSource* audioSource);
 
     void startAnalysisTaskForAudioSource (ARATestAudioSource* audioSource);
     bool cancelAnalysisTaskForAudioSource (ARATestAudioSource* audioSource);

@@ -19,6 +19,7 @@ Changes since previous releases:
   notifications whenever any part of their persistent state changes
 - added new partial persistency split archives test case to TestHost
 - added various threading and state validations to TestHost
+- added some configurable UI test code to ARATestPlugIn
 - various cleanups in macOS info.plist files
 - added script target to remove ARATestPlugIn from where it was installed for debugging
 - updated Audio Unit SDK from the old CoreAudioUtilityClasses.zip sample code download to

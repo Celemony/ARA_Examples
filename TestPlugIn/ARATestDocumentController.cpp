@@ -43,16 +43,6 @@
 #endif
 
 
-// By default, the test plug-in only analyzes audio sources when explicitly requested by the host.
-// The define below allows to always trigger audio source analysis when a new audio source instance
-// is created (and the host does not provide all supported content for it), which is closer to the
-// behavior of actual plug-ins like Melodyne, and also allows for testing analysis and related
-// notifications in hosts that never request audio source analysis.
-#if !defined (ARA_ALWAYS_PERFORM_ANALYSIS)
-    #define ARA_ALWAYS_PERFORM_ANALYSIS 0
-#endif
-
-
 ARA_SETUP_DEBUG_MESSAGE_PREFIX (TEST_PLUGIN_NAME);
 
 
@@ -122,6 +112,20 @@ public:
 private:
     std::vector<ARA::ARAContentNote> _exportedNotes;
 };
+
+/*******************************************************************************/
+
+void ARATestEditorView::doNotifySelection (const ARA::PlugIn::ViewSelection* selection) noexcept
+{
+#if !ARA_ALWAYS_PERFORM_ANALYSIS
+    for (const auto playbackRegion : selection->getEffectivePlaybackRegions ())
+    {
+        auto audioSource { playbackRegion->getAudioModification ()->getAudioSource<ARATestAudioSource> () };
+        if (audioSource->getNoteContent () == nullptr)
+            getDocumentController<ARATestDocumentController> ()->startOrScheduleAnalysisOfAudioSource (audioSource);
+    }
+#endif
+}
 
 /*******************************************************************************/
 
@@ -808,6 +812,19 @@ void ARATestDocumentController::doRequestProcessingAlgorithmForAudioSource (ARA:
 ARA::PlugIn::PlaybackRenderer* ARATestDocumentController::doCreatePlaybackRenderer () noexcept
 {
     return new ARATestPlaybackRenderer (this);
+}
+
+ARA::PlugIn::EditorView* ARATestDocumentController::doCreateEditorView () noexcept
+{
+#if !ARA_ALWAYS_PERFORM_ANALYSIS
+    auto result = new ARATestEditorView { this };
+    // An actual plug-in would need to control setEditorOpen () from its companion API implementation -
+    // we'er only doing a crude hack here because we have no such implementation!
+    result->setEditorOpen (true);
+    return result;
+#else
+    return new ARA::PlugIn::EditorView (this);
+#endif
 }
 
 /*******************************************************************************/
