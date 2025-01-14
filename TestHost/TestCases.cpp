@@ -807,14 +807,14 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
         bool renderingCompleted { false };
         auto renderOnOtherThread = [&] () {
             std::thread renderthread { [&] () {
-                ARAAudioAccessController::registerRenderThread();
+                ARAAudioAccessController::registerRenderThread ();
                 for (auto samplePosition { startOfPlaybackRegionSamples }; samplePosition < endOfPlaybackRegionSamples; samplePosition += renderBlockSize)
                 {
                     const auto samplesToRender { std::min (renderBlockSize, static_cast<int> (endOfPlaybackRegionSamples - samplePosition)) };
                     const auto outputPosition { samplePosition - startOfPlaybackRegionSamples };
                     plugInInstance->renderSamples (samplesToRender, samplePosition, &outputData[static_cast<size_t> (outputPosition)]);
                 }
-                ARAAudioAccessController::unregisterRenderThread();
+                ARAAudioAccessController::unregisterRenderThread ();
                 renderingCompleted = true;
             } };
 
