@@ -62,7 +62,7 @@ private:
     Document* getDocument () const noexcept { return _araDocumentController->getDocument (); }
 
     ARADocumentController* _araDocumentController;
-    std::map<AudioSource*, float> _audioSourceAnaysisProgressValues;
+    std::map<AudioSource*, float> _audioSourceAnalysisProgressValues;
 
     bool _minimalContentUpdateLogging { false };
 };
