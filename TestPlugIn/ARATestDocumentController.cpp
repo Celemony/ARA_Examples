@@ -32,6 +32,9 @@
 #include <atomic>
 #include <future>
 
+#if defined (__APPLE__)
+    #include <dispatch/dispatch.h>
+#endif
 
 // In this test plug-in, we want assertions and logging to be always enabled, even in release builds.
 // This needs to be done by configuring the project files properly - we verify this precondition here.
@@ -115,6 +118,30 @@ private:
 
 /*******************************************************************************/
 
+#if ARA_SIMULATE_USER_INTERACTION
+void simulateUIInteraction (ARA::PlugIn::DocumentController* documentController, double playbackStartTime)
+{
+    std::this_thread::sleep_for (std::chrono::milliseconds (20));
+    documentController->getHostPlaybackController ()->requestSetPlaybackPosition (playbackStartTime);
+    documentController->getHostPlaybackController ()->requestStartPlayback ();
+}
+
+#if defined (_WIN32)
+struct APCSimulateUIInteractionParams
+{
+    ARA::PlugIn::DocumentController* documentController;
+    double playbackStartTime;
+};
+
+void APCRouteNewTransactionFunc (ULONG_PTR parameter)
+{
+    auto params { reinterpret_cast<APCSimulateUIInteractionParams*> (parameter) };
+    simulateUIInteraction (params->documentController, params->playbackStartTime);
+    delete params;
+}
+#endif
+#endif
+
 void ARATestEditorView::doNotifySelection (const ARA::PlugIn::ViewSelection* selection) noexcept
 {
 #if !ARA_ALWAYS_PERFORM_ANALYSIS
@@ -124,6 +151,19 @@ void ARATestEditorView::doNotifySelection (const ARA::PlugIn::ViewSelection* sel
         if (audioSource->getNoteContent () == nullptr)
             getDocumentController<ARATestDocumentController> ()->startOrScheduleAnalysisOfAudioSource (audioSource);
     }
+#endif
+
+#if ARA_SIMULATE_USER_INTERACTION
+#if defined (_WIN32)
+    auto params { new APCProcessReceivedMessageParams { this, messageID, decoder } };
+    const auto result { ::QueueUserAPC (APCRouteNewTransactionFunc, _connection->getCreationThreadDispatchTarget (), reinterpret_cast<ULONG_PTR> (params)) };
+    ARA_INTERNAL_ASSERT (result != 0);
+#elif defined (__APPLE__)
+    dispatch_async (dispatch_get_main_queue (),
+        ^{
+            simulateUIInteraction(getDocumentController<ARATestDocumentController> (), selection->getEffectiveTimeRange ().start);
+        });
+#endif
 #endif
 }
 
@@ -816,7 +856,7 @@ ARA::PlugIn::PlaybackRenderer* ARATestDocumentController::doCreatePlaybackRender
 
 ARA::PlugIn::EditorView* ARATestDocumentController::doCreateEditorView () noexcept
 {
-#if !ARA_ALWAYS_PERFORM_ANALYSIS
+#if !ARA_ALWAYS_PERFORM_ANALYSIS || ARA_SIMULATE_USER_INTERACTION
     auto result = new ARATestEditorView { this };
     // An actual plug-in would need to control setEditorOpen () from its companion API implementation -
     // we'er only doing a crude hack here because we have no such implementation!

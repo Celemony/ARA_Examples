@@ -37,6 +37,12 @@
     #define ARA_ALWAYS_PERFORM_ANALYSIS 0
 #endif
 
+// Since the ARA SDK test code does not include any proper UI code, this switch allows for simulating
+// a user interaction after receiving selection notifications in the editor view.
+#if !defined (ARA_SIMULATE_USER_INTERACTION)
+    #define ARA_SIMULATE_USER_INTERACTION 0
+#endif
+
 
 class ARATestAudioSource;
 class ARATestPlaybackRenderer;

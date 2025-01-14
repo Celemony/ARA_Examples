@@ -903,7 +903,12 @@ void PlugInEntry::uninitializeARA ()
 
 void PlugInEntry::idleThreadForDuration (int32_t milliseconds)
 {
-    std::this_thread::sleep_for (std::chrono::milliseconds { milliseconds });
+#if defined (__APPLE__)
+    if (CFRunLoopGetMain () == CFRunLoopGetCurrent ())
+        CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.001 * milliseconds, true);
+    else
+#endif
+        std::this_thread::sleep_for (std::chrono::milliseconds { milliseconds });
 }
 
 /*******************************************************************************/
