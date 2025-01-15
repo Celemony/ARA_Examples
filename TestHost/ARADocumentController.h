@@ -175,7 +175,7 @@ public:
 #if ARA_VALIDATE_API_CALLS
     bool isUsingArchive (const ArchiveBase* archive = nullptr);
     bool isPollingModelUpdates () const noexcept { return _isPollingModelUpdates; }
-    bool wasCreatedOnCurrentThread () const noexcept { return _creationThreadID == std::this_thread::get_id (); }
+    bool wasCreatedOnCurrentThread () const noexcept;
 #endif
 
 private:
@@ -210,6 +210,7 @@ private:
 
 #if ARA_VALIDATE_API_CALLS
     bool _isPollingModelUpdates { false };
-    std::thread::id _creationThreadID;
+    const bool _usesIPC;
+    const std::thread::id _creationThreadID;
 #endif
 };

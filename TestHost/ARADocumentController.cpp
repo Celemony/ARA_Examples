@@ -33,6 +33,7 @@
 
 #include "ARA_Library/Dispatch/ARAHostDispatch.h"
 #include "ARA_Library/Debug/ARAContentLogger.h"
+#include "ARA_Library/IPC/ARAIPCProxyPlugIn.h"
 
 #include <thread>
 #include <cmath>
@@ -51,6 +52,10 @@ ARADocumentController::ARADocumentController (Document* document, PlugInEntry* p
                                     new ARAContentAccessController (this),
                                     new ARAModelUpdateController (this),
                                     new ARAPlaybackController (this) }
+#if ARA_VALIDATE_API_CALLS
+, _usesIPC { plugInEntry->usesIPC () },
+  _creationThreadID { std::this_thread::get_id () }
+#endif
 {
     const auto documentProperties { getDocumentProperties () };
     auto documentControllerInstance { plugInEntry->createDocumentControllerWithDocument (&_documentControllerHostInstance, &documentProperties) };
@@ -60,10 +65,6 @@ ARADocumentController::ARADocumentController (Document* document, PlugInEntry* p
     ARA_VALIDATE_API_INTERFACE (_documentController->getInterface (), ARADocumentControllerInterface);
 
     ARA_VALIDATE_API_CONDITION (_documentController->getFactory () == plugInEntry->getARAFactory ());
-
-#if ARA_VALIDATE_API_CALLS
-    _creationThreadID = std::this_thread::get_id ();
-#endif
 }
 
 ARADocumentController::~ARADocumentController ()
@@ -484,6 +485,16 @@ void ARADocumentController::logAudioModificationPreservesAudioSourceSignalIfSupp
 
     ARA_LOG ("ARAAudioModificationRef %p %s audio source signal.", getRef (audioModification),
              _documentController->isAudioModificationPreservingAudioSourceSignal ( getRef (audioModification)) ? "preserves" : "modifies");
+}
+
+bool ARADocumentController::wasCreatedOnCurrentThread () const noexcept
+{
+#if ARA_ENABLE_IPC
+    if (ARA::IPC::ARAIPCProxyPlugInCurrentThreadActsAsMainThread ())
+        return true;
+    ARA_INTERNAL_ASSERT (!_usesIPC || (_creationThreadID != std::this_thread::get_id ()));
+#endif
+    return _creationThreadID == std::this_thread::get_id ();
 }
 
 /*******************************************************************************/
