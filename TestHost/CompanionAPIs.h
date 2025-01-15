@@ -97,7 +97,11 @@ public:
 
     // If IPC is used, and the main thread is spinning in some loop for a prolonged time,
     // this call may be necessary to allow handling IPC in time.
-    virtual void idleThreadForDuration (int32_t milliseconds);
+    virtual void idleThreadForDuration (int32_t milliseconds, bool toggleDistributedMainThreadLock);
+
+    // If IPC is used, it might be necessary to synchronize the main threads between the host and the remotes
+    virtual void lockDistributedMainThreadIfNeeded () {}
+    virtual void unlockDistributedMainThreadIfNeeded () {}
 
     // Initialize ARA before creating any document controllers
     virtual void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress);

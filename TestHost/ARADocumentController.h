@@ -33,6 +33,7 @@
 #include "ModelObjects.h"
 #include "CompanionAPIs.h"
 
+#include <functional>
 #include <map>
 #include <thread>
 
@@ -134,7 +135,8 @@ public:
     /*******************************************************************************/
     // Functions to trigger audio source analysis and deal with processing algorithm selection
 
-    void requestAudioSourceContentAnalysis (AudioSource* audioSource, size_t contentTypesCount, const ARA::ARAContentType contentTypes[], bool bWaitUntilFinish);
+    // if a waitFunction is provided, requestAudioSourceContentAnalysis() will wait by repeatedly calling this function until analysis has completed
+    void requestAudioSourceContentAnalysis (AudioSource* audioSource, size_t contentTypesCount, const ARA::ARAContentType contentTypes[], std::function<void (void)>* waitFunction);
 
     int getProcessingAlgorithmsCount ();
     const ARA::ARAProcessingAlgorithmProperties* getProcessingAlgorithmProperties (int algorithmIndex);

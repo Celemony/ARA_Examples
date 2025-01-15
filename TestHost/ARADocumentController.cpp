@@ -381,7 +381,7 @@ void ARADocumentController::getPlaybackRegionHeadAndTailTime (PlaybackRegion* pl
     _documentController->getPlaybackRegionHeadAndTailTime (getRef (playbackRegion), headTime, tailTime);
 }
 
-void ARADocumentController::requestAudioSourceContentAnalysis (AudioSource* audioSource, size_t contentTypesCount, const ARA::ARAContentType contentTypes[], bool bWaitUntilFinish)
+void ARADocumentController::requestAudioSourceContentAnalysis (AudioSource* audioSource, size_t contentTypesCount, const ARA::ARAContentType contentTypes[], std::function<void (void)>* waitFunction)
 {
     // check license first without opening UI
     auto isLicensed { _documentController->isLicensedForCapabilities (false, contentTypesCount, contentTypes, ARA::kARAPlaybackTransformationNoChanges) };
@@ -418,7 +418,7 @@ void ARADocumentController::requestAudioSourceContentAnalysis (AudioSource* audi
 
     _documentController->requestAudioSourceContentAnalysis (getRef (audioSource), contentTypesCount, contentTypes);
 
-    if (!bWaitUntilFinish)
+    if (waitFunction == nullptr)
         return;
 
     // Now we've got to wait for analysis to complete -
@@ -444,8 +444,7 @@ void ARADocumentController::requestAudioSourceContentAnalysis (AudioSource* audi
         if (allDone)
             return;
 
-        // Sleep while we wait
-        std::this_thread::sleep_for (std::chrono::milliseconds { 50 });
+        (*waitFunction) ();
     }
 }
 

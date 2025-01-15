@@ -342,6 +342,16 @@ public:
         return _connectionRef != nullptr;
     }
 
+    void lockDistributedMainThreadIfNeeded () override
+    {
+        ARA::IPC::ARAIPCProxyPlugInLockDistributedMainThread ();
+    }
+
+    void unlockDistributedMainThreadIfNeeded () override
+    {
+        ARA::IPC::ARAIPCProxyPlugInUnlockDistributedMainThread ();
+    }
+
     void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress) override
     {
         if (usesIPC ())
@@ -593,8 +603,18 @@ public:
         return true;
     }
 
+    void lockDistributedMainThreadIfNeeded () override
+    {
+        ARA::IPC::ARAIPCProxyPlugInLockDistributedMainThread ();
+    }
+
+    void unlockDistributedMainThreadIfNeeded () override
+    {
+        ARA::IPC::ARAIPCProxyPlugInUnlockDistributedMainThread ();
+    }
+
 #if !USE_ARA_BACKGROUND_IPC
-    void idleThreadForDuration (int32_t milliseconds) override
+    void idleThreadForDuration (int32_t milliseconds, bool toggleDistributedMainThreadLock) override
     {
         _connection.runReceiveLoop (milliseconds);
     }
@@ -899,14 +919,20 @@ void PlugInEntry::uninitializeARA ()
     _factory->uninitializeARA ();
 }
 
-void PlugInEntry::idleThreadForDuration (int32_t milliseconds)
+void PlugInEntry::idleThreadForDuration (int32_t milliseconds, bool toggleDistributedMainThreadLock)
 {
+    if (toggleDistributedMainThreadLock)
+        unlockDistributedMainThreadIfNeeded();
+
 #if defined (__APPLE__)
     if (CFRunLoopGetMain () == CFRunLoopGetCurrent ())
         CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.001 * milliseconds, true);
     else
 #endif
         std::this_thread::sleep_for (std::chrono::milliseconds { milliseconds });
+
+    if (toggleDistributedMainThreadLock)
+        lockDistributedMainThreadIfNeeded();
 }
 
 /*******************************************************************************/

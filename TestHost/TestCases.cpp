@@ -117,8 +117,9 @@ ARADocumentController* createHostAndBasicDocument (PlugInEntry* plugInEntry, std
     {
         araDocumentController->enableAudioSourceSamplesAccess (audioSource.get (), true);
 
+        std::function<void (void)> waitFunction { [&] () { plugInEntry->idleThreadForDuration (50, true); } };
         if (requestPlugInAnalysisAndBlock && araFactory->analyzeableContentTypesCount > 0)
-            araDocumentController->requestAudioSourceContentAnalysis (audioSource.get (), araFactory->analyzeableContentTypesCount, araFactory->analyzeableContentTypes, true);
+            araDocumentController->requestAudioSourceContentAnalysis (audioSource.get (), araFactory->analyzeableContentTypesCount, araFactory->analyzeableContentTypes, &waitFunction);
     }
 
     if (requestPlugInAnalysisAndBlock)
@@ -133,6 +134,8 @@ ARADocumentController* createHostAndBasicDocument (PlugInEntry* plugInEntry, std
 void testPropertyUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("property updates");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     // create basic ARA model graph
     std::unique_ptr<TestHost> testHost;
@@ -164,6 +167,8 @@ void testPropertyUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFi
 
     // end the edit cycle once we're done updating the properties
     araDocumentController->endEditing ();
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
 
 /*******************************************************************************/
@@ -173,6 +178,8 @@ void testPropertyUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFi
 void testContentUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("content updates");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     // create basic ARA model graph
     std::unique_ptr<TestHost> testHost;
@@ -258,6 +265,8 @@ void testContentUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFil
     audioSource->setChords (chords);
     araDocumentController->updateAudioSourceContent (audioSource.get (), nullptr, audioSourceUpdateScope);
     araDocumentController->endEditing ();
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
 
 /*******************************************************************************/
@@ -266,6 +275,8 @@ void testContentUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFil
 void testContentReading (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("content reading");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     // create basic ARA model graph and perform analysis
     std::unique_ptr<TestHost> testHost;
@@ -282,6 +293,8 @@ void testContentReading (PlugInEntry* plugInEntry, const AudioFileList& audioFil
                 araDocumentController->logAllContent (playbackRegion.get ());
         }
     }
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
 
 /*******************************************************************************/
@@ -289,6 +302,8 @@ void testContentReading (PlugInEntry* plugInEntry, const AudioFileList& audioFil
 void testModificationCloning (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("modification cloning");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     // create basic ARA model graph and perform analysis
     std::unique_ptr<TestHost> testHost;
@@ -342,6 +357,8 @@ void testModificationCloning (PlugInEntry* plugInEntry, const AudioFileList& aud
         araDocumentController->logAvailableContent (audioModificationClone);
         araDocumentController->logAudioModificationPreservesAudioSourceSignalIfSupported (audioModificationClone);
     }
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
 
 /*******************************************************************************/
@@ -349,6 +366,8 @@ void testModificationCloning (PlugInEntry* plugInEntry, const AudioFileList& aud
 void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("archiving");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     bool supportsARA2Persistency { false };                 // will be properly set after creating document controller
 
@@ -492,6 +511,8 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
             }
         }
     }
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
 
 /*******************************************************************************/
@@ -500,6 +521,8 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("split archives");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     // create and archive the document,
     // caching the audio source / modification persistent IDs
@@ -657,6 +680,8 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
             }
         }
     }
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
 
 /*******************************************************************************/
@@ -665,6 +690,8 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
 void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("drag and drop");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     std::unique_ptr<TestHost> testHost;
     auto testDocController { createHostAndBasicDocument (plugInEntry, testHost, "ARA2PersistencyTestDoc", false, {}) };
@@ -741,6 +768,8 @@ void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
         ARA_LOG ("Audio source %p (ARAAudioSourceRef %p) has persistent ID \"%s\"", audioSource.get (), dropDocumentController->getRef (audioSource.get ()), audioSource->getPersistentID ().c_str ());
         dropDocumentController->logAvailableContent (audioSource.get ());
     }
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
 
 /*******************************************************************************/
@@ -751,6 +780,8 @@ void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingIfSupported, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("playback rendering (with time stretching if supported)");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     // create basic ARA model graph and perform analysis
     std::unique_ptr<TestHost> testHost;
@@ -806,6 +837,8 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
 
         bool renderingCompleted { false };
         auto renderOnOtherThread = [&] () {
+            plugInEntry->unlockDistributedMainThreadIfNeeded ();
+
             std::thread renderthread { [&] () {
                 ARAAudioAccessController::registerRenderThread ();
                 for (auto samplePosition { startOfPlaybackRegionSamples }; samplePosition < endOfPlaybackRegionSamples; samplePosition += renderBlockSize)
@@ -819,9 +852,11 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
             } };
 
             while (!renderingCompleted)
-                plugInEntry->idleThreadForDuration (10);
+                plugInEntry->idleThreadForDuration (10, false);
 
             renderthread.join ();
+
+            plugInEntry->lockDistributedMainThreadIfNeeded ();
         };
 
         renderOnOtherThread ();
@@ -864,6 +899,8 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
                 playbackRenderer.removePlaybackRegion (araDocumentController->getRef (playbackRegion));
         }
     }
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
 
 /*******************************************************************************/
@@ -872,6 +909,8 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
 void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("editor view communication");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     // create basic ARA model graph
     std::unique_ptr<TestHost> testHost;
@@ -894,7 +933,7 @@ void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     ARA_LOG ("Notifying editor view %p of %lu selected playback region(s)", editorView.getRef (), playbackRegionRefs.size ());
     const Selection selection1 { playbackRegionRefs.size (), playbackRegionRefs.data (), 0U, nullptr, nullptr };
     editorView.notifySelection (&selection1);
-    plugInEntry->idleThreadForDuration (50);    // idle a bit here to enable ARATestPlugIn's UI interaction simulation, see ARA_SIMULATE_USER_INTERACTION
+    plugInEntry->idleThreadForDuration (50, true);  // idle a bit here to enable ARATestPlugIn's UI interaction simulation, see ARA_SIMULATE_USER_INTERACTION
 
     // we can also select all region sequences and limit the selection to a specific time range
     std::vector<ARA::ARARegionSequenceRef> regionSequenceRefs;
@@ -904,13 +943,13 @@ void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     ARA_LOG ("Notifying editor view %p of %lu selected region sequence(s)", editorView.getRef (), regionSequenceRefs.size ());
     const Selection selection2 { 0U, nullptr, regionSequenceRefs.size (), regionSequenceRefs.data (), &timeRange };
     editorView.notifySelection (&selection2);
-    plugInEntry->idleThreadForDuration (50);    // idle a bit here to enable ARATestPlugIn's UI interaction simulation, see ARA_SIMULATE_USER_INTERACTION
+    plugInEntry->idleThreadForDuration (50, true);  // idle a bit here to enable ARATestPlugIn's UI interaction simulation, see ARA_SIMULATE_USER_INTERACTION
 
     // we can also mix playback region and region sequence selection, if this is a valid pattern in the host
     ARA_LOG ("Notifying editor view %p of %lu selected playback region(s) and %lu selected region sequence(s)", editorView.getRef (), playbackRegionRefs.size (), regionSequenceRefs.size ());
     const Selection selection3 { playbackRegionRefs.size (), playbackRegionRefs.data (), regionSequenceRefs.size (), regionSequenceRefs.data (), &timeRange };
     editorView.notifySelection (&selection3);
-    plugInEntry->idleThreadForDuration (50);    // idle a bit here to enable ARATestPlugIn's UI interaction simulation, see ARA_SIMULATE_USER_INTERACTION
+    plugInEntry->idleThreadForDuration (50, true);  // idle a bit here to enable ARATestPlugIn's UI interaction simulation, see ARA_SIMULATE_USER_INTERACTION
 
     // Region sequence hiding demonstration
     // "hide" the region sequences and inform the plug-in editor view
@@ -920,6 +959,8 @@ void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     // "unhide" the region sequences
     ARA_LOG ("Notifying editor view %p that all region sequences are now un-hidden", editorView.getRef ());
     editorView.notifyHideRegionSequences (0, nullptr);
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
 
 /*******************************************************************************/
@@ -927,6 +968,8 @@ void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 void testProcessingAlgorithms (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("processing algorithms");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     // create basic ARA model graph
     std::unique_ptr<TestHost> testHost;
@@ -957,13 +1000,16 @@ void testProcessingAlgorithms (PlugInEntry* plugInEntry, const AudioFileList& au
         // now request analysis for each source and wait for completion
         for (auto& audioSource : document->getAudioSources ())
         {
-            araDocumentController->requestAudioSourceContentAnalysis (audioSource.get (), araFactory->analyzeableContentTypesCount, araFactory->analyzeableContentTypes, true);
+            std::function<void (void)> waitFunction { [&] () { plugInEntry->idleThreadForDuration (50, true); } };
+            araDocumentController->requestAudioSourceContentAnalysis (audioSource.get (), araFactory->analyzeableContentTypesCount, araFactory->analyzeableContentTypes, &waitFunction);
             const auto actualIndex { araDocumentController->getProcessingAlgorithmForAudioSource (audioSource.get ()) };
             if (actualIndex != i)
                 ARA_LOG ("algorithm actually differs from requested algorithm, is %i \"%s\"", actualIndex, araDocumentController->getProcessingAlgorithmProperties (actualIndex)->name);
             araDocumentController->logAvailableContent (audioSource.get ());
         }
     }
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
 
 /*******************************************************************************/
@@ -971,6 +1017,8 @@ void testProcessingAlgorithms (PlugInEntry* plugInEntry, const AudioFileList& au
 void testAudioFileChunkLoading (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("ARA audio file loading XML chunks");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     // create basic ARA model graph with no audio sources - we'll create one for each wav file
     std::unique_ptr<TestHost> testHost;
@@ -1047,6 +1095,8 @@ void testAudioFileChunkLoading (PlugInEntry* plugInEntry, const AudioFileList& a
 
         ++index;
     }
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
 
 /*******************************************************************************/
@@ -1056,6 +1106,8 @@ void testAudioFileChunkLoading (PlugInEntry* plugInEntry, const AudioFileList& a
 void testAudioFileChunkSaving (PlugInEntry* plugInEntry, AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("ARA audio file saving XML chunks");
+
+    plugInEntry->lockDistributedMainThreadIfNeeded ();
 
     std::unique_ptr<TestHost> testHost;
     auto testDocController { createHostAndBasicDocument (plugInEntry, testHost, "ChunkSavingTestDoc", false, {}) };
@@ -1098,4 +1150,6 @@ void testAudioFileChunkSaving (PlugInEntry* plugInEntry, AudioFileList& audioFil
 //      const auto success { audioSource->getAudioFile ()->saveToFile (audioSource->getName ()) };
 //      ARA_INTERNAL_ASSERT (success);
     }
+
+    plugInEntry->unlockDistributedMainThreadIfNeeded ();
 }
