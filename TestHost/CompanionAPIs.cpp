@@ -459,14 +459,10 @@ class Connection : public ARA::IPC::Connection
 {
 public:
     Connection (IPCMessageChannel* mainThreadChannel, IPCMessageChannel* otherThreadsChannel)
-    : _mainChannel { mainThreadChannel },
-      _otherThreadsChannel { otherThreadsChannel }
-    {}
-
-    void setupWithMessageHandler (ARA::IPC::MessageHandler* messageHandler)
+    : _mainThreadChannel { mainThreadChannel }
     {
-        setupMainThreadChannel (_mainChannel, messageHandler);
-        setupOtherThreadsChannel (_otherThreadsChannel, messageHandler);
+        setMainThreadChannel (mainThreadChannel);
+        setOtherThreadsChannel (otherThreadsChannel);
     }
 
     ARA::IPC::MessageEncoder* createEncoder () override
@@ -487,12 +483,11 @@ public:
 
    bool runReceiveLoop (int32_t milliseconds)
     {
-        return _mainChannel->runReceiveLoop (milliseconds);
+        return _mainThreadChannel->runReceiveLoop (milliseconds);
     }
 
 private:
-    IPCMessageChannel* const _mainChannel;
-    IPCMessageChannel* const _otherThreadsChannel;
+    IPCMessageChannel* const _mainThreadChannel;
 };
 
 class IPCPlugInInstance : public PlugInInstance, protected ARA::IPC::RemoteCaller
@@ -558,7 +553,7 @@ struct RemoteLauncher
     }
 };
 
-class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher, public Connection, public ARA::IPC::ProxyPlugIn
+class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher
 {
 private:
     static const ARA::ARAFactory* defaultGetFactory (ARA::IPC::ARAIPCConnectionRef connection)
@@ -573,12 +568,12 @@ private:
                     const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCConnectionRef)>& getFactoryFunction)
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, channelID },
-      Connection { IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix),
-                   IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix) },
-      ARA::IPC::ProxyPlugIn { this }
+      _connection { IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix),
+                    IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix) },
+      _proxyPlugIn { &_connection }
     {
-        setupWithMessageHandler (this);
-        validateAndSetFactory (getFactoryFunction (toIPCRef (getConnection ())));
+        _connection.setMessageHandler (&_proxyPlugIn);
+        validateAndSetFactory (getFactoryFunction (toIPCRef (&_connection)));
     }
 
 public:
@@ -590,7 +585,7 @@ public:
 
     ~IPCPlugInEntry () override
     {
-        remoteCall (kIPCTerminateMethodID);
+        _proxyPlugIn.remoteCall (kIPCTerminateMethodID);
     }
 
     bool usesIPC () const override
@@ -601,32 +596,36 @@ public:
 #if !USE_ARA_BACKGROUND_IPC
     void idleThreadForDuration (int32_t milliseconds) override
     {
-        runReceiveLoop (milliseconds);
+        _connection.runReceiveLoop (milliseconds);
     }
 #endif
 
     void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
     {
-        ARA::IPC::ARAIPCProxyPlugInInitializeARA (toIPCRef (getConnection ()), getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
+        ARA::IPC::ARAIPCProxyPlugInInitializeARA (toIPCRef (&_connection), getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
     }
 
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
-        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (toIPCRef (getConnection ()), getARAFactory ()->factoryID, hostInstance, properties);
+        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (toIPCRef (&_connection), getARAFactory ()->factoryID, hostInstance, properties);
     }
 
     void uninitializeARA () override
     {
-        ARA::IPC::ARAIPCProxyPlugInUninitializeARA (toIPCRef (getConnection ()), getARAFactory ()->factoryID);
+        ARA::IPC::ARAIPCProxyPlugInUninitializeARA (toIPCRef (&_connection), getARAFactory ()->factoryID);
     }
 
     std::unique_ptr<PlugInInstance> createPlugInInstance () override
     {
         ARA::IPC::ARAIPCPlugInInstanceRef remoteInstanceRef {};
-        remoteCall (remoteInstanceRef, kIPCCreateEffectMethodID);
-        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, getConnection ());
+        _proxyPlugIn.remoteCall (remoteInstanceRef, kIPCCreateEffectMethodID);
+        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, &_connection);
     }
+
+private:
+    Connection _connection;
+    ARA::IPC::ProxyPlugIn _proxyPlugIn;
 };
 
 /*******************************************************************************/
@@ -703,17 +702,17 @@ public:
     ProxyHost (Connection* connection)
     : ARA::IPC::ProxyHost { connection }
     {
-        connection->setupWithMessageHandler (this);
+        connection->setMessageHandler (this);
     }
 
-    ARA::IPC::MessageEncoder* handleReceivedMessage (const ARA::IPC::MessageID messageID,
-                                                     const ARA::IPC::MessageDecoder* decoder) override
+    void handleReceivedMessage (const ARA::IPC::MessageID messageID, const ARA::IPC::MessageDecoder* const decoder,
+                                ARA::IPC::MessageEncoder* const replyEncoder) override
     {
         if (!ARA::IPC::MethodID::isCustomMessageID (messageID))
-            return ARA::IPC::ProxyHost::handleReceivedMessage (messageID, decoder);
-
-        ARA::IPC::MessageEncoder* replyEncoder { getConnection ()->createEncoder() };
-        if (messageID == kIPCCreateEffectMethodID)
+        {
+            ARA::IPC::ProxyHost::handleReceivedMessage (messageID, decoder, replyEncoder);
+        }
+        else if (messageID == kIPCCreateEffectMethodID)
         {
             auto plugInInstance { _plugInEntry->createPlugInInstance () };
             const auto plugInInstanceRef { reinterpret_cast<size_t> (plugInInstance.get ()) };
@@ -766,7 +765,6 @@ public:
         {
             ARA_INTERNAL_ASSERT (false && "unhandled message ID");
         }
-        return replyEncoder;
     }
 };
 
