@@ -352,17 +352,22 @@ bool IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
     return _receivePort->runReceiveLoop (milliseconds);
 }
 
-#if !USE_ARA_BACKGROUND_IPC
-bool IPCMessageChannel::runsReceiveLoopOnCurrentThread ()
+#if USE_ARA_BACKGROUND_IPC
+bool IPCMessageChannel::waitForMessage (ARA::ARATimeDuration /*timeout*/)
+{
+    // \todo lazy test code implementation, proper code would need to use a semaphore like in AUv3!
+    std::this_thread::sleep_for (std::chrono::nanoseconds (100));
+    return true;
+}
+#else
+bool IPCMessageChannel::currentThreadMustNotBeBlocked ()
 {
     return (std::this_thread::get_id () == _receiveThread);
 }
 
-void IPCMessageChannel::loopUntilMessageReceived ()
+bool IPCMessageChannel::waitForMessage (ARA::ARATimeDuration timeout)
 {
     ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _receiveThread);
-    while (!runReceiveLoop (messageTimeout))
-    {}
+    return runReceiveLoop (static_cast<int32_t> (timeout * 1000.0 + 0.5));
 }
 #endif
-
