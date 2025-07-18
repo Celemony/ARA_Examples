@@ -86,9 +86,9 @@ class IPCXMLMessageDecoder : public IPCXMLMessage, public ARA::IPC::MessageDecod
 public:
     // to be used by IPCMessageChannel only: encoding from channel-internal datas format
 #if defined (__APPLE__)
-    static IPCXMLMessageDecoder* createWithMessageData(CFDataRef data);
+    static IPCXMLMessageDecoder* createWithMessageData (CFDataRef data);
 #else
-    static IPCXMLMessageDecoder* createWithMessageData(const char* data, const size_t dataSize);
+    static IPCXMLMessageDecoder* createWithMessageData (const char* data, const size_t dataSize);
 #endif
 
     bool readInt32 (MessageArgumentKey argKey, int32_t* argValue) const override;

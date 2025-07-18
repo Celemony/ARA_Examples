@@ -258,7 +258,7 @@ const ARA::ARAFactory* VST3GetARAFactory (VST3Binary vst3Binary, const char* opt
         return nullptr;
 
     if (!optionalPlugInName)
-        return vst3Binary->araMainFactories.front()->getFactory ();
+        return vst3Binary->araMainFactories.front ()->getFactory ();
 
     for (auto& araMainFactory : vst3Binary->araMainFactories)
     {
