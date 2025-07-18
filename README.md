@@ -1,6 +1,6 @@
 # ARA Audio Random Access: Examples
 
-Copyright (c) 2012-2024, [Celemony Software GmbH](https://www.celemony.com), All Rights Reserved.
+Copyright (c) 2012-2025, [Celemony Software GmbH](https://www.celemony.com), All Rights Reserved.
 Published under the Apache 2.0 license.
 
 The ARA_Examples Git repository contains various sample code demonstrating how to both implement
