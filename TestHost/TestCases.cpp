@@ -894,6 +894,7 @@ void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     ARA_LOG ("Notifying editor view %p of %lu selected playback region(s)", editorView.getRef (), playbackRegionRefs.size ());
     const Selection selection1 { playbackRegionRefs.size (), playbackRegionRefs.data (), 0U, nullptr, nullptr };
     editorView.notifySelection (&selection1);
+    plugInEntry->idleThreadForDuration (50);    // idle a bit here to enable ARATestPlugIn's UI interaction simulation, see ARA_SIMULATE_USER_INTERACTION
 
     // we can also select all region sequences and limit the selection to a specific time range
     std::vector<ARA::ARARegionSequenceRef> regionSequenceRefs;
@@ -903,11 +904,13 @@ void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     ARA_LOG ("Notifying editor view %p of %lu selected region sequence(s)", editorView.getRef (), regionSequenceRefs.size ());
     const Selection selection2 { 0U, nullptr, regionSequenceRefs.size (), regionSequenceRefs.data (), &timeRange };
     editorView.notifySelection (&selection2);
+    plugInEntry->idleThreadForDuration (50);    // idle a bit here to enable ARATestPlugIn's UI interaction simulation, see ARA_SIMULATE_USER_INTERACTION
 
     // we can also mix playback region and region sequence selection, if this is a valid pattern in the host
     ARA_LOG ("Notifying editor view %p of %lu selected playback region(s) and %lu selected region sequence(s)", editorView.getRef (), playbackRegionRefs.size (), regionSequenceRefs.size ());
     const Selection selection3 { playbackRegionRefs.size (), playbackRegionRefs.data (), regionSequenceRefs.size (), regionSequenceRefs.data (), &timeRange };
     editorView.notifySelection (&selection3);
+    plugInEntry->idleThreadForDuration (50);    // idle a bit here to enable ARATestPlugIn's UI interaction simulation, see ARA_SIMULATE_USER_INTERACTION
 
     // Region sequence hiding demonstration
     // "hide" the region sequences and inform the plug-in editor view
