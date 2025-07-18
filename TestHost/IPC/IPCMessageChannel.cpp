@@ -140,7 +140,7 @@ public:
 
         ::SetEvent (_dataReceived);
 
-        _channel->routeReceivedMessage (messageID, decoder);
+        _channel->getMessageDispatcher ()->routeReceivedMessage (messageID, decoder);
         return true;
     }
 
@@ -250,7 +250,7 @@ private:
 #else
         const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
 #endif
-        channel->routeReceivedMessage (messageID, decoder);
+        channel->getMessageDispatcher ()->routeReceivedMessage (messageID, decoder);
         return nullptr;
     }
 
@@ -306,17 +306,17 @@ private:
 //------------------------------------------------------------------------------
 
 
-IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID, ARA::IPC::MessageHandler* messageHandler)
+IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID)
 {
-    auto channel { new IPCMessageChannel { messageHandler } };
+    auto channel { new IPCMessageChannel {} };
     channel->_sendPort = new IPCSendPort { channelID + ".from_server" };
     channel->_receivePort = new IPCReceivePort { channelID + ".to_server", channel };
     return channel;
 }
 
-IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID, ARA::IPC::MessageHandler* messageHandler)
+IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID)
 {
-    auto channel { new IPCMessageChannel { messageHandler } };
+    auto channel { new IPCMessageChannel {} };
     channel->_receivePort = new IPCReceivePort { channelID + ".from_server", channel };
     channel->_sendPort = new IPCSendPort { channelID + ".to_server" };
     return channel;
@@ -328,7 +328,7 @@ IPCMessageChannel::~IPCMessageChannel ()
     delete _receivePort;
 }
 
-void IPCMessageChannel::_sendMessage (ARA::IPC::MessageID messageID, ARA::IPC::MessageEncoder* encoder)
+void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, ARA::IPC::MessageEncoder* encoder)
 {
 #if USE_ARA_CF_ENCODING
     const auto messageData { static_cast<ARA::IPC::CFMessageEncoder*> (encoder)->createMessageEncoderData () };
