@@ -903,8 +903,14 @@ std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<st
         {
             const auto& binaryFileName { *++it };
             std::string optionalPlugInName {};
-            if ((++it != args.end ()) && ((*it)[0] != '-'))
-                optionalPlugInName = *it;
+            bool needsSpace { false };
+            while ((++it != args.end ()) && ((*it)[0] != '-'))
+            {
+                if (needsSpace)
+                    optionalPlugInName += " ";
+                optionalPlugInName += *it;
+                needsSpace = true;
+            }
             return std::make_unique<VST3PlugInEntry> (binaryFileName, optionalPlugInName);
         }
 
