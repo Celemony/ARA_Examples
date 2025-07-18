@@ -555,10 +555,10 @@ private:
                     const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCConnectionRef)>& getFactoryFunction)
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, channelID },
-      ARA::IPC::ProxyPlugIn { this },
-      Connection { this, IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix, this),
-                         IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix, this) }
+      ARA::IPC::ProxyPlugIn { this }
     {
+        setMainThreadChannel (IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix, this));
+        setOtherThreadsChannel (IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix, this));
         validateAndSetFactory (getFactoryFunction (toIPCRef (getConnection ())));
     }
 
@@ -682,16 +682,19 @@ class ProxyHost : public ARA::IPC::ProxyHost, public Connection
 {
 public:
     ProxyHost (const std::string& channelID)
-    : ARA::IPC::ProxyHost { this },
-      Connection { this, IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix, this),
-                         IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix, this)
-      }
-    {}
-
-    void handleReceivedMessage (const ARA::IPC::MessageID messageID,
-                                const ARA::IPC::MessageDecoder* decoder,
-                                ARA::IPC::MessageEncoder* const replyEncoder) override
+    : ARA::IPC::ProxyHost { this }
     {
+        setMainThreadChannel (IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix, this));
+        setOtherThreadsChannel (IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix, this));
+    }
+
+    ARA::IPC::MessageEncoder* handleReceivedMessage (const ARA::IPC::MessageID messageID,
+                                                     const ARA::IPC::MessageDecoder* decoder) override
+    {
+        if (!ARA::IPC::MethodID::isCustomMessageID (messageID))
+            return ARA::IPC::ProxyHost::handleReceivedMessage (messageID, decoder);
+
+        ARA::IPC::MessageEncoder* replyEncoder { createEncoder() };
         if (messageID == kIPCCreateEffectMethodID)
         {
             auto plugInInstance { _plugInEntry->createPlugInInstance () };
@@ -743,8 +746,9 @@ public:
         }
         else
         {
-            ARA::IPC::ProxyHost::handleReceivedMessage (messageID, decoder, replyEncoder);
+            ARA_INTERNAL_ASSERT (false && "unhandled message ID");
         }
+        return replyEncoder;
     }
 
     bool runReceiveLoop (int32_t milliseconds)

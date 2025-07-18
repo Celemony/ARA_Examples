@@ -306,17 +306,17 @@ private:
 //------------------------------------------------------------------------------
 
 
-IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID, ARA::IPC::Connection* connection)
+IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID, ARA::IPC::MessageHandler* messageHandler)
 {
-    auto channel { new IPCMessageChannel { connection } };
+    auto channel { new IPCMessageChannel { messageHandler } };
     channel->_sendPort = new IPCSendPort { channelID + ".from_server" };
     channel->_receivePort = new IPCReceivePort { channelID + ".to_server", channel };
     return channel;
 }
 
-IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID, ARA::IPC::Connection* connection)
+IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID, ARA::IPC::MessageHandler* messageHandler)
 {
-    auto channel { new IPCMessageChannel { connection } };
+    auto channel { new IPCMessageChannel { messageHandler } };
     channel->_receivePort = new IPCReceivePort { channelID + ".from_server", channel };
     channel->_sendPort = new IPCSendPort { channelID + ".to_server" };
     return channel;
