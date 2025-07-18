@@ -197,7 +197,7 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, b
             }];
             // loading out-of-process can take a considerable amount of time, so loop for up to a second if needed
             for (int i = 0; (i < 100) && (result->v3AudioUnit == nil); ++i)
-                [runloop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+                [runloop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
         }
         ARA_INTERNAL_ASSERT(result->v3AudioUnit != nil);
     }
