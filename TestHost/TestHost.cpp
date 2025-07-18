@@ -25,143 +25,132 @@
 
 #include "TestHost.h"
 
-void TestHost::addDocument (std::string documentName, PlugInEntry* plugInEntry)
+Document* TestHost::addDocument (std::string documentName, PlugInEntry* plugInEntry)
 {
-    destroyDocument (documentName);
-
-    auto doc { std::make_unique<Document> (documentName) };
-    auto controller { std::make_unique<ARADocumentController> (doc.get (), plugInEntry) };
-
-    _documents[documentName] = { std::move (doc), std::move (controller) };
+    auto doc { new Document { documentName } };
+    auto controller { new ARADocumentController { doc, plugInEntry} };
+    _documents[doc] = controller;
+    return doc;
 }
 
-void TestHost::destroyDocument (std::string documentName)
+void TestHost::destroyDocument (Document* document)
 {
     // To clean up the ARA document, remove model graph objects
     // starting at the bottom with playback regions and working upward
-    auto araDocumentController = getDocumentController (documentName);
+    auto araDocumentController = getDocumentController (document);
+    araDocumentController->beginEditing ();
 
-    if (araDocumentController)
+    while (!document->getAudioSources ().empty ())
     {
-        auto document = araDocumentController->getDocument ();
-        araDocumentController->beginEditing ();
+        auto& audioSource = document->getAudioSources ().back ();
 
-        while (!document->getAudioSources ().empty ())
+        while (!audioSource->getAudioModifications ().empty ())
         {
-            auto& audioSource = document->getAudioSources ().back ();
+            auto& audioModification = audioSource->getAudioModifications ().back ();
 
-            while (!audioSource->getAudioModifications ().empty ())
-            {
-                auto& audioModification = audioSource->getAudioModifications ().back ();
+            while (!audioModification->getPlaybackRegions ().empty ())
+                removePlaybackRegion (document, audioModification->getPlaybackRegions ().back ().get ());
 
-                while (!audioModification->getPlaybackRegions ().empty ())
-                    removePlaybackRegion (documentName, audioModification->getPlaybackRegions ().back ().get ());
-
-                removeAudioModification (documentName, audioModification.get ());
-            }
-
-            removeAudioSource (documentName, audioSource.get ());
+            removeAudioModification (document, audioModification.get ());
         }
 
-        while (!document->getRegionSequences ().empty ())
-            removeRegionSequence (documentName, document->getRegionSequences ().back ().get ());
-
-        while (!document->getMusicalContexts ().empty ())
-            removeMusicalContext (documentName, document->getMusicalContexts ().back ().get ());
-
-        araDocumentController->endEditing ();
+        removeAudioSource (document, audioSource.get ());
     }
 
-    _documents.erase (documentName);
+    while (!document->getRegionSequences ().empty ())
+        removeRegionSequence (document, document->getRegionSequences ().back ().get ());
+
+    while (!document->getMusicalContexts ().empty ())
+        removeMusicalContext (document, document->getMusicalContexts ().back ().get ());
+
+    araDocumentController->endEditing ();
+    
+    _documents.erase (document);
+    delete araDocumentController;
+    delete document;
 }
 
 TestHost::~TestHost ()
 {
-    std::vector<std::string> documentNames;
-    for (const auto& docController : _documents)
-        documentNames.push_back (docController.first);
-    for (const auto& docName : documentNames)
-        destroyDocument (docName);
+    while (!_documents.empty ())
+        destroyDocument (_documents.begin ()->first);
 }
 
-MusicalContext* TestHost::addMusicalContext (std::string documentName, std::string name, ARA::ARAColor color)
+MusicalContext* TestHost::addMusicalContext (Document* document, std::string name, ARA::ARAColor color)
 {
-    auto document = getDocument (documentName);
     document->addMusicalContext (std::make_unique <MusicalContext> (document, name, color));
     auto musicalContext = document->getMusicalContexts ().back ().get ();
-    if (auto araDocumentController = getDocumentController (documentName))
+    if (auto araDocumentController = getDocumentController (document))
         araDocumentController->addMusicalContext (musicalContext);
     return musicalContext;
 }
 
-void TestHost::removeMusicalContext (std::string documentName, MusicalContext* musicalContext)
+void TestHost::removeMusicalContext (Document* document, MusicalContext* musicalContext)
 {
-    if (auto araDocumentController = getDocumentController (documentName))
+    if (auto araDocumentController = getDocumentController (document))
         araDocumentController->removeMusicalContext (musicalContext);
-    getDocument (documentName)->removeMusicalContext (musicalContext);
+    document->removeMusicalContext (musicalContext);
 }
 
-RegionSequence* TestHost::addRegionSequence (std::string documentName, std::string name, MusicalContext* musicalContext, ARA::ARAColor color)
+RegionSequence* TestHost::addRegionSequence (Document* document, std::string name, MusicalContext* musicalContext, ARA::ARAColor color)
 {
-    auto document = getDocument (documentName);
     document->addRegionSequence (std::make_unique<RegionSequence> (document, name, musicalContext, color));
     auto regionSequence = document->getRegionSequences ().back ().get ();
-    if (auto araDocumentController = getDocumentController (documentName))
+    if (auto araDocumentController = getDocumentController (document))
         araDocumentController->addRegionSequence (regionSequence);
     return regionSequence;
 }
 
-void TestHost::removeRegionSequence (std::string documentName, RegionSequence* regionSequence)
+void TestHost::removeRegionSequence (Document* document, RegionSequence* regionSequence)
 {
-    if (auto araDocumentController = getDocumentController (documentName))
+    if (auto araDocumentController = getDocumentController (document))
         araDocumentController->removeRegionSequence (regionSequence);
-    getDocument (documentName)->removeRegionSequence (regionSequence);
+    document->removeRegionSequence (regionSequence);
 }
 
-AudioSource* TestHost::addAudioSource (std::string documentName, AudioFileBase* audioFile, std::string persistentID)
+AudioSource* TestHost::addAudioSource (Document* document, AudioFileBase* audioFile, std::string persistentID)
 {
-    auto document = getDocument (documentName);
     document->addAudioSource (std::make_unique<AudioSource> (document, audioFile, persistentID));
     auto audioSource = document->getAudioSources ().back ().get ();
-    if (auto araDocumentController = getDocumentController (documentName))
+    if (auto araDocumentController = getDocumentController (document))
         araDocumentController->addAudioSource (audioSource);
     return audioSource;
 }
 
-void TestHost::removeAudioSource (std::string documentName, AudioSource* audioSource)
+void TestHost::removeAudioSource (Document* document, AudioSource* audioSource)
 {
-    if (auto araDocumentController = getDocumentController (documentName))
+    if (auto araDocumentController = getDocumentController (document))
         araDocumentController->removeAudioSource (audioSource);
-    getDocument (documentName)->removeAudioSource (audioSource);
+    document->removeAudioSource (audioSource);
 }
 
-AudioModification* TestHost::addAudioModification (std::string documentName, AudioSource* audioSource, std::string name, std::string persistentID)
+AudioModification* TestHost::addAudioModification (Document* document, AudioSource* audioSource, std::string name, std::string persistentID)
 {
     audioSource->addAudioModification (std::make_unique<AudioModification> (audioSource, name, persistentID));
     auto audioModification = audioSource->getAudioModifications ().back ().get ();
-    if (auto araDocumentController = getDocumentController (documentName))
+    if (auto araDocumentController = getDocumentController (document))
         araDocumentController->addAudioModification (audioModification);
     return audioModification;
 }
 
-void TestHost::removeAudioModification (std::string documentName, AudioModification* audioModification)
+void TestHost::removeAudioModification (Document* document, AudioModification* audioModification)
 {
-    if (auto araDocumentController = getDocumentController (documentName))
+    if (auto araDocumentController = getDocumentController (document))
         araDocumentController->removeAudioModification (audioModification);
     audioModification->getAudioSource ()->removeAudioModification (audioModification);
 }
 
-AudioModification* TestHost::cloneAudioModification (std::string documentName, AudioModification* audioModification, std::string name, std::string persistentID)
+AudioModification* TestHost::cloneAudioModification (Document* document, AudioModification* audioModification, std::string name, std::string persistentID)
 {
     auto audioSource = audioModification->getAudioSource ();
     audioSource->addAudioModification (std::make_unique<AudioModification> (audioSource, name, persistentID));
     auto clonedModification = audioSource->getAudioModifications ().back ().get ();
-    if (auto araDocumentController = getDocumentController (documentName))
+    if (auto araDocumentController = getDocumentController (document))
         araDocumentController->cloneAudioModification (audioModification, clonedModification);
     return clonedModification;
 }
 
-PlaybackRegion* TestHost::addPlaybackRegion (std::string documentName, AudioModification* audioModification,
+PlaybackRegion* TestHost::addPlaybackRegion (Document* document, AudioModification* audioModification,
                                              ARA::ARAPlaybackTransformationFlags transformationFlags,
                                              double startInModificationTime, double durationInModificationTime,
                                              double startInPlaybackTime, double durationInPlaybackTime,
@@ -176,24 +165,19 @@ PlaybackRegion* TestHost::addPlaybackRegion (std::string documentName, AudioModi
                                                 regionSequence,
                                                 name, color));
     auto playbackRegion = audioModification->getPlaybackRegions ().back ().get ();
-    if (auto araDocumentController = getDocumentController (documentName))
+    if (auto araDocumentController = getDocumentController (document))
         araDocumentController->addPlaybackRegion (playbackRegion);
     return playbackRegion;
 }
 
-void TestHost::removePlaybackRegion (std::string documentName, PlaybackRegion* playbackRegion)
+void TestHost::removePlaybackRegion (Document* document, PlaybackRegion* playbackRegion)
 {
-    if (auto araDocumentController = getDocumentController (documentName))
+    if (auto araDocumentController = getDocumentController (document))
         araDocumentController->removePlaybackRegion (playbackRegion);
     playbackRegion->getAudioModification ()->removePlaybackRegion (playbackRegion);
 }
 
-Document* TestHost::getDocument (std::string documentName)
+ARADocumentController* TestHost::getDocumentController (Document* document)
 {
-    return _documents.count (documentName) ? _documents.at (documentName).first.get () : nullptr;
-}
-
-ARADocumentController* TestHost::getDocumentController (std::string documentName)
-{
-    return _documents.count (documentName) ? _documents.at (documentName).second.get () : nullptr;
+    return _documents[document];
 }

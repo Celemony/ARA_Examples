@@ -42,34 +42,33 @@ public:
     ~TestHost ();
 
     // document control
-    void addDocument (std::string documentName, PlugInEntry* plugInEntry);
-    void destroyDocument (std::string documentName);
+    Document* addDocument (std::string documentName, PlugInEntry* plugInEntry);
+    void destroyDocument (Document* document);
 
-    MusicalContext* addMusicalContext (std::string documentName, std::string name, ARA::ARAColor color);
-    void removeMusicalContext (std::string documentName, MusicalContext* musicalContext);
+    MusicalContext* addMusicalContext (Document* document, std::string name, ARA::ARAColor color);
+    void removeMusicalContext (Document* document, MusicalContext* musicalContext);
 
-    RegionSequence* addRegionSequence (std::string documentName, std::string name, MusicalContext* musicalContext, ARA::ARAColor color);
-    void removeRegionSequence (std::string documentName, RegionSequence* regionSequence);
+    RegionSequence* addRegionSequence (Document* document, std::string name, MusicalContext* musicalContext, ARA::ARAColor color);
+    void removeRegionSequence (Document* document, RegionSequence* regionSequence);
 
-    AudioSource* addAudioSource (std::string documentName, AudioFileBase* audioFile, std::string persistentID);
-    void removeAudioSource (std::string documentName, AudioSource* audioSource);
+    AudioSource* addAudioSource (Document* document, AudioFileBase* audioFile, std::string persistentID);
+    void removeAudioSource (Document* document, AudioSource* audioSource);
 
-    AudioModification* addAudioModification (std::string documentName, AudioSource* audioSource, std::string name, std::string persistentID);
-    void removeAudioModification (std::string documentName, AudioModification* audioModification);
-    AudioModification* cloneAudioModification (std::string documentName, AudioModification* audioModification, std::string name, std::string persistentID);
+    AudioModification* addAudioModification (Document* document, AudioSource* audioSource, std::string name, std::string persistentID);
+    void removeAudioModification (Document* document, AudioModification* audioModification);
+    AudioModification* cloneAudioModification (Document* document, AudioModification* audioModification, std::string name, std::string persistentID);
 
-    PlaybackRegion* addPlaybackRegion (std::string documentName, AudioModification* audioModification,
+    PlaybackRegion* addPlaybackRegion (Document* document, AudioModification* audioModification,
                                        ARA::ARAPlaybackTransformationFlags transformationFlags,
                                        double startInModificationTime, double durationInModificationTime,
                                        double startInPlaybackTime, double durationInPlaybackTime,
                                        RegionSequence* regionSequence,
                                        std::string name, ARA::ARAColor color);
-    void removePlaybackRegion (std::string documentName, PlaybackRegion* playbackRegion);
+    void removePlaybackRegion (Document* document, PlaybackRegion* playbackRegion);
 
     // document and ARA document controller access
-    Document* getDocument (std::string documentName);
-    ARADocumentController* getDocumentController (std::string documentName);
+    ARADocumentController* getDocumentController (Document* document);
 
 private:
-    std::map<std::string, std::pair<std::unique_ptr<Document>, std::unique_ptr<ARADocumentController>>> _documents;
+    std::map<Document*, ARADocumentController*> _documents;
 };
