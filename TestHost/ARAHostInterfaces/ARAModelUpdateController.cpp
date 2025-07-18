@@ -43,25 +43,25 @@ void ARAModelUpdateController::notifyAudioSourceAnalysisProgress (ARA::ARAAudioS
     {
         case ARA::kARAAnalysisProgressStarted:
         {
-            ARA_VALIDATE_API_STATE (_audioSourceAnaysisProgressValues.count (audioSource) == 0);
+            ARA_VALIDATE_API_STATE (_audioSourceAnalysisProgressValues.count (audioSource) == 0);
             ARA_LOG ("audio source %p (ARAAudioSourceRef %p) analysis started with progress %.f%%.", audioSource, audioSourceRef, 100.0 * value);
-            _audioSourceAnaysisProgressValues[audioSource] = value;
+            _audioSourceAnalysisProgressValues[audioSource] = value;
             break;
         }
         case ARA::kARAAnalysisProgressUpdated:
         {
-            ARA_VALIDATE_API_STATE (_audioSourceAnaysisProgressValues.count (audioSource) != 0);
-            ARA_VALIDATE_API_STATE (_audioSourceAnaysisProgressValues[audioSource] <= value);
+            ARA_VALIDATE_API_STATE (_audioSourceAnalysisProgressValues.count (audioSource) != 0);
+            ARA_VALIDATE_API_STATE (_audioSourceAnalysisProgressValues[audioSource] <= value);
             ARA_LOG ("audio source %p (ARAAudioSourceRef %p) analysis progress is %.f%%.", audioSource, audioSourceRef, 100.0 * value);
-            _audioSourceAnaysisProgressValues[audioSource] = value;
+            _audioSourceAnalysisProgressValues[audioSource] = value;
             break;
         }
         case ARA::kARAAnalysisProgressCompleted:
         {
-            ARA_VALIDATE_API_STATE (_audioSourceAnaysisProgressValues.count (audioSource) != 0);
-            ARA_VALIDATE_API_STATE (_audioSourceAnaysisProgressValues[audioSource] <= value);
+            ARA_VALIDATE_API_STATE (_audioSourceAnalysisProgressValues.count (audioSource) != 0);
+            ARA_VALIDATE_API_STATE (_audioSourceAnalysisProgressValues[audioSource] <= value);
             ARA_LOG ("audio source %p (ARAAudioSourceRef %p) analysis finished with progress %.f%%.", audioSource, audioSourceRef, 100.0 * value);
-            _audioSourceAnaysisProgressValues.erase (audioSource);
+            _audioSourceAnalysisProgressValues.erase (audioSource);
             break;
         }
         default:
