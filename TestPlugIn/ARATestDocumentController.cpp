@@ -883,7 +883,7 @@ void ARATestDocumentController::rendererDidAccessModelGraph (ARATestPlaybackRend
 
 void ARATestDocumentController::disableRendererModelGraphAccess () noexcept
 {
-#if (__cplusplus >= 201703L)
+#if __cplusplus >= 201703L
     static_assert (decltype (_renderersCanAccessModelGraph)::is_always_lock_free);
     static_assert (decltype (_countOfRenderersCurrentlyAccessingModelGraph)::is_always_lock_free);
 #else
