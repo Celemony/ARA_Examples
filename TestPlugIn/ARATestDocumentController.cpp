@@ -161,7 +161,7 @@ void ARATestEditorView::doNotifySelection (const ARA::PlugIn::ViewSelection* sel
 #elif defined (__APPLE__)
     dispatch_async (dispatch_get_main_queue (),
         ^{
-            simulateUIInteraction(getDocumentController<ARATestDocumentController> (), selection->getEffectiveTimeRange ().start);
+            simulateUIInteraction (getDocumentController<ARATestDocumentController> (), selection->getEffectiveTimeRange ().start);
         });
 #endif
 #endif

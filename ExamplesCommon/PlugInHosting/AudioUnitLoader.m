@@ -70,7 +70,7 @@ struct _AudioUnitInstance
 #endif
 };
 
-void CallAudioUnitAsyncIfNeeded (AudioUnitInstance audioUnitInstance, void (^audioUnitCall)(void))
+void CallAudioUnitAsyncIfNeeded(AudioUnitInstance audioUnitInstance, void (^audioUnitCall)(void))
 {
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     if (audioUnitInstance->audioUnitComponent->araProxy)
@@ -78,7 +78,7 @@ void CallAudioUnitAsyncIfNeeded (AudioUnitInstance audioUnitInstance, void (^aud
         _Atomic bool ready;
         _Atomic bool * readyPtr = &ready;
         atomic_init (readyPtr, 0);
-        dispatch_async (dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
             audioUnitCall();
             atomic_store_explicit(readyPtr, 1, memory_order_release);
         });
@@ -86,7 +86,7 @@ void CallAudioUnitAsyncIfNeeded (AudioUnitInstance audioUnitInstance, void (^aud
         while (atomic_load_explicit(readyPtr, memory_order_acquire) == 0)
         {
             if (@available(macOS 13.0, iOS 16.0, *))
-                ARAIPCAUProxyPlugInPerformPendingMainThreadTasks (audioUnitInstance->audioUnitComponent->araProxy);
+                ARAIPCAUProxyPlugInPerformPendingMainThreadTasks(audioUnitInstance->audioUnitComponent->araProxy);
         }
     }
     else
@@ -516,7 +516,7 @@ void AudioUnitStartRendering(AudioUnitInstance audioUnitInstance, UInt32 maxBloc
                 return (result == noErr);
             };
 
-        CallAudioUnitAsyncIfNeeded (audioUnitInstance, ^{
+        CallAudioUnitAsyncIfNeeded(audioUnitInstance, ^{
             ARA_MAYBE_UNUSED_VAR(BOOL) success = [audioUnitInstance->v3AudioUnit allocateRenderResourcesAndReturnError:nil];
             ARA_INTERNAL_ASSERT(success == YES);
         });
@@ -564,7 +564,7 @@ void AudioUnitStopRendering(AudioUnitInstance audioUnitInstance)
     }
     else
     {
-        CallAudioUnitAsyncIfNeeded (audioUnitInstance, ^{
+        CallAudioUnitAsyncIfNeeded(audioUnitInstance, ^{
             [audioUnitInstance->v3AudioUnit deallocateRenderResources];
             [audioUnitInstance->v3RenderBlock release];
         });

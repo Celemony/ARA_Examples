@@ -209,7 +209,7 @@ int main (int argc, const char* argv[])
     const auto testCases { parseTestCases (args) };
 
     // start up ARA
-    plugInEntry->initializeARA(assertFunctionReference);
+    plugInEntry->initializeARA (assertFunctionReference);
 
     // conditionally execute each test case
     const auto shouldTest { [&] (const std::string& testCase) { return testCases.empty () || ARA::contains (testCases, testCase); } };
@@ -239,7 +239,7 @@ int main (int argc, const char* argv[])
         testAudioFileChunkLoading (plugInEntry.get (), audioFiles);
 
     // shut down ARA
-    plugInEntry->uninitializeARA();
+    plugInEntry->uninitializeARA ();
 
     return 0;
 }
