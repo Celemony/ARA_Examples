@@ -77,11 +77,6 @@ public:
 
     void sendMessage (ARA::IPC::MessageID messageID, ARA::IPC::MessageEncoder* encoder) override;
 
-#if !USE_ARA_BACKGROUND_IPC
-    bool currentThreadMustNotBeBlocked () override;
-#endif
-    bool waitForMessage (ARA::ARATimeDuration timeout) override;
-
 protected:
     using ARA::IPC::MessageChannel::MessageChannel;
 

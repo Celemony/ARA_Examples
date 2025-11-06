@@ -459,7 +459,8 @@ class Connection : public ARA::IPC::Connection
 {
 public:
     Connection (IPCMessageChannel* mainThreadChannel, IPCMessageChannel* otherThreadsChannel)
-    : _mainThreadChannel { mainThreadChannel }
+    : ARA::IPC::Connection { &_runReceiveLoop, this },
+      _mainThreadChannel { mainThreadChannel }
     {
         setMainThreadChannel (mainThreadChannel);
         setOtherThreadsChannel (otherThreadsChannel);
@@ -484,6 +485,12 @@ public:
    bool runReceiveLoop (int32_t milliseconds)
     {
         return _mainThreadChannel->runReceiveLoop (milliseconds);
+    }
+
+private:
+    static void _runReceiveLoop (void* connection)
+    {
+        static_cast<Connection*> (connection)->runReceiveLoop (10);
     }
 
 private:
