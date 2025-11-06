@@ -20,8 +20,8 @@ concise long-term change history, any changes since the last tagged release may 
 
 Creating ARA-enabled products relies on using at least one of the various established audio plug-in
 formats as "companion APIs". The CMake code allows for setting path variables to your local copies
-of these SDKs: `ARA_VST3_SDK_DIR` and `ARA_AUDIO_UNIT_SDK_DIR`. If needed, installing the SDKs
-can be done using the [ARA SDK Installer](https://github.com/Celemony/ARA_SDK).
+of these SDKs: `ARA_VST3_SDK_DIR`, `ARA_AUDIO_UNIT_SDK_DIR` and `ARA_CLAP_SDK_DIR`. If needed,
+installing these SDKs can be done using the [ARA SDK Installer](https://github.com/Celemony/ARA_SDK).
 
 
 ## 3rd party submodules
