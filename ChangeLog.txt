@@ -1,19 +1,13 @@
-This is a development build of the ARA Examples 2.3.
-=== PRELIMINARY - DO NOT USE FOR SHIPPING PRODUCTS! ===
+Proposed Features which have been postponed to a later subrelease:
+- Audio Unit version 3 support (App Extension, incl. IPC when not loaded in-process)
+- generic ARA IPC implementation in ARA_Library
 
 
-Changes since previous releases:
+=== ARA SDK 2.3 release (aka 2.3.001) (2025/11/07) ===
 - AAX is now fully supported as companion API
 - CLAP is now fully supported as companion API
-- initial draft of Audio Unit version 3 support (App Extension)
-  Note that macOS code signing is required for proper loading in sandboxes such as App Extensions,
-  configured via CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY and CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM.
-- various related refactorings and cleanups in plug-in hosting code
-- initial draft of generic ARA IPC implementation in ARA_Library
-- IPCDemo refactored and merged into ARATestHost, utilizing new ARA_IPC library draft
-- IPC now also supports using VST3 or CLAP (was previously limited to Audio Units)
-- IPC now also works on Windows (was previously limited to macOS)
-- IPC now also supports using pugixml as encoder (was previously limited to the macOS-only CFDictionary)
+- various related refactorings and cleanups in plug-in hosting code,
+  also preparing for future Audio Unit version 3 support (App Extension)
 - added API to notify the host when the private, opaque document state changes (to trigger saving it)
   and incremented API generation to allow plug-ins to indicate that they fully conform to sending
   notifications whenever any part of their persistent state changes
