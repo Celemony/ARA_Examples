@@ -29,8 +29,7 @@
 #include "ARA_Library/Debug/ARADebug.h"
 #include "ARA_Library/Dispatch/ARAHostDispatch.h"
 
-//#include "ARA_Library/IPC/ARAIPC.h"
-#define ARA_ENABLE_IPC 0
+#include "ARA_Library/IPC/ARAIPC.h"
 
 #include <string>
 #include <vector>

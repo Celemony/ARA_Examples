@@ -20,7 +20,7 @@
 
 #include "ARA_API/ARAInterface.h"
 #include "ARA_Library/Debug/ARADebug.h"
-//#include "ARA_Library/IPC/ARAIPC.h"
+#include "ARA_Library/IPC/ARAIPC.h"
 
 #include <MacTypes.h>
 
@@ -37,7 +37,7 @@ bool AudioUnitIsV2(AudioUnitComponent audioUnitComponent);
 AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, bool useIPC);
 // On return, *connection will be NULL if Audio Unit does not use IPC, otherwise it will point to
 // a valid message channel for all factory-related calls until AudioUnitCleanupComponent() is called.
-const ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnit/*, ARA_IPC_NAMESPACE ARAIPCConnectionRef * connectionRef*/);
+const ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnit, ARA_IPC_NAMESPACE ARAIPCConnectionRef * connectionRef);
 const ARA_NAMESPACE ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnit, ARA_NAMESPACE ARADocumentControllerRef controllerRef, ARA_NAMESPACE ARAPlugInInstanceRoleFlags assignedRoles);
 void AudioUnitStartRendering(AudioUnitInstance audioUnit, UInt32 channelCount, UInt32 maxBlockSize, double sampleRate);
 void AudioUnitRenderBuffer(AudioUnitInstance audioUnit, UInt32 blockSize, SInt64 samplePosition, float ** buffers);

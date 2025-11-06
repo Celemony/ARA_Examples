@@ -29,7 +29,6 @@
 
 #if defined (__APPLE__)
     #include "ExamplesCommon/PlugInHosting/AudioUnitLoader.h"
-    #include <CoreFoundation/CoreFoundation.h>
 #endif
 
 #ifndef ARA_ENABLE_CLAP
@@ -329,7 +328,7 @@ public:
       _audioUnitComponent { AudioUnitPrepareComponentWithIDs (parseOSType (type), parseOSType (subType), parseOSType (manufacturer)) }
     {
         AudioUnitInstance audioUnitInstance = AudioUnitOpenInstance (_audioUnitComponent, useIPCIfPossible);
-        validateAndSetFactory (AudioUnitGetARAFactory (audioUnitInstance/*, &_connectionRef*/));
+        validateAndSetFactory (AudioUnitGetARAFactory (audioUnitInstance, &_connectionRef));
         AudioUnitCloseInstance (audioUnitInstance);
     }
 
@@ -338,41 +337,33 @@ public:
         AudioUnitCleanupComponent (_audioUnitComponent);
     }
 
-/*
     bool usesIPC () const override
     {
         return _connectionRef != nullptr;
     }
-*/
 
     void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress) override
     {
-/*
         if (usesIPC ())
             ARA::IPC::ARAIPCProxyPlugInInitializeARA (_connectionRef, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
         else
-*/
             PlugInEntry::initializeARA (assertFunctionAddress);
     }
 
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
-/*
         if (usesIPC ())
             return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_connectionRef, getARAFactory ()->factoryID, hostInstance, properties);
         else
-*/
             return PlugInEntry::createDocumentControllerWithDocument (hostInstance, properties);
     }
 
     void uninitializeARA () override
     {
-/*
         if (usesIPC ())
             ARA::IPC::ARAIPCProxyPlugInUninitializeARA (_connectionRef, getARAFactory ()->factoryID);
         else
-*/
             PlugInEntry::uninitializeARA ();
     }
 
@@ -384,7 +375,7 @@ public:
 
 private:
     AudioUnitComponent const _audioUnitComponent;
-//  ARA::IPC::ARAIPCConnectionRef _connectionRef {};
+    ARA::IPC::ARAIPCConnectionRef _connectionRef {};
 };
 
 #endif // defined (__APPLE__)
