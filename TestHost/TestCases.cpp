@@ -791,18 +791,25 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
     {
         ARA_LOG ("Rendering %lu region(s) assigned to playback renderer %p with sample rate %lgHz", playbackRegions.size (), playbackRenderer.getRef (), renderSampleRate);
 
+        const auto channelCount { static_cast<size_t> (audioFiles[0]->getChannelCount ()) };
+
         auto startOfPlaybackRegionSamples { ARA::samplePositionAtTime (startOfPlaybackRegions, renderSampleRate) };
         auto endOfPlaybackRegionSamples { ARA::samplePositionAtTime (endOfPlaybackRegions, renderSampleRate) };
 
+        const auto sampleCount { static_cast<size_t> (endOfPlaybackRegionSamples - startOfPlaybackRegionSamples) };
+
         // create a buffer of output samples
-        std::vector<float> outputData (static_cast<size_t> (endOfPlaybackRegionSamples - startOfPlaybackRegionSamples));
+        std::vector<std::vector<float>> outputData { channelCount };
+        for (auto& buffer : outputData)
+            buffer.resize (static_cast<size_t> (sampleCount));
+        std::vector<float*> buffers { channelCount };
 
         // ARA plug-ins should be rendered with large buffer sizes for playback (and ahead-of-time in
         // actual hosts) since they do not depend on any realtime input.
         constexpr auto renderBlockSize { 2048 };
 
         // render all playback region samples
-        plugInInstance->startRendering (renderBlockSize, renderSampleRate);
+        plugInInstance->startRendering (static_cast<int> (channelCount), renderBlockSize, renderSampleRate);
 
         bool renderingCompleted { false };
         auto renderOnOtherThread = [&] () {
@@ -812,7 +819,9 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
                 {
                     const auto samplesToRender { std::min (renderBlockSize, static_cast<int> (endOfPlaybackRegionSamples - samplePosition)) };
                     const auto outputPosition { samplePosition - startOfPlaybackRegionSamples };
-                    plugInInstance->renderSamples (samplesToRender, samplePosition, &outputData[static_cast<size_t> (outputPosition)]);
+                    for (auto i { 0U }; i < channelCount; ++i)
+                        buffers[i] = outputData[i].data () + outputPosition;
+                    plugInInstance->renderSamples (samplesToRender, samplePosition, buffers.data ());
                 }
                 ARAAudioAccessController::unregisterRenderThread ();
                 renderingCompleted = true;

@@ -464,11 +464,11 @@ int main(int argc, const char * argv[])
     ARA_LOG("configuring rendering");
     plugInInstance->playbackRendererInterface->addPlaybackRegion(plugInInstance->playbackRendererRef, playbackRegionRef);
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
-    AudioUnitStartRendering(audioUnit, renderBlockSize, renderSampleRate);
+    AudioUnitStartRendering(audioUnit, 1, renderBlockSize, renderSampleRate);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
-    VST3StartRendering(vst3Effect, renderBlockSize, renderSampleRate);
+    VST3StartRendering(vst3Effect, 1, renderBlockSize, renderSampleRate);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_CLAP
-    CLAPStartRendering(clapPlugIn, renderBlockSize, renderSampleRate);
+    CLAPStartRendering(clapPlugIn, 1, renderBlockSize, renderSampleRate);
 #endif
 
 
@@ -482,12 +482,13 @@ int main(int argc, const char * argv[])
     for (i = 0; i < renderBlockCount; ++i)
     {
         int samplePosition = i * renderBlockSize;
+        float * buffer = outputData + samplePosition;
 #if PLUGIN_FORMAT == PLUGIN_FORMAT_AU
-        AudioUnitRenderBuffer(audioUnit, renderBlockSize, samplePosition, outputData + samplePosition);
+        AudioUnitRenderBuffer(audioUnit, renderBlockSize, samplePosition, &buffer);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_VST3
-        VST3RenderBuffer(vst3Effect, renderBlockSize, renderSampleRate, samplePosition, outputData + samplePosition);
+        VST3RenderBuffer(vst3Effect, renderBlockSize, renderSampleRate, samplePosition, &buffer);
 #elif PLUGIN_FORMAT == PLUGIN_FORMAT_CLAP
-        CLAPRenderBuffer(clapPlugIn, renderBlockSize, samplePosition, outputData + samplePosition);
+        CLAPRenderBuffer(clapPlugIn, renderBlockSize, samplePosition, &buffer);
 #endif
     }
 

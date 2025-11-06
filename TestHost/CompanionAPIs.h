@@ -50,8 +50,8 @@ public:
     virtual void bindToDocumentControllerWithRoles (ARA::ARADocumentControllerRef documentControllerRef, ARA::ARAPlugInInstanceRoleFlags assignedRoles) = 0;
 
     // Companion API specific implementations
-    virtual void startRendering (int maxBlockSize, double sampleRate) = 0;
-    virtual void renderSamples (int blockSize, int64_t samplePosition, float* buffer) = 0;
+    virtual void startRendering (int channelCount, int maxBlockSize, double sampleRate) = 0;
+    virtual void renderSamples (int blockSize, int64_t samplePosition, float** buffers) = 0;
     virtual void stopRendering () = 0;
 
     // Getters for ARA specific plug-in role interfaces

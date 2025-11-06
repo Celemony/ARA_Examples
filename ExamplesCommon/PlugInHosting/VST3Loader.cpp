@@ -98,6 +98,7 @@ struct _VST3Binary
 struct _VST3Effect
 {
     IPtr<IComponent> component;
+    int32_t channelCount;
 
 #if ARA_VALIDATE_API_CALLS
     VST3Binary binary;
@@ -291,9 +292,9 @@ VST3Effect VST3CreateEffect (VST3Binary vst3Binary, const char* optionalPlugInNa
             result = component->initialize (nullptr);
             ARA_INTERNAL_ASSERT (result == kResultOk);
 #if ARA_VALIDATE_API_CALLS
-            return new _VST3Effect { component, vst3Binary, classInfo.name };
+            return new _VST3Effect { component, 0, vst3Binary, classInfo.name };
 #else
-            return new _VST3Effect { component };
+            return new _VST3Effect { component, 0 };
 #endif
         }
     }
@@ -335,18 +336,40 @@ const ARA::ARAPlugInExtensionInstance* VST3BindToARADocumentController (VST3Effe
 #endif
 }
 
-void VST3StartRendering (VST3Effect vst3Effect, int32_t maxBlockSize, double sampleRate)
+void VST3StartRendering (VST3Effect vst3Effect, int32_t channelCount, int32_t maxBlockSize, double sampleRate)
 {
     FUnknownPtr<IAudioProcessor> processor { vst3Effect->component };
     ARA_INTERNAL_ASSERT (processor);
+
+    ARA_INTERNAL_ASSERT (vst3Effect->channelCount == 0);
+    vst3Effect->channelCount = channelCount;
 
     ProcessSetup setup = { kRealtime, kSample32, maxBlockSize, sampleRate };
     tresult ARA_MAYBE_UNUSED_VAR (result);
     result = processor->setupProcessing (setup);
     ARA_INTERNAL_ASSERT (result == kResultOk);
 
-    SpeakerArrangement inputs = SpeakerArr::kMono;
-    SpeakerArrangement outputs = SpeakerArr::kMono;
+    SpeakerArrangement arrangement;
+    switch (channelCount)
+    {
+        default:
+        {
+            ARA_INTERNAL_ASSERT (false && "no default format defined for given channel count");
+            // no break; intended here
+        }
+        case 1: arrangement = SpeakerArr::kMono; break;
+        case 2: arrangement = SpeakerArr::kStereo; break;
+        case 3: arrangement = SpeakerArr::k30Music; break;
+        case 4: arrangement = SpeakerArr::k40Music; break;
+        case 5: arrangement = SpeakerArr::k50; break;
+        case 6: arrangement = SpeakerArr::k51; break;
+        case 7: arrangement = SpeakerArr::k61Music; break;
+        case 8: arrangement = SpeakerArr::k71Music; break;
+        case 9: arrangement = SpeakerArr::k81Music; break;
+    }
+
+    SpeakerArrangement inputs = arrangement;
+    SpeakerArrangement outputs = arrangement;
     result = processor->setBusArrangements (&inputs, 1, &outputs, 1);
     ARA_INTERNAL_ASSERT (result == kResultOk);
     result = vst3Effect->component->activateBus (kAudio, kInput, 0, true);
@@ -358,22 +381,23 @@ void VST3StartRendering (VST3Effect vst3Effect, int32_t maxBlockSize, double sam
     ARA_INTERNAL_ASSERT (result == kResultOk);
 }
 
-void VST3RenderBuffer (VST3Effect vst3Effect, int32_t blockSize, double sampleRate, int64_t samplePosition, float* buffer)
+void VST3RenderBuffer (VST3Effect vst3Effect, int32_t blockSize, double sampleRate, int64_t samplePosition, float** buffers)
 {
     FUnknownPtr<IAudioProcessor> processor { vst3Effect->component };
     ARA_INTERNAL_ASSERT (processor);
 
-    float* channels[1] = { buffer };
-    memset (buffer, 0, static_cast<size_t> (blockSize) * sizeof (float));
+    for (int32_t i = 0; i < vst3Effect->channelCount; ++i)
+        memset (buffers[i], 0, static_cast<size_t> (blockSize) * sizeof (float));
+
     AudioBusBuffers inputs;
-    inputs.numChannels = 1;
+    inputs.numChannels = vst3Effect->channelCount;
     inputs.silenceFlags = 0xFFFFFFFFFFFFFFFFU;
-    inputs.channelBuffers32 = channels;
+    inputs.channelBuffers32 = buffers;
 
     AudioBusBuffers outputs;
-    outputs.numChannels = 1;
+    outputs.numChannels = vst3Effect->channelCount;
     outputs.silenceFlags = 0;
-    outputs.channelBuffers32 = channels;
+    outputs.channelBuffers32 = buffers;
 
     // in order for an ARA playback renderer to produce output, it must be set to playback mode (in stop, only editor renderers are active)
     // thus we implement some crude, minimal transport information here.
@@ -399,6 +423,8 @@ void VST3RenderBuffer (VST3Effect vst3Effect, int32_t blockSize, double sampleRa
 
 void VST3StopRendering (VST3Effect vst3Effect)
 {
+    ARA_INTERNAL_ASSERT (vst3Effect->channelCount != 0);
+
     tresult ARA_MAYBE_UNUSED_VAR (result);
     result = vst3Effect->component->setActive (false);
     ARA_INTERNAL_ASSERT (result == kResultOk);
@@ -407,6 +433,8 @@ void VST3StopRendering (VST3Effect vst3Effect)
     ARA_INTERNAL_ASSERT (result == kResultOk);
     result = vst3Effect->component->activateBus (kAudio, kOutput, 0, false);
     ARA_INTERNAL_ASSERT (result == kResultOk);
+
+    vst3Effect->channelCount = 0;
 }
 
 void VST3DestroyEffect (VST3Effect vst3Effect)

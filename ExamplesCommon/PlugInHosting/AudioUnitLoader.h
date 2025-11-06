@@ -39,8 +39,8 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, b
 // a valid message channel for all factory-related calls until AudioUnitCleanupComponent() is called.
 const ARA_NAMESPACE ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnit, ARA_IPC_NAMESPACE ARAIPCConnectionRef * connectionRef);
 const ARA_NAMESPACE ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUnitInstance audioUnit, ARA_NAMESPACE ARADocumentControllerRef controllerRef, ARA_NAMESPACE ARAPlugInInstanceRoleFlags assignedRoles);
-void AudioUnitStartRendering(AudioUnitInstance audioUnit, UInt32 maxBlockSize, double sampleRate);
-void AudioUnitRenderBuffer(AudioUnitInstance audioUnit, UInt32 blockSize, SInt64 samplePosition, float * buffer);
+void AudioUnitStartRendering(AudioUnitInstance audioUnit, UInt32 channelCount, UInt32 maxBlockSize, double sampleRate);
+void AudioUnitRenderBuffer(AudioUnitInstance audioUnit, UInt32 blockSize, SInt64 samplePosition, float ** buffers);
 void AudioUnitStopRendering(AudioUnitInstance audioUnit);
 void AudioUnitCloseInstance(AudioUnitInstance audioUnit);
 void AudioUnitCleanupComponent(AudioUnitComponent audioUnitComponent);

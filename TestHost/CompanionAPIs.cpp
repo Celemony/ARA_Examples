@@ -194,14 +194,14 @@ public:
         validateAndSetPlugInExtensionInstance (plugInExtensionInstance, assignedRoles);
     }
 
-    void startRendering (int maxBlockSize, double sampleRate) override
+    void startRendering (int channelCount, int maxBlockSize, double sampleRate) override
     {
-        AudioUnitStartRendering (_audioUnit, static_cast<UInt32> (maxBlockSize), sampleRate);
+        AudioUnitStartRendering (_audioUnit, static_cast<UInt32> (channelCount), static_cast<UInt32> (maxBlockSize), sampleRate);
     }
 
-    void renderSamples (int blockSize, int64_t samplePosition, float* buffer) override
+    void renderSamples (int blockSize, int64_t samplePosition, float** buffers) override
     {
-        AudioUnitRenderBuffer (_audioUnit, static_cast<UInt32> (blockSize), samplePosition, buffer);
+        AudioUnitRenderBuffer (_audioUnit, static_cast<UInt32> (blockSize), samplePosition, buffers);
     }
 
     void stopRendering () override
@@ -237,15 +237,15 @@ public:
         validateAndSetPlugInExtensionInstance (plugInExtensionInstance, assignedRoles);
     }
 
-    void startRendering (int maxBlockSize, double sampleRate) override
+    void startRendering (int channelCount, int maxBlockSize, double sampleRate) override
     {
-        VST3StartRendering (_vst3Effect, maxBlockSize, sampleRate);
+        VST3StartRendering (_vst3Effect, channelCount, maxBlockSize, sampleRate);
         _sampleRate = sampleRate;
     }
 
-    void renderSamples (int blockSize, int64_t samplePosition, float* buffer) override
+    void renderSamples (int blockSize, int64_t samplePosition, float** buffers) override
     {
-        VST3RenderBuffer (_vst3Effect, blockSize, _sampleRate, samplePosition, buffer);
+        VST3RenderBuffer (_vst3Effect, blockSize, _sampleRate, samplePosition, buffers);
     }
 
     void stopRendering () override
@@ -282,14 +282,14 @@ public:
         validateAndSetPlugInExtensionInstance (plugInExtensionInstance, assignedRoles);
     }
 
-    void startRendering (int maxBlockSize, double sampleRate) override
+    void startRendering (int channelCount, int maxBlockSize, double sampleRate) override
     {
-        CLAPStartRendering (_clapPlugIn, static_cast<uint32_t> (maxBlockSize), sampleRate);
+        CLAPStartRendering (_clapPlugIn, static_cast<uint32_t> (channelCount), static_cast<uint32_t> (maxBlockSize), sampleRate);
     }
 
-    void renderSamples (int blockSize, int64_t samplePosition, float* buffer) override
+    void renderSamples (int blockSize, int64_t samplePosition, float** buffers) override
     {
-        CLAPRenderBuffer (_clapPlugIn, static_cast<uint32_t> (blockSize), samplePosition, buffer);
+        CLAPRenderBuffer (_clapPlugIn, static_cast<uint32_t> (blockSize), samplePosition, buffers);
     }
 
     void stopRendering () override
@@ -495,7 +495,8 @@ class IPCPlugInInstance : public PlugInInstance, protected ARA::IPC::RemoteCalle
 public:
     IPCPlugInInstance (ARA::IPC::ARAIPCPlugInInstanceRef remoteRef, ARA::IPC::Connection* connection)
     : RemoteCaller { connection },
-      _remoteRef { remoteRef }
+      _remoteRef { remoteRef },
+      _channelCount { 0 }
     {}
 
     ~IPCPlugInInstance () override
@@ -513,28 +514,77 @@ public:
         validateAndSetPlugInExtensionInstance (plugInExtension, assignedRoles);
     }
 
-    void startRendering (int maxBlockSize, double sampleRate) override
+    void startRendering (int channelCount, int maxBlockSize, double sampleRate) override
     {
-        remoteCall (kIPCStartRenderingMethodID, _remoteRef, maxBlockSize, sampleRate);
+        ARA_INTERNAL_ASSERT (_channelCount == 0);
+        _channelCount = channelCount;
+        remoteCall (kIPCStartRenderingMethodID, _remoteRef, channelCount, maxBlockSize, sampleRate);
     }
 
-    void renderSamples (int blockSize, int64_t samplePosition, float* buffer) override
+    void renderSamples (int blockSize, int64_t samplePosition, float** buffers) override
     {
-        const auto byteSize { static_cast<size_t> (blockSize) * sizeof (float) };
-        auto resultSize { byteSize };
-        ARA::IPC::BytesDecoder reply { reinterpret_cast<uint8_t*> (buffer), resultSize };
-        remoteCall (reply, kIPCRenderSamplesMethodID, _remoteRef, samplePosition,
-                    ARA::IPC::BytesEncoder { reinterpret_cast<const uint8_t*> (buffer), byteSize, false });
-        ARA_INTERNAL_ASSERT (resultSize == byteSize);
+        ARA_INTERNAL_ASSERT (_channelCount != 0);
+        const auto channelCount { static_cast<size_t> (_channelCount) };
+        const auto bufferSize { sizeof (float) * static_cast<size_t> (blockSize) };
+
+        // recursively limit message size to keep IPC responsive
+        if (blockSize > 8192)
+        {
+            const auto blockSize1 { blockSize / 2 };
+            renderSamples (blockSize1, samplePosition, buffers);
+
+            const auto blockSize2 { blockSize - blockSize1 };
+            std::vector<float*> buffers2;
+            buffers2.reserve (channelCount);
+            for (auto i { 0U }; i < channelCount; ++i)
+                buffers2.emplace_back (buffers[i] + static_cast<size_t> (blockSize1));
+
+            return renderSamples (blockSize2, samplePosition + blockSize1, buffers2.data ());
+        }
+
+        // custom decoding to deal with float data memory ownership
+        CustomDecodeFunction customDecode {
+            [&channelCount, &bufferSize, &buffers] (const ARA::IPC::MessageDecoder* decoder) -> void
+            {
+                std::vector<size_t> resultSizes;
+                std::vector<ARA::IPC::BytesDecoder> decoders;
+                resultSizes.reserve (channelCount);
+                decoders.reserve (channelCount);
+                for (auto i { 0U }; i < channelCount; ++i)
+                {
+                    resultSizes.emplace_back (bufferSize);
+                    decoders.emplace_back (reinterpret_cast<uint8_t*> (buffers[i]), resultSizes[i]);
+                }
+
+                ARA::IPC::ArrayArgument<ARA::IPC::BytesDecoder> channelData { decoders.data (), decoders.size () };
+                const auto success { decodeReply (channelData, decoder) };
+                ARA_INTERNAL_ASSERT (success);
+                if (success)
+                    ARA_INTERNAL_ASSERT (channelData.count == channelCount);
+
+                for (auto i { 0U }; i < channelCount; ++i)
+                {
+                    if (success)
+                        ARA_INTERNAL_ASSERT (resultSizes[i] == bufferSize);
+                    else
+                        std::memset (buffers[i], 0, bufferSize);
+                }
+
+            } };
+
+        remoteCall (customDecode, kIPCRenderSamplesMethodID, _remoteRef, blockSize, samplePosition );
     }
 
     void stopRendering () override
     {
+        ARA_INTERNAL_ASSERT (_channelCount != 0);
         remoteCall (kIPCStopRenderingMethodID, _remoteRef);
+        _channelCount = 0;
     }
 
 private:
     ARA::IPC::ARAIPCPlugInInstanceRef const _remoteRef;
+    int _channelCount;
 };
 
 // helper class to launch remote before initializing related IPC channel members
@@ -722,26 +772,38 @@ public:
         else if (messageID == kIPCStartRenderingMethodID)
         {
             size_t plugInInstanceRef;
+            int32_t channelCount;
             int32_t maxBlockSize;
             double sampleRate;
-            ARA::IPC::decodeArguments (decoder, plugInInstanceRef, maxBlockSize, sampleRate);
+            ARA::IPC::decodeArguments (decoder, plugInInstanceRef, channelCount, maxBlockSize, sampleRate);
 
-            reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->startRendering (maxBlockSize, sampleRate);
+            auto& renderData { _plugInInstanceRenderDataMap[plugInInstanceRef] = { RenderData {} } };
+            for (auto i { 0U }; i < static_cast<size_t> (channelCount); ++i)
+            {
+                renderData.samples.emplace_back (static_cast<size_t> (maxBlockSize));
+                renderData.buffers.emplace_back (renderData.samples[i].data ());
+                renderData.encoders.emplace_back (nullptr, 0, false);   // encoders will be updated with proper buffer area when rendering
+            }
+
+            reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->startRendering (channelCount, maxBlockSize, sampleRate);
         }
         else if (messageID == kIPCRenderSamplesMethodID)
         {
             size_t plugInInstanceRef;
+            int32_t blockSize;
             int64_t samplePosition;
-            // \todo using static (plus not copy bytes) here assumes single-threaded callbacks, but currently this is a valid requirement
-            static std::vector<uint8_t> buffer;
-            ARA::IPC::BytesDecoder writer { buffer };
-            ARA::IPC::decodeArguments (decoder, plugInInstanceRef, samplePosition, writer);
-            ARA_INTERNAL_ASSERT (buffer.size () > 0);
+            ARA::IPC::decodeArguments (decoder, plugInInstanceRef, blockSize, samplePosition);
 
-            // \todo this ignores potential float data alignment or byte order issues...
-            reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->renderSamples (static_cast<int> (buffer.size () / sizeof (float)),
-                                                                            samplePosition, reinterpret_cast<float*> (buffer.data ()));
-            ARA::IPC::encodeReply (replyEncoder, ARA::IPC::BytesEncoder { buffer, false });
+            auto& renderData { _plugInInstanceRenderDataMap[plugInInstanceRef] };
+            const auto channelCount { renderData.samples.size () };
+            ARA_INTERNAL_ASSERT (static_cast<size_t> (blockSize) <= renderData.samples[0].size ());
+            reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->renderSamples (blockSize, samplePosition, renderData.buffers.data ());
+
+            // \todo this ignores potential byte order issues...
+            for (auto i { 0U }; i < static_cast<size_t> (channelCount); ++i)
+                renderData.encoders[i] = ARA::IPC::BytesEncoder { reinterpret_cast<const uint8_t *> (renderData.samples[i].data ()),
+                                                                  static_cast<size_t>(blockSize) * sizeof (float), false };
+            ARA::IPC::encodeReply (replyEncoder, ARA::IPC::ArrayArgument<const ARA::IPC::BytesEncoder> { renderData.encoders.data (), renderData.encoders.size () });
         }
         else if (messageID == kIPCStopRenderingMethodID)
         {
@@ -749,6 +811,12 @@ public:
             ARA::IPC::decodeArguments (decoder, plugInInstanceRef);
 
             reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->stopRendering ();
+
+#if ARA_ENABLE_INTERNAL_ASSERTS
+            const auto erased
+#endif
+                              { _plugInInstanceRenderDataMap.erase (plugInInstanceRef) };
+            ARA_INTERNAL_ASSERT (erased != 0);
         }
         else if (messageID == kIPCDestroyEffectMethodID)
         {
@@ -766,6 +834,14 @@ public:
             ARA_INTERNAL_ASSERT (false && "unhandled message ID");
         }
     }
+private:
+    struct RenderData
+    {
+        std::vector<std::vector<float>> samples;
+        std::vector<float*> buffers;
+        std::vector<ARA::IPC::BytesEncoder> encoders;
+    };
+    std::map<size_t, RenderData> _plugInInstanceRenderDataMap;
 };
 
 namespace RemoteHost

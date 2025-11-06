@@ -60,6 +60,7 @@ struct _CLAPBinary
 struct _CLAPPlugIn
 {
     const clap_plugin_t * plugin;
+    uint32_t channelCount;
     double sampleRate;
 };
 
@@ -262,17 +263,72 @@ const ARAPlugInExtensionInstance * CLAPBindToARADocumentController(CLAPPlugIn cl
     return ara_extension->bind_to_document_controller(clapPlugIn->plugin, controllerRef, knownRoles, assignedRoles);
 }
 
-void CLAPStartRendering(CLAPPlugIn clapPlugIn, uint32_t maxBlockSize, double sampleRate)
+void CLAPStartRendering(CLAPPlugIn clapPlugIn, uint32_t channelCount, uint32_t maxBlockSize, double sampleRate)
 {
+    ARA_INTERNAL_ASSERT(clapPlugIn->channelCount == 0);
+    clapPlugIn->channelCount = channelCount;
+    clapPlugIn->sampleRate = sampleRate;
+
     bool ARA_MAYBE_UNUSED_VAR(success);
 
     // we require that ARA plug-ins are capable of handling mono and stereo
     const clap_plugin_configurable_audio_ports_t * configurable_audio_ports = clapPlugIn->plugin->get_extension(clapPlugIn->plugin, CLAP_EXT_CONFIGURABLE_AUDIO_PORTS);
     if (configurable_audio_ports)
     {
-        clap_audio_port_configuration_request_t requests[] = { { true, 0, 1, CLAP_PORT_MONO, NULL },
-                                                               { false, 0, 1, CLAP_PORT_MONO, NULL } };
+        clap_audio_port_configuration_request_t inputRequest;
+        switch (channelCount)
+        {
+            default:
+            {
+                ARA_INTERNAL_ASSERT(false && "no default format defined for given channel count");
+                // no break; intended here
+            }
+            case 1:
+            {
+                clap_audio_port_configuration_request_t input1 = { true, 0, 1, CLAP_PORT_MONO, NULL };
+                inputRequest = input1;
+                break;
+            }
+            case 2:
+            {
+                clap_audio_port_configuration_request_t input2 = { true, 0, 2, CLAP_PORT_STEREO, NULL };
+                inputRequest = input2;
+                break;
+            }
+            case 3:
+            {
+                const uint8_t channelMap3[3] = { CLAP_SURROUND_FL, CLAP_SURROUND_FR, CLAP_SURROUND_FC };
+                clap_audio_port_configuration_request_t input3 = { true, 0, 3, CLAP_PORT_STEREO, channelMap3 };
+                inputRequest = input3;
+                break;
+            }
+            case 4:
+            {
+                const uint8_t channelMap4[4] = { CLAP_SURROUND_FL, CLAP_SURROUND_FR, CLAP_SURROUND_BL, CLAP_SURROUND_BR };
+                clap_audio_port_configuration_request_t input4 = { true, 0, 4, CLAP_PORT_STEREO, channelMap4 };
+                inputRequest = input4;
+                break;
+            }
+            case 5:
+            {
+                const uint8_t channelMap5[5] = { CLAP_SURROUND_FL, CLAP_SURROUND_FR, CLAP_SURROUND_FC, CLAP_SURROUND_BL, CLAP_SURROUND_BR };
+                clap_audio_port_configuration_request_t input5 = { true, 0, 5, CLAP_PORT_STEREO, channelMap5 };
+                inputRequest = input5;
+                break;
+            }
+            case 6:
+            {
+                const uint8_t channelMap6[6] = { CLAP_SURROUND_FL, CLAP_SURROUND_FR, CLAP_SURROUND_FC, CLAP_SURROUND_LFE, CLAP_SURROUND_BL, CLAP_SURROUND_BR };
+                clap_audio_port_configuration_request_t input6 = { true, 0, 6, CLAP_PORT_STEREO, channelMap6 };
+                inputRequest = input6;
+                break;
+            }
+        }
+    
+        clap_audio_port_configuration_request_t outputRequest = inputRequest;
+        outputRequest.is_input = false;
 
+        clap_audio_port_configuration_request_t requests[] = { inputRequest, outputRequest };
         success = configurable_audio_ports->apply_configuration(clapPlugIn->plugin, requests, (uint32_t) sizeof(requests) / sizeof(requests[0]));
         ARA_INTERNAL_ASSERT(success);
     }
@@ -283,9 +339,8 @@ void CLAPStartRendering(CLAPPlugIn clapPlugIn, uint32_t maxBlockSize, double sam
         {
             uint32_t count = audio_ports_config->count(clapPlugIn->plugin);
             ARA_INTERNAL_ASSERT(count >= 2);
-            // this simple loader always uses mono, pick appropriate config
-            bool ARA_MAYBE_UNUSED_VAR(foundMonoConfig);
-            foundMonoConfig = false;
+            bool ARA_MAYBE_UNUSED_VAR(foundMatchingConfig);
+            foundMatchingConfig = false;
             for (uint32_t i = 0; i < count; ++i)
             {
                 clap_audio_ports_config_t config;
@@ -293,16 +348,16 @@ void CLAPStartRendering(CLAPPlugIn clapPlugIn, uint32_t maxBlockSize, double sam
                 ARA_INTERNAL_ASSERT(success);
                 if (config.has_main_input &&
                     config.has_main_output &&
-                    config.main_input_channel_count == 1 &&
-                    config.main_output_channel_count == 1)
+                    config.main_input_channel_count == channelCount &&
+                    config.main_output_channel_count == channelCount)
                 {
                     success = audio_ports_config->select(clapPlugIn->plugin, config.id);
                     ARA_INTERNAL_ASSERT(success);
-                    foundMonoConfig = true;
+                    foundMatchingConfig = true;
                     break;
                 }
             }
-            ARA_INTERNAL_ASSERT(foundMonoConfig);
+            ARA_INTERNAL_ASSERT(foundMatchingConfig);
         }
     }
 
@@ -323,8 +378,6 @@ void CLAPStartRendering(CLAPPlugIn clapPlugIn, uint32_t maxBlockSize, double sam
     ARA_INTERNAL_ASSERT(in_info.channel_count == 1);
     ARA_INTERNAL_ASSERT(out_info.channel_count == 1);
 
-    clapPlugIn->sampleRate = sampleRate;
-
     clapPlugIn->plugin->activate(clapPlugIn->plugin, sampleRate, 1, maxBlockSize);
     clapPlugIn->plugin->start_processing(clapPlugIn->plugin);
 }
@@ -344,8 +397,9 @@ bool CLAP_ABI output_events_try_push(const struct clap_output_events* list, cons
   return false;
 }
 
-void CLAPRenderBuffer(CLAPPlugIn clapPlugIn, uint32_t blockSize, int64_t samplePosition, float * buffer)
+void CLAPRenderBuffer(CLAPPlugIn clapPlugIn, uint32_t blockSize, int64_t samplePosition, float** buffers)
 {
+    ARA_INTERNAL_ASSERT(clapPlugIn->channelCount != 0);
     ARA_INTERNAL_ASSERT(blockSize >= 1);
 
     // events
@@ -380,21 +434,22 @@ void CLAPRenderBuffer(CLAPPlugIn clapPlugIn, uint32_t blockSize, int64_t sampleP
     // I/O
     const clap_audio_buffer_t audio_inputs =
     {
-        .data32 = &buffer,
-        .channel_count = 1,
+        .data32 = buffers,
+        .channel_count = clapPlugIn->channelCount,
         .latency = 0,
         .constant_mask = UINT64_MAX
     };
 
     clap_audio_buffer_t audio_outputs =
     {
-        .data32 = &buffer,
-        .channel_count = 1,
+        .data32 = buffers,
+        .channel_count = clapPlugIn->channelCount,
         .latency = 0,
         .constant_mask = 0
     };
 
-    memset(buffer, 0, blockSize * sizeof(float));
+    for (uint32_t i = 0; i < clapPlugIn->channelCount; ++i)
+        memset(buffers[i], 0, blockSize * sizeof(float));
 
     // process
     clap_process_t process =
@@ -417,8 +472,10 @@ void CLAPRenderBuffer(CLAPPlugIn clapPlugIn, uint32_t blockSize, int64_t sampleP
 
 void CLAPStopRendering(CLAPPlugIn clapPlugIn)
 {
+    ARA_INTERNAL_ASSERT(clapPlugIn->channelCount != 0);
     clapPlugIn->plugin->stop_processing(clapPlugIn->plugin);
     clapPlugIn->plugin->deactivate(clapPlugIn->plugin);
+    clapPlugIn->channelCount = 0;
 }
 
 void CLAPDestroyPlugIn(CLAPPlugIn clapPlugIn)
