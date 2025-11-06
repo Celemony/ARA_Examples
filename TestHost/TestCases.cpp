@@ -835,6 +835,13 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
 
         renderOnOtherThread ();
 
+        auto logRenderResults = [&] () {
+            ARA_LOG ("Render results:");
+            for (auto i { 0U }; i < channelCount; ++i)
+                ARA_LOG ("  channel %i: %.5f, %.5f, %.5f, %.5f, %.5f, ...", outputData[i][0], outputData[i][1], outputData[i][2], outputData[i][3], outputData[i][4], outputData[i][5]);
+        };
+        logRenderResults ();
+
         // optionally perform the render again if the plug-in supports time stretching
         if (enableTimeStretchingIfSupported)
         {
@@ -859,6 +866,7 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
                 ARA_LOG ("Rendering %lu region(s) assigned to playback renderer %p with sample rate %lgHz", playbackRegions.size (), playbackRenderer.getRef (), renderSampleRate);
 
                 renderOnOtherThread ();
+                logRenderResults ();
             }
             else
             {
