@@ -26,10 +26,11 @@
 #import <AVFoundation/AVFoundation.h>
 
 #include "ARA_API/ARAAudioUnit.h"
-#include "ARA_API/ARAAudioUnit_v3.h"
+//#include "ARA_API/ARAAudioUnit_v3.h"
 #include "ARA_Library/Debug/ARADebug.h"
-#include "ARA_Library/IPC/ARAIPCAudioUnit_v3.h"
-#include "ARA_Library/IPC/ARAIPCProxyPlugIn.h"
+//#include "ARA_Library/IPC/ARAIPCAudioUnit_v3.h"
+//#include "ARA_Library/IPC/ARAIPCProxyPlugIn.h"
+#define ARA_AUDIOUNITV3_IPC_IS_AVAILABLE 0
 
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     #include <stdatomic.h>
@@ -71,7 +72,7 @@ struct _AudioUnitInstance
 #endif
 };
 
-void CallAudioUnitAsyncIfNeeded(AudioUnitInstance audioUnitInstance, void (^audioUnitCall)(void))
+void CallAudioUnitAsyncIfNeeded(AudioUnitInstance ARA_MAYBE_UNUSED_ARG(audioUnitInstance), void (^audioUnitCall)(void))
 {
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     if (audioUnitInstance->audioUnitComponent->araProxy)
@@ -233,10 +234,10 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, b
     return result;
 }
 
-const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, ARAIPCConnectionRef * connectionRef)
+const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance/*, ARAIPCConnectionRef * connectionRef*/)
 {
     const ARAFactory * result = NULL;    // initially assume this plug-in doesn't support ARA
-    *connectionRef = NULL;
+//  *connectionRef = NULL;
 
     // check whether the AU supports ARA by trying to get the factory
     if (audioUnitInstance->isAUv2)
@@ -260,6 +261,7 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, A
             }
         }
     }
+/*
     else
     {
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
@@ -289,6 +291,7 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, A
             }
         }
     }
+*/
 
     // validate the AU is properly tagged as ARA (if it supports ARA)
 #if ARA_VALIDATE_API_CALLS
@@ -343,6 +346,7 @@ const ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUni
     else
     {
         const ARAPlugInExtensionInstance * instance = NULL;
+/*
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
         if (audioUnitInstance->isOutOfProcess)
         {
@@ -359,6 +363,7 @@ const ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUni
             instance = [(AUAudioUnit<ARAAudioUnit> *)audioUnitInstance->v3AudioUnit bindToDocumentController:controllerRef withRoles:assignedRoles knownRoles:knownRoles];
         }
         ARA_VALIDATE_API_CONDITION(instance != NULL);
+*/
         return instance;
     }
 }

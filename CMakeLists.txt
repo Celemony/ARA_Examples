@@ -1110,7 +1110,8 @@ endif()
 # ARA_Library (including ARA_API)
 message(STATUS "Importing ARA_Library (including ARA_API)")
 add_subdirectory("${ARA_LIBRARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/ARA_Library.build" EXCLUDE_FROM_ALL)
-set_target_properties(ARA_Host_Library ARA_PlugIn_Library ARA_IPC_Library PROPERTIES
+#set_target_properties(ARA_Host_Library ARA_PlugIn_Library ARA_IPC_Library PROPERTIES
+set_target_properties(ARA_Host_Library ARA_PlugIn_Library PROPERTIES
     FOLDER "ARA_Library"
     XCODE_GENERATE_SCHEME OFF
     XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
@@ -1118,7 +1119,8 @@ set_target_properties(ARA_Host_Library ARA_PlugIn_Library ARA_IPC_Library PROPER
 
 # for debug builds, these are enabled automatically by the ARA SDK, as is appropriate for actual products
 # - but for our examples/tests here, we want to enable these also for release builds
-foreach(target ARA_Host_Library ARA_PlugIn_Library ARA_IPC_Library)
+#foreach(target ARA_Host_Library ARA_PlugIn_Library ARA_IPC_Library)
+foreach(target ARA_Host_Library ARA_PlugIn_Library)
     target_compile_definitions(${target} PUBLIC
         -DARA_VALIDATE_API_CALLS=1
         -DARA_ENABLE_INTERNAL_ASSERTS=1
@@ -1230,7 +1232,8 @@ target_link_libraries(ARATestPlugInCommon PUBLIC
 )
 
 # \todo add IPC implementation for Linux
-if(APPLE OR WIN32)
+#if(APPLE OR WIN32)
+if(0)
     target_link_libraries(ARATestPlugInCommon PUBLIC
         ARA_IPC_Library
     )
@@ -1389,7 +1392,8 @@ endif(ARA_ENABLE_AUDIO_UNIT)
 # ======================
 # audio plug-in target Audio Unit v3 App Extension Test Plug-In, including the required dummy app
 
-if(APPLE)
+#if(APPLE)
+if(FALSE)
 
     add_library(ARATestPlugInAUv3Framework SHARED
         "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Framework/BufferedAudioBus.hpp"
@@ -1655,7 +1659,7 @@ target_link_libraries(ARAMiniHost PRIVATE
     ARA_API
     ARAExamplesCommon
     ARA_Host_Library
-    ARA_IPC_Library
+#   ARA_IPC_Library
 )
 
 if(ARA_ENABLE_VST3)
@@ -1776,7 +1780,8 @@ elseif(UNIX)
 endif()
 
 # \todo add IPC implementation for Linux
-if(APPLE OR WIN32)
+#if(APPLE OR WIN32)
+if(FALSE)
     target_sources(ARATestHost PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCMessageChannel.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCMessageChannel.cpp"
@@ -1802,9 +1807,9 @@ if(ARA_SETUP_DEBUGGING)
     if(ARA_ENABLE_AUDIO_UNIT)
         add_dependencies(ARATestHost ARATestPlugInAudioUnit)
     endif()
-    if(APPLE)
-        add_dependencies(ARATestHost ARATestPlugInAUv3App)
-    endif()
+#   if(APPLE)
+#       add_dependencies(ARATestHost ARATestPlugInAUv3App)
+#   endif()
     if(ARA_ENABLE_CLAP)
         add_dependencies(ARATestHost ARATestPlugInCLAP)
     endif()
