@@ -268,7 +268,7 @@ const ARAFactory * AudioUnitGetARAFactory(AudioUnitInstance audioUnitInstance, A
             if (@available(macOS 13.0, iOS 16.0, *))
             {
                 if (!audioUnitInstance->audioUnitComponent->araProxy)
-                    audioUnitInstance->audioUnitComponent->araProxy = ARAIPCAUProxyPlugInInitialize(audioUnitInstance->v3AudioUnit, NULL);
+                    audioUnitInstance->audioUnitComponent->araProxy = ARAIPCAUProxyPlugInInitialize(audioUnitInstance->v3AudioUnit, NULL, NULL);
                 if (audioUnitInstance->audioUnitComponent->araProxy)
                 {
                     *connectionRef = audioUnitInstance->audioUnitComponent->araProxy;
