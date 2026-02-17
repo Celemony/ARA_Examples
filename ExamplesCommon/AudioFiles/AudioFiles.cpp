@@ -93,11 +93,7 @@ public:
 
         persistentID = archive.child_value (ARA::kARAXMLName_PersistentID);
 
-#if __cplusplus >= 201703L
         return base64_decode (std::string_view { archive.child_value (ARA::kARAXMLName_ArchiveData) }, true);
-#else
-        return base64_decode (archive.child_value (ARA::kARAXMLName_ArchiveData), true);
-#endif
     }
 
     void setAudioSourceData (const std::string& documentArchiveID, bool openAutomatically,

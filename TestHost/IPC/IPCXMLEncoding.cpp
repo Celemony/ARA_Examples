@@ -251,11 +251,7 @@ bool IPCXMLMessageDecoder::readBytesSize (const MessageArgumentKey argKey, size_
         return false;
     }
     _bytesCacheKey = argKey;
-#if __cplusplus >= 201703L
     _bytesCacheData = base64_decode (std::string_view { attribute.as_string () }, false);
-#else
-    _bytesCacheData = base64_decode (std::string { attribute.as_string () }, false);
-#endif
     *argSize = _bytesCacheData.size ();
     return true;
 }
@@ -269,11 +265,7 @@ void IPCXMLMessageDecoder::readBytes (const MessageArgumentKey argKey, uint8_t* 
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
     ARA_INTERNAL_ASSERT (!attribute.empty ());
 
-#if __cplusplus >= 201703L
     const auto decodedData { base64_decode (std::string_view { attribute.as_string () }, false) };
-#else
-    const auto decodedData { base64_decode (std::string { attribute.as_string () }, false) };
-#endif
     std::memcpy (argValue, decodedData.c_str (), decodedData.size ());
 }
 

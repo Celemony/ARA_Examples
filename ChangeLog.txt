@@ -4,6 +4,7 @@ This is a development build of the ARA Examples 3.0.
 
 Changes since previous releases:
 - support for ARA 1 and 2.0 Draft dropped
+- C++17 is now consistently required on all platforms
 - initial draft of Audio Unit version 3 support (App Extension)
   Note that macOS code signing is required for proper loading in sandboxes such as App Extensions,
   configured via CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY and CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM.
@@ -12,7 +13,6 @@ Changes since previous releases:
 - IPC now also supports using VST3 or CLAP (was previously limited to Audio Units)
 - IPC now also works on Windows (was previously limited to macOS)
 - IPC now also supports using pugixml as encoder (was previously limited to the macOS-only CFDictionary)
-- C++14 is now consistently required on all platforms
 
 
 === ARA SDK 2.3 release (aka 2.3.001) (2025/11/07) ===

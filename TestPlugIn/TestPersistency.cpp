@@ -129,18 +129,7 @@ size_t TestUnarchiver::readSize () noexcept
 {
     uint64_t data { read8ByteData () };
 
-#if __cplusplus >= 201703L
     if constexpr (sizeof (size_t) < sizeof (uint64_t))
-#else
-    #if defined (_MSC_VER)
-        __pragma (warning(push))
-        __pragma (warning(disable : 4127))
-    #endif
-    if (sizeof (size_t) < sizeof (uint64_t))
-    #if defined (_MSC_VER)
-        __pragma (warning(pop))
-    #endif
-#endif
     {
         if (data > std::numeric_limits<size_t>::max ())
         {

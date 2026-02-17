@@ -883,13 +883,8 @@ void ARATestDocumentController::rendererDidAccessModelGraph (ARATestPlaybackRend
 
 void ARATestDocumentController::disableRendererModelGraphAccess () noexcept
 {
-#if __cplusplus >= 201703L
     static_assert (decltype (_renderersCanAccessModelGraph)::is_always_lock_free);
     static_assert (decltype (_countOfRenderersCurrentlyAccessingModelGraph)::is_always_lock_free);
-#else
-    ARA_INTERNAL_ASSERT (_renderersCanAccessModelGraph.is_lock_free ());
-    ARA_INTERNAL_ASSERT (_countOfRenderersCurrentlyAccessingModelGraph.is_lock_free ());
-#endif
 
     ARA_INTERNAL_ASSERT (_renderersCanAccessModelGraph);
     _renderersCanAccessModelGraph = false;

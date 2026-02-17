@@ -224,17 +224,17 @@ if(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD)
 endif()
 
 if(CMAKE_CXX_STANDARD)
-    if(NOT(CMAKE_CXX_STANDARD VERSION_GREATER_EQUAL 14 AND
+    if(NOT(CMAKE_CXX_STANDARD VERSION_GREATER_EQUAL 17 AND
            CMAKE_CXX_STANDARD VERSION_LESS 98))
-       message(FATAL_ERROR "This project require C++14 or newer.")
+       message(FATAL_ERROR "This project require C++17 or newer.")
     endif()
 else()
-    set(CMAKE_CXX_STANDARD 14)
+    set(CMAKE_CXX_STANDARD 17)
 endif()
 if(NOT CMAKE_CXX_EXTENSIONS)
     set(CMAKE_CXX_EXTENSIONS OFF)
 endif()
-set(CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 # ======================
@@ -291,6 +291,15 @@ if(MSVC)
         $<IF:$<CONFIG:Debug>,/ZI,/Zi>
         /diagnostics:column
     )
+
+    # /Zc:__cplusplus, added in Visual Studio 2017 version 15.7, is required to make __cplusplus
+    # accurate, see https://devblogs.microsoft.com/cppblog/msvc-now-correctly-reports-__cplusplus/
+    if(MSVC_VERSION GREATER_EQUAL 1914)
+        add_compile_options(
+            /Zc:__cplusplus
+        )
+    endif()
+
 elseif(GCC_STYLE_COMPILER)
     add_compile_options(
         $<IF:$<CONFIG:Debug>,-O0,-Os>
@@ -479,7 +488,6 @@ if(ARA_ENABLE_AUDIO_UNIT)
     )
 
     set_target_properties(AudioUnitSDK PROPERTIES
-        CXX_STANDARD 17
         FOLDER "3rdParty"
         XCODE_GENERATE_SCHEME OFF
         XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
@@ -1339,7 +1347,6 @@ if(ARA_ENABLE_AUDIO_UNIT)
     )
 
     set_target_properties(ARATestPlugInAudioUnit PROPERTIES
-        CXX_STANDARD 17
         FOLDER "Examples/ARATestPlugIn"
         OUTPUT_NAME "ARATestPlugIn"
     )
