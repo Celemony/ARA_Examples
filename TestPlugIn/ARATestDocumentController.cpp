@@ -211,7 +211,7 @@ public:
 
 private:
     const TestProcessingAlgorithm* const _algorithm;
-    ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAProcessingAlgorithmProperties, name)> _algorithmProperties;
+    ARA::SizedStruct<&ARA::ARAProcessingAlgorithmProperties::name> _algorithmProperties;
 };
 
 /*******************************************************************************/

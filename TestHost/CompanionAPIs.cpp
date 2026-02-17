@@ -955,7 +955,7 @@ void PlugInEntry::initializeARA (ARA::ARAAssertFunction* assertFunctionAddress)
     ARA_INTERNAL_ASSERT (_factory);
 
     // initialize ARA factory with interface configuration
-    const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAInterfaceConfiguration, assertFunctionAddress)> interfaceConfig = { getDesiredAPIGeneration (_factory), assertFunctionAddress };
+    const ARA::SizedStruct<&ARA::ARAInterfaceConfiguration::assertFunctionAddress> interfaceConfig = { getDesiredAPIGeneration (_factory), assertFunctionAddress };
     _factory->initializeARAWithConfiguration (&interfaceConfig);
 }
 
