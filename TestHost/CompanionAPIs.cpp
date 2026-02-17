@@ -495,6 +495,20 @@ private:
     IPCMessageChannel* const _mainThreadChannel;
 };
 
+class ProxyPlugInConnection : public Connection
+{
+public:
+    using Connection::Connection;
+    bool sendsHostMessages () const override { return true; }
+};
+
+class ProxyHostConnection : public Connection
+{
+public:
+    using Connection::Connection;
+    bool sendsHostMessages () const override { return false; }
+};
+
 class IPCPlugInInstance : public PlugInInstance, protected ARA::IPC::RemoteCaller
 {
 public:
@@ -679,7 +693,7 @@ public:
     }
 
 private:
-    Connection _connection;
+    ProxyPlugInConnection _connection;
     ARA::IPC::ProxyPlugIn _proxyPlugIn;
 };
 
@@ -855,8 +869,8 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
 {
     _plugInEntry = std::move (plugInEntry);
 
-    Connection connection { IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix),
-                            IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix) };
+    ProxyHostConnection connection { IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix),
+                                     IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix) };
     ProxyHost proxy { &connection };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
