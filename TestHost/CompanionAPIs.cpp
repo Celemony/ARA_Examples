@@ -480,7 +480,7 @@ public:
         return true;
     }
 
-   bool runReceiveLoop (int32_t milliseconds)
+    bool runReceiveLoop (int32_t milliseconds)
     {
         return _mainThreadChannel->runReceiveLoop (milliseconds);
     }
