@@ -1,10 +1,10 @@
 //------------------------------------------------------------------------------
-//! \file       TestAUv3App.m
+//! \file       TestAUv3Extension.m
 //!             App Extension placeholder function for the Audio Unit v3 App Extension,
 //!             based on Apple's AUv3FilterDemo found at:
 //!             https://developer.apple.com/documentation/audiotoolbox/audio_unit_v3_plug-ins/creating_custom_audio_effects
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2021-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2021-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at

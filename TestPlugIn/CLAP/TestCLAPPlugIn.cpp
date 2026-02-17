@@ -3,7 +3,7 @@
 //!             CLAP implementation for the ARA test plug-in,
 //!             based on the plugin-template.c from the CLAP SDK
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2022-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2022-2026, Celemony Software GmbH, All Rights Reserved.
 //!             Developed in cooperation with Timo Kaluza (defiantnerd)
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
