@@ -300,7 +300,7 @@ static ARAAssertFunction * assertFunctionReference = &assertFunction;
 int main(int argc, const char * argv[])
 {
     ARAInterfaceConfiguration interfaceConfig = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAInterfaceConfiguration, assertFunctionAddress),
-                                                  kARAAPIGeneration_2_0_Final, NULL /* asserts will be configured later if needed */ };
+                                                  kARAAPIGeneration_2_3_Final, NULL /* asserts will be configured later if needed */ };
 
     const ARAPlugInExtensionInstance * plugInInstance = NULL;
 
@@ -387,7 +387,7 @@ int main(int argc, const char * argv[])
         ARA_WARN("this plug-in doesn't support ARA.");
         return -1;
     }
-    if (factory->lowestSupportedApiGeneration > kARAAPIGeneration_2_0_Final)
+    if (factory->lowestSupportedApiGeneration > kARAAPIGeneration_2_3_Final)
     {
         ARA_WARN("this plug-in only supports newer generations of ARA.");
         return -1;
