@@ -327,13 +327,8 @@ const ARA::ARAPlugInExtensionInstance* VST3BindToARADocumentController (VST3Effe
             return result;
     }
 
-#if defined (ARA_SUPPORT_VERSION_1) && (ARA_SUPPORT_VERSION_1)
-    ARA_INTERNAL_ASSERT (assignedRoles == knownRoles);
-    return entry->bindToDocumentController (controllerRef);
-#else
     ARA_INTERNAL_ASSERT (false);
     return nullptr;
-#endif
 }
 
 void VST3StartRendering (VST3Effect vst3Effect, int32_t channelCount, int32_t maxBlockSize, double sampleRate)

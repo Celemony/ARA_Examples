@@ -149,11 +149,6 @@ void PlugInInstance::validateAndSetPlugInExtensionInstance (const ARA::ARAPlugIn
 {
     ARA_VALIDATE_API_STATE (plugInExtensionInstance != nullptr);
 
-#if ARA_SUPPORT_VERSION_1
-    if (_factory->highestSupportedApiGeneration < kARAAPIGeneration_2_0_Draft)
-        return;
-#endif
-
     if ((assignedRoles & ARA::kARAPlaybackRendererRole) != 0)
         ARA_VALIDATE_API_INTERFACE (plugInExtensionInstance->playbackRendererInterface, ARAPlaybackRendererInterface);
     else
@@ -942,9 +937,7 @@ void PlugInEntry::validateAndSetFactory (const ARA::ARAFactory* factory)
 
     // ensure that this plug-in is supported by our test host
     ARA_INTERNAL_ASSERT (factory->lowestSupportedApiGeneration <= ARA::kARAAPIGeneration_3_0_Draft);
-#if ARA_SUPPORT_VERSION_1
-    ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_1_0_Final);
-#elif ARA_CPU_ARM
+#if ARA_CPU_ARM
     ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_2_0_Final);
 #else
     ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_2_0_Draft);
