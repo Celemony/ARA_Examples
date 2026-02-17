@@ -110,17 +110,9 @@ public:
     /*******************************************************************************/
     // Archiving functions
 
-    // ARA2 style archiving (aka "partial persistency")
-    bool supportsPartialPersistency ();
     bool storeObjectsToArchive (ArchiveBase* archive, const ARA::ARAStoreObjectsFilter* filter = nullptr);
     bool restoreObjectsFromArchive (const ArchiveBase* archive, const ARA::ARARestoreObjectsFilter* filter = nullptr);
 
-    // ARA1 style monolithic document archiving functions
-    bool storeDocumentToArchive (ArchiveBase* archive);
-    bool beginRestoringDocumentFromArchive (const ArchiveBase* archive);
-    bool endRestoringDocumentFromArchive (const ArchiveBase* archive);
-
-    // audio file chunk authoring
     bool supportsStoringAudioFileChunks ();
     bool storeAudioSourceToAudioFileChunk (ArchiveBase* archive, AudioSource* audioSource, ARA::ARAPersistentID* documentArchiveID, bool* openAutomatically);
 
