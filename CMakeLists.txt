@@ -224,16 +224,12 @@ if(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD)
 endif()
 
 if(CMAKE_CXX_STANDARD)
-    if(NOT(CMAKE_CXX_STANDARD VERSION_GREATER_EQUAL 11 AND
+    if(NOT(CMAKE_CXX_STANDARD VERSION_GREATER_EQUAL 14 AND
            CMAKE_CXX_STANDARD VERSION_LESS 98))
-       message(FATAL_ERROR "This project require C++11 or newer.")
+       message(FATAL_ERROR "This project require C++14 or newer.")
     endif()
 else()
-    if(MSVC)
-        set(CMAKE_CXX_STANDARD 14)
-    else()
-        set(CMAKE_CXX_STANDARD 11)
-    endif()
+    set(CMAKE_CXX_STANDARD 14)
 endif()
 if(NOT CMAKE_CXX_EXTENSIONS)
     set(CMAKE_CXX_EXTENSIONS OFF)
@@ -866,7 +862,7 @@ function(configure_ARA_Examples_target target)
 
     # language standards
     target_compile_features(${target} PRIVATE
-        cxx_std_11
+        cxx_std_14
         c_std_11
     )
 
