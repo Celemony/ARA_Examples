@@ -941,7 +941,7 @@ void PlugInEntry::validateAndSetFactory (const ARA::ARAFactory* factory)
         ARA_INTERNAL_ASSERT ((factory->supportedPlaybackTransformationFlags & ARA::kARAPlaybackTransformationContentBasedFades) == ARA::kARAPlaybackTransformationContentBasedFades);
 
     // ensure that this plug-in is supported by our test host
-    ARA_INTERNAL_ASSERT (factory->lowestSupportedApiGeneration <= ARA::kARAAPIGeneration_2_0_Final);
+    ARA_INTERNAL_ASSERT (factory->lowestSupportedApiGeneration <= ARA::kARAAPIGeneration_3_0_Draft);
 #if ARA_SUPPORT_VERSION_1
     ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_1_0_Final);
 #elif ARA_CPU_ARM
@@ -955,7 +955,7 @@ void PlugInEntry::validateAndSetFactory (const ARA::ARAFactory* factory)
 
 ARA::ARAAPIGeneration PlugInEntry::getDesiredAPIGeneration (const ARA::ARAFactory* const factory)
 {
-    ARA::ARAAPIGeneration desiredApiGeneration { ARA::kARAAPIGeneration_2_0_Final };
+    ARA::ARAAPIGeneration desiredApiGeneration { ARA::kARAAPIGeneration_3_0_Draft };
     if (desiredApiGeneration > factory->highestSupportedApiGeneration)
         desiredApiGeneration = factory->highestSupportedApiGeneration;
     return desiredApiGeneration;
