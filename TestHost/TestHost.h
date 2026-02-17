@@ -48,7 +48,7 @@ public:
     MusicalContext* addMusicalContext (Document* document, std::string name, ARA::ARAColor color);
     void removeMusicalContext (Document* document, MusicalContext* musicalContext);
 
-    RegionSequence* addRegionSequence (Document* document, std::string name, MusicalContext* musicalContext, ARA::ARAColor color);
+    RegionSequence* addRegionSequence (Document* document, std::string name, std::string persistentID, MusicalContext* musicalContext, ARA::ARAColor color);
     void removeRegionSequence (Document* document, RegionSequence* regionSequence);
 
     AudioSource* addAudioSource (Document* document, AudioFileBase* audioFile, std::string persistentID);
