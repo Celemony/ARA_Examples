@@ -55,6 +55,7 @@ private:
 };
 
 
+void addChunk (AudioFileBase&& audioFile, bool openAutomatically);
 void addChunk (AudioFileBase&& audioFile, bool openAutomatically)
 {
     const auto persistentID { "audioSource1" };

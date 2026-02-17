@@ -303,6 +303,7 @@ private:
 #if defined (__APPLE__)
 
 // very crude conversion from string to OSType
+OSType parseOSType (const std::string& idString);
 OSType parseOSType (const std::string& idString)
 {
     ARA_INTERNAL_ASSERT (idString.size () == sizeof (OSType));
@@ -310,6 +311,7 @@ OSType parseOSType (const std::string& idString)
           (static_cast<uint32_t> (idString[1]) << 16) | (static_cast<uint32_t> (idString[0]) << 24);
 }
 
+std::string createAUEntryDescription (const std::string& type, const std::string& subType, const std::string& manufacturer);
 std::string createAUEntryDescription (const std::string& type, const std::string& subType, const std::string& manufacturer)
 {
     return std::string { "Audio Unit (" } + type + " - " + subType + " - " + manufacturer + ")";
@@ -377,6 +379,7 @@ private:
 
 /*******************************************************************************/
 
+std::string createEntryDescription (const std::string& apiName, const std::string& binaryName, const std::string& optionalPlugInName);
 std::string createEntryDescription (const std::string& apiName, const std::string& binaryName, const std::string& optionalPlugInName)
 {
     return apiName + " " + ((optionalPlugInName.empty ()) ? "" : optionalPlugInName + " ") + "@ " + binaryName;

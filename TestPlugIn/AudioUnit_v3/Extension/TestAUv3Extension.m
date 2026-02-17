@@ -18,6 +18,7 @@
 //!             limitations under the License.
 //------------------------------------------------------------------------------
 
+__attribute__ ((used)) void placeholder(void);
 __attribute__ ((used)) void placeholder(void)
 {
     // This placeholder function ensures the extension correctly loads.
