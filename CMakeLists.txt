@@ -163,6 +163,8 @@ set(CMAKE_SUPPRESS_REGENERATION ON)
 set(CMAKE_XCODE_GENERATE_TOP_LEVEL_PROJECT_ONLY ON)
 set(CMAKE_XCODE_GENERATE_SCHEME ${ARA_SETUP_DEBUGGING})
 
+# this triggers a warning when using CLAP because they are using install()
+# \todo there seems to be no way to silence the warning?
 set(CMAKE_SKIP_INSTALL_RULES YES)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -208,7 +210,7 @@ if(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD)
     endif()
 
     string(REGEX MATCH "[Cc]\\+\\+" temp CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD)
-    if (CMAKE_CXX_EXTENSIONS)
+    if(CMAKE_CXX_EXTENSIONS)
         if((temp AND NOT CMAKE_CXX_EXTENSIONS) OR
            (NOT temp AND CMAKE_CXX_EXTENSIONS))
             message(FATAL_ERROR "Conflicting C++ standards set in general versus Xcode-specific configuration.")
@@ -257,12 +259,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(WIN32)
     # no special setup for Windows needed at this point.
 elseif(APPLE)
-    if (CMAKE_OSX_DEPLOYMENT_TARGET AND
-        CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "10.9")
-        message(FATAL_ERROR "CMAKE_OSX_DEPLOYMENT_TARGET must be '10.9' or higher.")
+    # CMAKE_OSX_SYSROOT also applies to other SDKs like iOS, tvOS, visionOS, or watchOS
+    if(CMAKE_OSX_SYSROOT AND (NOT CMAKE_OSX_SYSROOT STREQUAL ""))
+        if(NOT CMAKE_OSX_SYSROOT MATCHES ".+[Mm][Aa][Cc][Oo][Ss][X?x?]?[0123456789]+\.[0123456789]+\.sdk")
+            message(FATAL_ERROR "CMake support for Apple platforms is currently limited to macOS.")
+        endif()
+        execute_process(COMMAND xcrun --sdk "${CMAKE_OSX_SYSROOT}" --show-sdk-version OUTPUT_VARIABLE mac_os_sdk_version OUTPUT_STRIP_TRAILING_WHITESPACE)
+    else()
+        execute_process(COMMAND xcrun --sdk macosx --show-sdk-version OUTPUT_VARIABLE mac_os_sdk_version OUTPUT_STRIP_TRAILING_WHITESPACE)
     endif()
-    if(NOT CMAKE_OSX_SYSROOT MATCHES ".+[Mm][Aa][Cc][Oo][Ss][X?x?]?[0123456789]+\.[0123456789]+\.sdk")
-        message(FATAL_ERROR "CMake support for Apple platforms is currently limited to macOS.")
+    set(CMAKE_OSX_SYSROOT "macosx${mac_os_sdk_version}")
+    unset(mac_os_sdk_version)
+
+    if(CMAKE_OSX_DEPLOYMENT_TARGET AND (CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "10.9"))
+        message(FATAL_ERROR "CMAKE_OSX_DEPLOYMENT_TARGET must be '10.9' or higher.")
     endif()
 elseif(UNIX)
     set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
@@ -994,7 +1004,7 @@ function(ara_configure_binary_package target extension apple_plist_file)
         list(APPEND target_resources
             ${apple_plist_file}
         )
-        if (NOT ${extension} MATCHES "framework")
+        if(NOT ${extension} MATCHES "framework")
             list(APPEND target_resources
                 "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/macOS/ARAExamples.icns"
             )
@@ -1263,7 +1273,7 @@ endif()
 # ======================
 # audio plug-in target VST3 Test Plug-In
 
-if (ARA_ENABLE_VST3)
+if(ARA_ENABLE_VST3)
 
     if(APPLE)
         add_library(ARATestPlugInVST3 MODULE "")
@@ -1543,7 +1553,7 @@ endif(APPLE)
 
 if(ARA_ENABLE_CLAP)
 
-    if (APPLE)
+    if(APPLE)
         add_library(ARATestPlugInCLAP MODULE "")
     else()
         add_library(ARATestPlugInCLAP SHARED "")
