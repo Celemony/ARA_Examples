@@ -71,6 +71,7 @@ struct _AudioUnitInstance
 #endif
 };
 
+void CallAudioUnitAsyncIfNeeded(AudioUnitInstance audioUnitInstance, void (^audioUnitCall)(void));
 void CallAudioUnitAsyncIfNeeded(AudioUnitInstance audioUnitInstance, void (^audioUnitCall)(void))
 {
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
@@ -360,6 +361,9 @@ const ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUni
 
 OSStatus GetTransportState2(void * inHostUserData, Boolean * outIsPlaying, Boolean * outIsRecording,
                             Boolean * outTransportStateChanged, Float64 * outCurrentSampleInTimeLine,
+                            Boolean * outIsCycling, Float64 * outCycleStartBeat, Float64 * outCycleEndBeat);
+OSStatus GetTransportState2(void * inHostUserData, Boolean * outIsPlaying, Boolean * outIsRecording,
+                            Boolean * outTransportStateChanged, Float64 * outCurrentSampleInTimeLine,
                             Boolean * outIsCycling, Float64 * outCycleStartBeat, Float64 * outCycleEndBeat)
 {
     AudioUnitInstance instance = inHostUserData;
@@ -385,12 +389,18 @@ OSStatus GetTransportState2(void * inHostUserData, Boolean * outIsPlaying, Boole
 
 OSStatus GetTransportState1(void * inHostUserData, Boolean * outIsPlaying,
                             Boolean * outTransportStateChanged, Float64 * outCurrentSampleInTimeLine,
+                            Boolean * outIsCycling, Float64 * outCycleStartBeat, Float64 * outCycleEndBeat);
+OSStatus GetTransportState1(void * inHostUserData, Boolean * outIsPlaying,
+                            Boolean * outTransportStateChanged, Float64 * outCurrentSampleInTimeLine,
                             Boolean * outIsCycling, Float64 * outCycleStartBeat, Float64 * outCycleEndBeat)
 {
     return GetTransportState2(inHostUserData, outIsPlaying, NULL, outTransportStateChanged, outCurrentSampleInTimeLine,
                             outIsCycling, outCycleStartBeat, outCycleEndBeat);
 }
 
+OSStatus RenderCallback(void * ARA_MAYBE_UNUSED_ARG(inRefCon), AudioUnitRenderActionFlags * ARA_MAYBE_UNUSED_ARG(ioActionFlags),
+                        const AudioTimeStamp * ARA_MAYBE_UNUSED_ARG(inTimeStamp), UInt32 ARA_MAYBE_UNUSED_ARG(inBusNumber),
+                        UInt32 ARA_MAYBE_UNUSED_ARG(inNumberFrames), AudioBufferList * _Nullable ioData);
 OSStatus RenderCallback(void * ARA_MAYBE_UNUSED_ARG(inRefCon), AudioUnitRenderActionFlags * ARA_MAYBE_UNUSED_ARG(ioActionFlags),
                         const AudioTimeStamp * ARA_MAYBE_UNUSED_ARG(inTimeStamp), UInt32 ARA_MAYBE_UNUSED_ARG(inBusNumber),
                         UInt32 ARA_MAYBE_UNUSED_ARG(inNumberFrames), AudioBufferList * _Nullable ioData)
@@ -401,6 +411,7 @@ OSStatus RenderCallback(void * ARA_MAYBE_UNUSED_ARG(inRefCon), AudioUnitRenderAc
     return noErr;
 }
 
+AudioStreamBasicDescription GetStreamDescription (UInt32 channelCount, double sampleRate);
 AudioStreamBasicDescription GetStreamDescription (UInt32 channelCount, double sampleRate)
 {
     AudioStreamBasicDescription desc = { sampleRate, kAudioFormatLinearPCM, kAudioFormatFlagsNativeFloatPacked|kAudioFormatFlagIsNonInterleaved,
@@ -408,6 +419,7 @@ AudioStreamBasicDescription GetStreamDescription (UInt32 channelCount, double sa
     return desc;
 }
 
+void ConfigureBusses(AudioUnit audioUnit, AudioUnitScope inScope, UInt32 channelCount, double sampleRate);
 void ConfigureBusses(AudioUnit audioUnit, AudioUnitScope inScope, UInt32 channelCount, double sampleRate)
 {
     UInt32 busCount = 1;
@@ -441,6 +453,7 @@ void ConfigureBusses(AudioUnit audioUnit, AudioUnitScope inScope, UInt32 channel
     status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ShouldAllocateBuffer, inScope, 0, &shouldAllocate, sizeof(shouldAllocate));
 }
 
+void ConfigureBussesArray(AUAudioUnitBusArray * bussesArray, UInt32 channelCount, double sampleRate);
 void ConfigureBussesArray(AUAudioUnitBusArray * bussesArray, UInt32 channelCount, double sampleRate)
 {
     if (bussesArray.countChangeable)

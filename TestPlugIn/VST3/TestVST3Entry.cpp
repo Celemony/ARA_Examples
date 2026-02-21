@@ -36,6 +36,7 @@ ARA_DISABLE_VST3_WARNINGS_BEGIN
 
 //------------------------------------------------------------------------
 // called after library was loaded
+bool InitModule ();
 bool InitModule ()
 {
     return true;
@@ -43,6 +44,7 @@ bool InitModule ()
 
 //------------------------------------------------------------------------
 // called after library is unloaded
+bool DeinitModule ();
 bool DeinitModule ()
 {
     return true;
