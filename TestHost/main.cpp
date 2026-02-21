@@ -91,8 +91,7 @@ static AudioFileList parseAudioFiles (const std::vector<std::string>& args)
                ((*it)[0] != '-'))
         {
             icstdsp::AudioFile audioFile;
-            int ARA_MAYBE_UNUSED_VAR (err);
-            err = audioFile.Load (it->c_str ());
+            [[maybe_unused]] const auto err { audioFile.Load (it->c_str ()) };
             ARA_INTERNAL_ASSERT (err == 0);
             parsedFiles.emplace_back (std::make_shared<AudioDataFile> (*it++, std::move (audioFile)));
         }

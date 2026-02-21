@@ -292,7 +292,7 @@ public:
 
     void sendMessage (ARA::IPC::MessageID messageID, CFDataRef messageData)
     {
-        const auto ARA_MAYBE_UNUSED_VAR (result) { CFMessagePortSendRequest (_port, messageID, messageData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
+        [[maybe_unused]] const auto result { CFMessagePortSendRequest (_port, messageID, messageData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
         ARA_INTERNAL_ASSERT (result == kCFMessagePortSuccess);
     }
 
