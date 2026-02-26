@@ -825,8 +825,12 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
 {
     _plugInEntry = std::move (plugInEntry);
 
-    ProxyHost proxy { IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix),
-                      IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix) };
+    auto mainThreadMessageChannel { IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix) };
+    auto otherThreadsMessageChannel { IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix) };
+    
+    auto waitLoop { [messageChannel = mainThreadMessageChannel.get ()] { messageChannel->runReceiveLoop (100 /*ms*/); } };
+
+    ProxyHost proxy { std::move (mainThreadMessageChannel), std::move (otherThreadsMessageChannel) };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
     ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef,
@@ -841,7 +845,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
                                                 });
 
     while (!_shutDown)
-        static_cast<IPCMessageChannel *> (proxy.getConnection ()->getMainThreadDispatcher ()->getMessageChannel ())->runReceiveLoop (100 /*ms*/);
+        waitLoop ();
 
     _plugInEntry.reset ();
 
