@@ -290,7 +290,6 @@ static void destroySharedMessageChannelsIfNeeded() {
     }
 }
 
-// \todo the return value should be _Nullable!
 - (id<AUMessageChannel> _Nonnull)messageChannelFor:(NSString * _Nonnull)channelName {
     if (@available(macOS 13.0, iOS 16.0, *))
     {
@@ -305,7 +304,9 @@ static void destroySharedMessageChannelsIfNeeded() {
             return _otherMessageChannel;
         }
     }
-    return nil;
+//  \todo the return value should be declared _Nullable in the OS - must be fixed there!
+//  return nil;
+    return (id<AUMessageChannel> _Nonnull) nil;
 }
 
 #endif // ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
