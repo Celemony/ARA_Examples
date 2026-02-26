@@ -97,7 +97,7 @@ public:
 
     // If IPC is used, and the main thread is spinning in some loop for a prolonged time,
     // this call may be necessary to allow handling IPC in time.
-    virtual void idleThreadForDuration (int32_t milliseconds);
+    void idleThreadForDuration (int32_t milliseconds);
 
     // Initialize ARA before creating any document controllers
     virtual void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress);

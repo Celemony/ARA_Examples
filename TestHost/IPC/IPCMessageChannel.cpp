@@ -46,7 +46,6 @@
 #if defined (_WIN32)
 //------------------------------------------------------------------------------
 
-
 class IPCMessagePort
 {
 protected:
@@ -144,6 +143,13 @@ public:
         return true;
     }
 
+#if USE_ARA_BACKGROUND_IPC
+    std::thread::id getReceiveThreadID ()
+    {
+        return _receiveThread->get_id ();
+    }
+#endif
+
 private:
     IPCMessageChannel* const _channel;
 #if USE_ARA_BACKGROUND_IPC
@@ -185,7 +191,6 @@ public:
 //------------------------------------------------------------------------------
 #elif defined (__APPLE__)
 //------------------------------------------------------------------------------
-
 
 class IPCReceivePort
 {
@@ -240,6 +245,13 @@ public:
     {
         return (CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.001 * milliseconds, true) != kCFRunLoopRunTimedOut);
     }
+
+#if USE_ARA_BACKGROUND_IPC
+    std::thread::id getReceiveThreadID ()
+    {
+        return _receiveThread->get_id ();
+    }
+#endif
 
 private:
     static CFDataRef _portCallback (CFMessagePortRef /*port*/, SInt32 messageID, CFDataRef messageData, void* info)
@@ -340,10 +352,27 @@ void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, std::unique_
 #endif
 }
 
+bool IPCMessageChannel::receivesMessagesOnCurrentThread ()
+{
+#if USE_ARA_BACKGROUND_IPC
+    return _receivePort->getReceiveThreadID () == std::this_thread::get_id ();
+#else
+    return _receiveThreadID == std::this_thread::get_id ();
+#endif
+}
+
+bool IPCMessageChannel::waitForMessageOnCurrentThread ()
+{
+#if !USE_ARA_BACKGROUND_IPC
+    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _receiveThreadID);
+#endif
+    return _receivePort->runReceiveLoop (10);
+}
+
 bool IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
 {
 #if !USE_ARA_BACKGROUND_IPC
-    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _receiveThread);
+    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _receiveThreadID);
 #endif
     return _receivePort->runReceiveLoop (milliseconds);
 }

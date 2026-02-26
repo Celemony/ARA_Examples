@@ -77,6 +77,9 @@ public:
 
     void sendMessage (ARA::IPC::MessageID messageID, std::unique_ptr<ARA::IPC::MessageEncoder> && encoder) override;
 
+    bool receivesMessagesOnCurrentThread () override;
+    bool waitForMessageOnCurrentThread () override;
+
 protected:
     using ARA::IPC::MessageChannel::MessageChannel;
 
@@ -84,7 +87,7 @@ private:
     friend class IPCReceivePort;
 
 #if !USE_ARA_BACKGROUND_IPC
-    std::thread::id _receiveThread { std::this_thread::get_id () };
+    std::thread::id _receiveThreadID { std::this_thread::get_id () };
 #endif
 
     std::unique_ptr<IPCSendPort> _sendPort;

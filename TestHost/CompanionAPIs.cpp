@@ -620,13 +620,6 @@ public:
         return true;
     }
 
-#if !USE_ARA_BACKGROUND_IPC
-    void idleThreadForDuration (int32_t milliseconds) override
-    {
-        _proxyPlugIn.getConnection ().runReceiveLoop (milliseconds);
-    }
-#endif
-
     void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
     {
         ARA::IPC::ARAIPCProxyPlugInInitializeARA (toIPCRef (&_proxyPlugIn), getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
