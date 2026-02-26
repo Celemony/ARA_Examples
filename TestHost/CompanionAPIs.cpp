@@ -634,11 +634,10 @@ private:
                     const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCProxyPlugInRef)>& getFactoryFunction)
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, channelID },
-      _connection { IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix),
-                    IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix) },
-      _proxyPlugIn { &_connection }
+      _proxyPlugIn { std::make_unique<ProxyPlugInConnection> (IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix),
+                                                              IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix)) }
     {
-        _connection.setMessageHandler (ARA::IPC::ProxyPlugIn::handleReceivedMessage);
+        _proxyPlugIn.getConnection ()->setMessageHandler (ARA::IPC::ProxyPlugIn::handleReceivedMessage);
         validateAndSetFactory (getFactoryFunction (toIPCRef (&_proxyPlugIn)));
     }
 
@@ -662,7 +661,7 @@ public:
 #if !USE_ARA_BACKGROUND_IPC
     void idleThreadForDuration (int32_t milliseconds) override
     {
-        _connection.runReceiveLoop (milliseconds);
+        _proxyPlugIn.getConnection ().runReceiveLoop (milliseconds);
     }
 #endif
 
@@ -686,11 +685,10 @@ public:
     {
         ARA::IPC::ARAIPCPlugInInstanceRef remoteInstanceRef {};
         _proxyPlugIn.remoteCall (remoteInstanceRef, kIPCCreateEffectMethodID);
-        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, &_connection);
+        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _proxyPlugIn.getConnection ());
     }
 
 private:
-    ProxyPlugInConnection _connection;
     ARA::IPC::ProxyPlugIn _proxyPlugIn;
 };
 
@@ -765,10 +763,10 @@ bool _shutDown { false };
 class ProxyHost : public ARA::IPC::ProxyHost
 {
 public:
-    ProxyHost (Connection* connection)
-    : ARA::IPC::ProxyHost { connection }
+    ProxyHost (std::unique_ptr<Connection> && connection)
+    : ARA::IPC::ProxyHost { std::move (connection) }
     {
-        connection->setMessageHandler ([this] (auto&& ...args) { handleReceivedMessage (args...); });
+        getConnection ()->setMessageHandler ([this] (auto&& ...args) { handleReceivedMessage (args...); });
     }
 
     void handleReceivedMessage (const ARA::IPC::MessageID messageID, const ARA::IPC::MessageDecoder* const decoder,
@@ -866,9 +864,8 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
 {
     _plugInEntry = std::move (plugInEntry);
 
-    ProxyHostConnection connection { IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix),
-                                     IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix) };
-    ProxyHost proxy { &connection };
+    ProxyHost proxy { std::make_unique<ProxyHostConnection> (IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix),
+                                                             IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix)) };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
     ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef,
@@ -883,7 +880,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
                                                 });
 
     while (!_shutDown)
-        connection.runReceiveLoop (100 /*ms*/);
+        static_cast<ProxyHostConnection *> (proxy.getConnection ())->runReceiveLoop (100 /*ms*/);
 
     _plugInEntry.reset ();
 
