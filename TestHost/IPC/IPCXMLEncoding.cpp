@@ -101,9 +101,9 @@ pugi::xml_attribute IPCXMLMessageEncoder::_appendAttribute (const MessageArgumen
     return _root.append_attribute (_getEncodedKey (argKey));
 }
 
-ARA::IPC::MessageEncoder* IPCXMLMessageEncoder::appendSubMessage (const MessageArgumentKey argKey)
+std::unique_ptr<ARA::IPC::MessageEncoder> IPCXMLMessageEncoder::appendSubMessage (const MessageArgumentKey argKey)
 {
-    return new IPCXMLMessageEncoder { _dictionary, _root.append_child (_getEncodedKey (argKey)) };
+    return IPCXMLMessageEncoder::createWithXML (_dictionary, _root.append_child (_getEncodedKey (argKey)));
 }
 
 #if defined (__APPLE__)
@@ -142,21 +142,21 @@ std::string IPCXMLMessageEncoder::createEncodedMessage () const
 
 
 #if defined (__APPLE__)
-IPCXMLMessageDecoder* IPCXMLMessageDecoder::createWithMessageData (CFDataRef data)
+std::unique_ptr<IPCXMLMessageDecoder> IPCXMLMessageDecoder::createWithMessageData (CFDataRef data)
 {
     const auto dataSize { static_cast<size_t> (CFDataGetLength (data)) };
     if (dataSize == 0)
         return nullptr;
 
-    return new IPCXMLMessageDecoder { reinterpret_cast<const char *> (CFDataGetBytePtr (data)), dataSize };
+    return std::unique_ptr<IPCXMLMessageDecoder> { new IPCXMLMessageDecoder { reinterpret_cast<const char *> (CFDataGetBytePtr (data)), dataSize } };
 }
 #else
-IPCXMLMessageDecoder* IPCXMLMessageDecoder::createWithMessageData (const char* data, const size_t dataSize)
+std::unique_ptr<IPCXMLMessageDecoder> IPCXMLMessageDecoder::createWithMessageData (const char* data, const size_t dataSize)
 {
     if (dataSize == 0)
         return nullptr;
 
-    return new IPCXMLMessageDecoder { data, dataSize };
+    return std::unique_ptr<IPCXMLMessageDecoder> { new IPCXMLMessageDecoder { data, dataSize } };
 }
 #endif
 
@@ -269,14 +269,14 @@ void IPCXMLMessageDecoder::readBytes (const MessageArgumentKey argKey, uint8_t* 
     std::memcpy (argValue, decodedData.c_str (), decodedData.size ());
 }
 
-ARA::IPC::MessageDecoder* IPCXMLMessageDecoder::readSubMessage (const MessageArgumentKey argKey) const
+std::unique_ptr<ARA::IPC::MessageDecoder> IPCXMLMessageDecoder::readSubMessage (const MessageArgumentKey argKey) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto child { _root.child (_getEncodedKey (argKey)) };
     if (child.empty ())
         return nullptr;
 
-    return new IPCXMLMessageDecoder { _dictionary, child };
+    return std::unique_ptr<IPCXMLMessageDecoder> { new IPCXMLMessageDecoder { _dictionary, child } };
 }
 
 bool IPCXMLMessageDecoder::hasDataForKey (const MessageArgumentKey argKey) const
