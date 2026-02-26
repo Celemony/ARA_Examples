@@ -27,48 +27,6 @@
 #import "ARA_Library/IPC/ARAIPCProxyHost.h"
 
 
-#if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
-
-// \todo this class could be a reusable part of ARA_Library if we could figure out how to avoid the
-//       ObjC class name clashes that will arise when multiple plug-ins from different binaries are
-//       using/linking this class.
-//       The IPC-related additions to TestAUv3AudioUnit could also be moved to a reusable base class
-//       from which TestAUv3AudioUnit and others could derive.
-//       A workaround might be a set of macros that can be used to provide the code with adjusted
-//       class names for client projects, but since some methods may be implemented in the client
-//       this is somewhat messy.
-
-API_AVAILABLE(macos(13.0), ios(16.0))
-@interface TestAUv3ARAIPCMessageChannel : NSObject<AUMessageChannel>
-@end
-
-
-@implementation TestAUv3ARAIPCMessageChannel {
-    ARA::IPC::ARAIPCMessageChannelRef _messageChannelRef;
-}
-
-@synthesize callHostBlock = _callHostBlock;
-
-- (instancetype)initAsMainThreadChannel:(BOOL) isMainThreadChannel {
-    self = [super init];
-
-    if (self == nil) { return nil; }
-
-    _callHostBlock = nil;
-    _messageChannelRef = ARA::IPC::ARAIPCAUProxyHostInitializeMessageChannel(self, isMainThreadChannel);
-
-    return self;
-}
-
-- (NSDictionary * _Nonnull)callAudioUnit:(NSDictionary *)message {
-    return ARA::IPC::ARAIPCAUProxyHostCommandHandler(_messageChannelRef, message);
-}
-
-@end
-
-#endif // ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
-
-
 @interface TestAUv3AudioUnit ()
 
 @property AUAudioUnitBusArray *inputBusArray;
@@ -261,48 +219,19 @@ API_AVAILABLE(macos(13.0), ios(16.0))
 
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
 
-NSObject<AUMessageChannel> * __strong _mainMessageChannel API_AVAILABLE(macos(13.0), ios(16.0)) = nil;
-NSObject<AUMessageChannel> * __strong _otherMessageChannel API_AVAILABLE(macos(13.0), ios(16.0)) = nil;
-
-static void createSharedMessageChannelsIfNeeded() API_AVAILABLE(macos(13.0), ios(16.0)) {
-    if (_mainMessageChannel)
-        return;
-
-    ARA::IPC::ARAIPCProxyHostAddFactory(ARATestDocumentController::getARAFactory());
-
-    _mainMessageChannel = [[TestAUv3ARAIPCMessageChannel alloc] initAsMainThreadChannel:YES];
-    _otherMessageChannel = [[TestAUv3ARAIPCMessageChannel alloc] initAsMainThreadChannel:NO];
-}
-
-__attribute__((destructor))
-static void destroySharedMessageChannelsIfNeeded() {
-    if (@available(macOS 13.0, iOS 16.0, *))
-    {
-        if (_mainMessageChannel)
-            ARA::IPC::ARAIPCAUProxyHostUninitialize();
-
-        _mainMessageChannel = nil;
-        _otherMessageChannel = nil;
-    }
-}
-
 - (id<AUMessageChannel> _Nonnull)messageChannelFor:(NSString * _Nonnull)channelName {
+    id<AUMessageChannel> result = nil;
+
     if (@available(macOS 13.0, iOS 16.0, *))
     {
-        if ([channelName isEqualToString:ARA_AUDIOUNIT_MAIN_THREAD_MESSAGES_UTI])
-        {
-            createSharedMessageChannelsIfNeeded();
-            return _mainMessageChannel;
-        }
-        if ([channelName isEqualToString:ARA_AUDIOUNIT_OTHER_THREADS_MESSAGES_UTI])
-        {
-            createSharedMessageChannelsIfNeeded();
-            return _otherMessageChannel;
-        }
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{ ARA::IPC::ARAIPCProxyHostAddFactory(_araFactory); });
+
+        result = ARA::IPC::ARAIPCAUProxyHostMessageChannelFor(channelName);
     }
-//  \todo the return value should be declared _Nullable in the OS - must be fixed there!
-//  return nil;
-    return (id<AUMessageChannel> _Nonnull) nil;
+
+    // \todo the return value should be declared _Nullable in the OS - must be fixed there!
+    return (id<AUMessageChannel> _Nonnull) result;
 }
 
 #endif // ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
