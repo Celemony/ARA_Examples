@@ -93,7 +93,7 @@ constexpr auto otherChannelIDSuffix { ".other" };
     _Pragma ("GCC diagnostic ignored \"-Wunused-template\"")
 #endif
 
-ARA_MAP_IPC_REF (ARA::IPC::Connection, ARA::IPC::ARAIPCConnectionRef)
+ARA_MAP_IPC_REF (ARA::IPC::ProxyPlugIn, ARA::IPC::ARAIPCProxyPlugInRef)
 
 #if defined (__GNUC__)
     _Pragma ("GCC diagnostic pop")
@@ -323,7 +323,7 @@ public:
       _audioUnitComponent { AudioUnitPrepareComponentWithIDs (parseOSType (type), parseOSType (subType), parseOSType (manufacturer)) }
     {
         AudioUnitInstance audioUnitInstance = AudioUnitOpenInstance (_audioUnitComponent, useIPCIfPossible);
-        validateAndSetFactory (AudioUnitGetARAFactory (audioUnitInstance, &_connectionRef));
+        validateAndSetFactory (AudioUnitGetARAFactory (audioUnitInstance, &_proxyPlugInRef));
         AudioUnitCloseInstance (audioUnitInstance);
     }
 
@@ -334,13 +334,13 @@ public:
 
     bool usesIPC () const override
     {
-        return _connectionRef != nullptr;
+        return _proxyPlugInRef != nullptr;
     }
 
     void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress) override
     {
         if (usesIPC ())
-            ARA::IPC::ARAIPCProxyPlugInInitializeARA (_connectionRef, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
+            ARA::IPC::ARAIPCProxyPlugInInitializeARA (_proxyPlugInRef, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
         else
             PlugInEntry::initializeARA (assertFunctionAddress);
     }
@@ -349,7 +349,7 @@ public:
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
         if (usesIPC ())
-            return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_connectionRef, getARAFactory ()->factoryID, hostInstance, properties);
+            return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_proxyPlugInRef, getARAFactory ()->factoryID, hostInstance, properties);
         else
             return PlugInEntry::createDocumentControllerWithDocument (hostInstance, properties);
     }
@@ -357,7 +357,7 @@ public:
     void uninitializeARA () override
     {
         if (usesIPC ())
-            ARA::IPC::ARAIPCProxyPlugInUninitializeARA (_connectionRef, getARAFactory ()->factoryID);
+            ARA::IPC::ARAIPCProxyPlugInUninitializeARA (_proxyPlugInRef, getARAFactory ()->factoryID);
         else
             PlugInEntry::uninitializeARA ();
     }
@@ -370,7 +370,7 @@ public:
 
 private:
     AudioUnitComponent const _audioUnitComponent;
-    ARA::IPC::ARAIPCConnectionRef _connectionRef {};
+    ARA::IPC::ARAIPCProxyPlugInRef _proxyPlugInRef {};
 };
 
 #endif // defined (__APPLE__)
@@ -622,16 +622,16 @@ struct RemoteLauncher
 class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher
 {
 private:
-    static const ARA::ARAFactory* defaultGetFactory (ARA::IPC::ARAIPCConnectionRef connection)
+    static const ARA::ARAFactory* defaultGetFactory (ARA::IPC::ARAIPCProxyPlugInRef proxyPlugInRef)
     {
-        const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (connection) };
+        const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (proxyPlugInRef) };
         ARA_INTERNAL_ASSERT (count > 0);
-        return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (connection, 0U);
+        return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (proxyPlugInRef, 0U);
     }
 
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
                     const std::string& channelID,
-                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCConnectionRef)>& getFactoryFunction)
+                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCProxyPlugInRef)>& getFactoryFunction)
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, channelID },
       _connection { IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix),
@@ -639,13 +639,13 @@ private:
       _proxyPlugIn { &_connection }
     {
         _connection.setMessageHandler (ARA::IPC::ProxyPlugIn::handleReceivedMessage);
-        validateAndSetFactory (getFactoryFunction (toIPCRef (&_connection)));
+        validateAndSetFactory (getFactoryFunction (toIPCRef (&_proxyPlugIn)));
     }
 
 public:
     // \todo the current ARA IPC implementation does not support sending ARA asserts to the host...
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
-                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCConnectionRef)>& getFactoryFunction = defaultGetFactory)
+                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCProxyPlugInRef)>& getFactoryFunction = defaultGetFactory)
     : IPCPlugInEntry { std::move (description), launchArgs, _createChannelID (), getFactoryFunction }
     {}
 
@@ -668,18 +668,18 @@ public:
 
     void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
     {
-        ARA::IPC::ARAIPCProxyPlugInInitializeARA (toIPCRef (&_connection), getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
+        ARA::IPC::ARAIPCProxyPlugInInitializeARA (toIPCRef (&_proxyPlugIn), getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
     }
 
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
-        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (toIPCRef (&_connection), getARAFactory ()->factoryID, hostInstance, properties);
+        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (toIPCRef (&_proxyPlugIn), getARAFactory ()->factoryID, hostInstance, properties);
     }
 
     void uninitializeARA () override
     {
-        ARA::IPC::ARAIPCProxyPlugInUninitializeARA (toIPCRef (&_connection), getARAFactory ()->factoryID);
+        ARA::IPC::ARAIPCProxyPlugInUninitializeARA (toIPCRef (&_proxyPlugIn), getARAFactory ()->factoryID);
     }
 
     std::unique_ptr<PlugInInstance> createPlugInInstance () override
@@ -702,22 +702,22 @@ protected:
     IPCGenericPlugInEntry (const std::string& commandLineArg, const std::string& apiName, const std::string& binaryName, const std::string& optionalPlugInName)
     : IPCPlugInEntry { createEntryDescription (apiName, binaryName, optionalPlugInName),
                         commandLineArg + " " + binaryName + " " + optionalPlugInName,
-                        [&optionalPlugInName] (ARA::IPC::ARAIPCConnectionRef connection) -> const ARA::ARAFactory*
+                        [&optionalPlugInName] (ARA::IPC::ARAIPCProxyPlugInRef proxyPlugInRef) -> const ARA::ARAFactory*
                         {
-                            const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (connection) };
+                            const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (proxyPlugInRef) };
                             ARA_INTERNAL_ASSERT (count > 0);
 
                             if (optionalPlugInName.empty ())
-                                return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (connection, 0U);
+                                return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (proxyPlugInRef, 0U);
 
                             for (auto i { 0U }; i < count; ++i)
                             {
-                                auto factory { ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (connection, i) };
+                                auto factory { ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (proxyPlugInRef, i) };
                                 if (0 == std::strcmp (factory->plugInName, optionalPlugInName.c_str ()))
                                     return factory;
                             }
                             ARA_INTERNAL_ASSERT (false);
-                            return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (connection, 0U);
+                            return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (proxyPlugInRef, 0U);
                         } }
     {}
 };
