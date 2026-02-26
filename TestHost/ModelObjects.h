@@ -89,161 +89,6 @@ private:
 
 /*******************************************************************************/
 
-class Document
-{
-public:
-    Document (std::string name);
-
-    const std::string& getName () const noexcept { return _name; }
-    void setName (std::string name) { _name = name; }
-
-    std::vector<std::unique_ptr<MusicalContext>> const& getMusicalContexts () const noexcept { return _musicalContexts; }
-    void addMusicalContext (std::unique_ptr<MusicalContext>&& musicalContext) { _musicalContexts.emplace_back (std::move (musicalContext)); }
-    void removeMusicalContext (MusicalContext* musicalContext) { ARA::find_erase (_musicalContexts, musicalContext); }
-
-    std::vector<std::unique_ptr<RegionSequence>> const& getRegionSequences () const noexcept { return _regionSequences; }
-    void addRegionSequence (std::unique_ptr<RegionSequence>&& regionSequence) { _regionSequences.emplace_back (std::move (regionSequence)); }
-    void removeRegionSequence (RegionSequence* regionSequence) { ARA::find_erase (_regionSequences, regionSequence); }
-
-    std::vector<std::unique_ptr<AudioSource>> const& getAudioSources () const noexcept { return _audioSources; }
-    void addAudioSource (std::unique_ptr<AudioSource>&& audioSource) { _audioSources.emplace_back (std::move (audioSource)); }
-    void removeAudioSource (AudioSource* audioSource) { ARA::find_erase (_audioSources, audioSource); }
-
-private:
-    std::string _name;
-    std::vector<std::unique_ptr<AudioSource>> _audioSources;
-    std::vector<std::unique_ptr<MusicalContext>> _musicalContexts;
-    std::vector<std::unique_ptr<RegionSequence>> _regionSequences;
-};
-
-/*******************************************************************************/
-
-class MusicalContext : public ContentContainer
-{
-public:
-    MusicalContext (Document* document, std::string name, ARA::ARAColor color);
-
-    Document* getDocument () const noexcept { return _document; }
-
-    const std::string& getName () const noexcept { return _name; }
-    void setName (std::string name) { _name = name; }
-
-    int getOrderIndex () const noexcept;
-
-    const ARA::ARAColor& getColor () const noexcept { return _color; }
-    void setColor (ARA::ARAColor color) { _color = color; }
-
-    std::vector<RegionSequence*> const& getRegionSequences () const noexcept { return _regionSequences; }
-    // Do not call those directly: instead use the related calls at the RegionSequence class, which will implictly call this.
-    void _addRegionSequence (RegionSequence* regionSequence) { _regionSequences.push_back (regionSequence); }
-    void _removeRegionSequence (RegionSequence* regionSequence) { ARA::find_erase (_regionSequences, regionSequence); }
-
-private:
-    Document* const _document;
-    std::string _name;
-    ARA::ARAColor _color;
-    std::vector<RegionSequence*> _regionSequences;
-};
-
-/*******************************************************************************/
-
-class RegionSequence
-{
-public:
-    RegionSequence (Document* document, std::string name, std::string persistentID, MusicalContext* musicalContext, ARA::ARAColor color);
-    ~RegionSequence ();
-
-    Document* getDocument () const noexcept { return _document; }
-
-    const std::string& getName () const noexcept { return _name; }
-    void setName (std::string name) { _name = name; }
-
-    const std::string& getPersistentID () const noexcept { return _persistentID; }
-    void setPersistentID (std::string persistentID) { _persistentID = persistentID; }
-
-    int getOrderIndex () const noexcept;
-
-    MusicalContext* getMusicalContext () const noexcept { return _musicalContext; }
-    void setMusicalContext (MusicalContext* musicalContext);
-
-    const ARA::ARAColor& getColor () const noexcept { return _color; }
-    void setColor (ARA::ARAColor color) { _color = color; }
-
-    std::vector<PlaybackRegion*> const& getPlaybackRegions () const noexcept { return _playbackRegions; }
-    // Do not call those directly: instead use the related calls at the PlaybackRegion class, which will implictly call this.
-    void _addPlaybackRegion (PlaybackRegion* region) { _playbackRegions.push_back (region); }
-    void _removePlaybackRegion (PlaybackRegion* region) { ARA::find_erase (_playbackRegions, region); }
-
-private:
-    Document* const _document;
-    std::string _name;
-    std::string _persistentID;
-    MusicalContext* _musicalContext;
-    ARA::ARAColor _color;
-    std::vector<PlaybackRegion*> _playbackRegions;
-};
-
-/*******************************************************************************/
-
-class AudioSource : public ContentContainer
-{
-public:
-    AudioSource (Document* document, AudioFileBase* audioFile, std::string persistentID);
-
-    Document* getDocument () const noexcept { return _document; }
-    AudioFileBase* getAudioFile () const noexcept { return _audioFile; }
-
-    const std::string& getName () const noexcept { return _audioFile->getName (); }
-    void setName (std::string name) { _audioFile->setName (name); }
-
-    const std::string& getPersistentID () const noexcept { return _persistentID; }
-    void setPersistentID (std::string persistentID) { _persistentID = persistentID; }
-
-    int64_t getSampleCount () const noexcept { return _audioFile->getSampleCount (); }
-    double getSampleRate () const noexcept { return _audioFile->getSampleRate (); }
-    double getDuration () const noexcept { return ARA::timeAtSamplePosition (getSampleCount (), getSampleRate ()); }
-    int getChannelCount () const noexcept { return _audioFile->getChannelCount (); }
-    bool merits64BitSamples () const noexcept { return _audioFile->merits64BitSamples (); }
-
-    std::vector<std::unique_ptr<AudioModification>> const& getAudioModifications () const noexcept { return _audioModifications; }
-    void addAudioModification (std::unique_ptr<AudioModification>&& modification) { _audioModifications.emplace_back (std::move (modification)); }
-    void removeAudioModification (AudioModification* modification) { ARA::find_erase (_audioModifications, modification); }
-
-private:
-    Document* const _document;
-    AudioFileBase* const _audioFile;
-    std::string _persistentID;
-    std::vector<std::unique_ptr<AudioModification>> _audioModifications;
-};
-
-/*******************************************************************************/
-
-class AudioModification
-{
-public:
-    AudioModification (AudioSource* audioSource, std::string name, std::string persistentID);
-
-    AudioSource* getAudioSource () const noexcept { return _audioSource; }
-
-    const std::string& getName () const noexcept { return _name; }
-    void setName (std::string name) { _name = name; }
-
-    const std::string& getPersistentID () const noexcept { return _persistentID; }
-    void setPersistentID (std::string persistentID) { _persistentID = persistentID; }
-
-    std::vector<std::unique_ptr<PlaybackRegion>> const& getPlaybackRegions () const noexcept { return _playbackRegions; }
-    void addPlaybackRegion (std::unique_ptr<PlaybackRegion>&& region) { _playbackRegions.emplace_back (std::move (region)); }
-    void removePlaybackRegion (PlaybackRegion* region) { ARA::find_erase (_playbackRegions, region); }
-
-private:
-    AudioSource* const _audioSource;
-    std::string _name;
-    std::string _persistentID;
-    std::vector<std::unique_ptr<PlaybackRegion>> _playbackRegions;
-};
-
-/*******************************************************************************/
-
 class PlaybackRegion
 {
 public:
@@ -294,4 +139,159 @@ private:
     RegionSequence* _regionSequence;
     std::string _name;
     ARA::ARAColor _color;
+};
+
+/*******************************************************************************/
+
+class AudioModification
+{
+public:
+    AudioModification (AudioSource* audioSource, std::string name, std::string persistentID);
+
+    AudioSource* getAudioSource () const noexcept { return _audioSource; }
+
+    const std::string& getName () const noexcept { return _name; }
+    void setName (std::string name) { _name = name; }
+
+    const std::string& getPersistentID () const noexcept { return _persistentID; }
+    void setPersistentID (std::string persistentID) { _persistentID = persistentID; }
+
+    std::vector<std::unique_ptr<PlaybackRegion>> const& getPlaybackRegions () const noexcept { return _playbackRegions; }
+    void addPlaybackRegion (std::unique_ptr<PlaybackRegion>&& region) { _playbackRegions.emplace_back (std::move (region)); }
+    void removePlaybackRegion (PlaybackRegion* region) { ARA::find_erase (_playbackRegions, region); }
+
+private:
+    AudioSource* const _audioSource;
+    std::string _name;
+    std::string _persistentID;
+    std::vector<std::unique_ptr<PlaybackRegion>> _playbackRegions;
+};
+
+/*******************************************************************************/
+
+class AudioSource : public ContentContainer
+{
+public:
+    AudioSource (Document* document, AudioFileBase* audioFile, std::string persistentID);
+
+    Document* getDocument () const noexcept { return _document; }
+    AudioFileBase* getAudioFile () const noexcept { return _audioFile; }
+
+    const std::string& getName () const noexcept { return _audioFile->getName (); }
+    void setName (std::string name) { _audioFile->setName (name); }
+
+    const std::string& getPersistentID () const noexcept { return _persistentID; }
+    void setPersistentID (std::string persistentID) { _persistentID = persistentID; }
+
+    int64_t getSampleCount () const noexcept { return _audioFile->getSampleCount (); }
+    double getSampleRate () const noexcept { return _audioFile->getSampleRate (); }
+    double getDuration () const noexcept { return ARA::timeAtSamplePosition (getSampleCount (), getSampleRate ()); }
+    int getChannelCount () const noexcept { return _audioFile->getChannelCount (); }
+    bool merits64BitSamples () const noexcept { return _audioFile->merits64BitSamples (); }
+
+    std::vector<std::unique_ptr<AudioModification>> const& getAudioModifications () const noexcept { return _audioModifications; }
+    void addAudioModification (std::unique_ptr<AudioModification>&& modification) { _audioModifications.emplace_back (std::move (modification)); }
+    void removeAudioModification (AudioModification* modification) { ARA::find_erase (_audioModifications, modification); }
+
+private:
+    Document* const _document;
+    AudioFileBase* const _audioFile;
+    std::string _persistentID;
+    std::vector<std::unique_ptr<AudioModification>> _audioModifications;
+};
+
+/*******************************************************************************/
+
+class RegionSequence
+{
+public:
+    RegionSequence (Document* document, std::string name, std::string persistentID, MusicalContext* musicalContext, ARA::ARAColor color);
+    ~RegionSequence ();
+
+    Document* getDocument () const noexcept { return _document; }
+
+    const std::string& getName () const noexcept { return _name; }
+    void setName (std::string name) { _name = name; }
+
+    const std::string& getPersistentID () const noexcept { return _persistentID; }
+    void setPersistentID (std::string persistentID) { _persistentID = persistentID; }
+
+    int getOrderIndex () const noexcept;
+
+    MusicalContext* getMusicalContext () const noexcept { return _musicalContext; }
+    void setMusicalContext (MusicalContext* musicalContext);
+
+    const ARA::ARAColor& getColor () const noexcept { return _color; }
+    void setColor (ARA::ARAColor color) { _color = color; }
+
+    std::vector<PlaybackRegion*> const& getPlaybackRegions () const noexcept { return _playbackRegions; }
+    // Do not call those directly: instead use the related calls at the PlaybackRegion class, which will implictly call this.
+    void _addPlaybackRegion (PlaybackRegion* region) { _playbackRegions.push_back (region); }
+    void _removePlaybackRegion (PlaybackRegion* region) { ARA::find_erase (_playbackRegions, region); }
+
+private:
+    Document* const _document;
+    std::string _name;
+    std::string _persistentID;
+    MusicalContext* _musicalContext;
+    ARA::ARAColor _color;
+    std::vector<PlaybackRegion*> _playbackRegions;
+};
+
+/*******************************************************************************/
+
+class MusicalContext : public ContentContainer
+{
+public:
+    MusicalContext (Document* document, std::string name, ARA::ARAColor color);
+
+    Document* getDocument () const noexcept { return _document; }
+
+    const std::string& getName () const noexcept { return _name; }
+    void setName (std::string name) { _name = name; }
+
+    int getOrderIndex () const noexcept;
+
+    const ARA::ARAColor& getColor () const noexcept { return _color; }
+    void setColor (ARA::ARAColor color) { _color = color; }
+
+    std::vector<RegionSequence*> const& getRegionSequences () const noexcept { return _regionSequences; }
+    // Do not call those directly: instead use the related calls at the RegionSequence class, which will implictly call this.
+    void _addRegionSequence (RegionSequence* regionSequence) { _regionSequences.push_back (regionSequence); }
+    void _removeRegionSequence (RegionSequence* regionSequence) { ARA::find_erase (_regionSequences, regionSequence); }
+
+private:
+    Document* const _document;
+    std::string _name;
+    ARA::ARAColor _color;
+    std::vector<RegionSequence*> _regionSequences;
+};
+
+/*******************************************************************************/
+
+class Document
+{
+public:
+    Document (std::string name);
+
+    const std::string& getName () const noexcept { return _name; }
+    void setName (std::string name) { _name = name; }
+
+    std::vector<std::unique_ptr<MusicalContext>> const& getMusicalContexts () const noexcept { return _musicalContexts; }
+    void addMusicalContext (std::unique_ptr<MusicalContext>&& musicalContext) { _musicalContexts.emplace_back (std::move (musicalContext)); }
+    void removeMusicalContext (MusicalContext* musicalContext) { ARA::find_erase (_musicalContexts, musicalContext); }
+
+    std::vector<std::unique_ptr<RegionSequence>> const& getRegionSequences () const noexcept { return _regionSequences; }
+    void addRegionSequence (std::unique_ptr<RegionSequence>&& regionSequence) { _regionSequences.emplace_back (std::move (regionSequence)); }
+    void removeRegionSequence (RegionSequence* regionSequence) { ARA::find_erase (_regionSequences, regionSequence); }
+
+    std::vector<std::unique_ptr<AudioSource>> const& getAudioSources () const noexcept { return _audioSources; }
+    void addAudioSource (std::unique_ptr<AudioSource>&& audioSource) { _audioSources.emplace_back (std::move (audioSource)); }
+    void removeAudioSource (AudioSource* audioSource) { ARA::find_erase (_audioSources, audioSource); }
+
+private:
+    std::string _name;
+    std::vector<std::unique_ptr<AudioSource>> _audioSources;
+    std::vector<std::unique_ptr<MusicalContext>> _musicalContexts;
+    std::vector<std::unique_ptr<RegionSequence>> _regionSequences;
 };

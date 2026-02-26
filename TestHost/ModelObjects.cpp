@@ -28,21 +28,55 @@
 
 /*******************************************************************************/
 
-Document::Document (std::string name)
-: _name { name }
+PlaybackRegion::PlaybackRegion (AudioModification* audioModification, ARA::ARAPlaybackTransformationFlags transformationFlags, double startInModificationTime, double durationInModificationTime, double startInPlaybackTime, double durationInPlaybackTime, RegionSequence * regionSequence, std::string name, ARA::ARAColor color)
+: _audioModification { audioModification },
+  _transformationFlags { transformationFlags },
+  _startInModificationTime { startInModificationTime },
+  _durationInModificationTime { durationInModificationTime },
+  _startInPlaybackTime { startInPlaybackTime },
+  _durationInPlaybackTime { durationInPlaybackTime },
+  _regionSequence { regionSequence },
+  _name { name },
+  _color { color }
+{
+    _regionSequence->_addPlaybackRegion (this);
+}
+
+PlaybackRegion::~PlaybackRegion ()
+{
+    _regionSequence->_removePlaybackRegion (this);
+}
+
+// Note that setRegionsequence handles removing this from the old
+// region sequence and adding this to the new region sequence
+void PlaybackRegion::setRegionSequence (RegionSequence* regionSequence)
+{
+    if (regionSequence == _regionSequence)
+        return;
+
+    _regionSequence->_removePlaybackRegion (this);
+    _regionSequence = regionSequence;
+    _regionSequence->_addPlaybackRegion (this);
+}
+
+/*******************************************************************************/
+
+AudioModification::AudioModification (AudioSource * audioSource, std::string name, std::string persistentID)
+: _audioSource { audioSource },
+  _name { name },
+  _persistentID { persistentID }
 {}
 
 /*******************************************************************************/
 
-MusicalContext::MusicalContext (Document * document, std::string name, ARA::ARAColor color)
+AudioSource::AudioSource (Document* document, AudioFileBase* audioFile, std::string persistentID)
 : _document { document },
-  _name { name },
-  _color { color }
-{}
-
-int MusicalContext::getOrderIndex () const noexcept
+  _audioFile { audioFile },
+  _persistentID { persistentID }
 {
-    return static_cast<int> (ARA::index_of (_document->getMusicalContexts (), this));
+    // at this point, only up to stereo formats are supported because the test code
+    // doesn't handle surround channel arrangements yet.
+    ARA_INTERNAL_ASSERT (_audioFile->getChannelCount () <= 2);
 }
 
 /*******************************************************************************/
@@ -79,53 +113,19 @@ void RegionSequence::setMusicalContext (MusicalContext* musicalContext)
 
 /*******************************************************************************/
 
-AudioSource::AudioSource (Document* document, AudioFileBase* audioFile, std::string persistentID)
+MusicalContext::MusicalContext (Document * document, std::string name, ARA::ARAColor color)
 : _document { document },
-  _audioFile { audioFile },
-  _persistentID { persistentID }
-{
-    // at this point, only up to stereo formats are supported because the test code
-    // doesn't handle surround channel arrangements yet.
-    ARA_INTERNAL_ASSERT (_audioFile->getChannelCount () <= 2);
-}
-
-/*******************************************************************************/
-
-AudioModification::AudioModification (AudioSource * audioSource, std::string name, std::string persistentID)
-: _audioSource { audioSource },
-  _name { name },
-  _persistentID { persistentID }
-{}
-
-/*******************************************************************************/
-
-PlaybackRegion::PlaybackRegion (AudioModification* audioModification, ARA::ARAPlaybackTransformationFlags transformationFlags, double startInModificationTime, double durationInModificationTime, double startInPlaybackTime, double durationInPlaybackTime, RegionSequence * regionSequence, std::string name, ARA::ARAColor color)
-: _audioModification { audioModification },
-  _transformationFlags { transformationFlags },
-  _startInModificationTime { startInModificationTime },
-  _durationInModificationTime { durationInModificationTime },
-  _startInPlaybackTime { startInPlaybackTime },
-  _durationInPlaybackTime { durationInPlaybackTime },
-  _regionSequence { regionSequence },
   _name { name },
   _color { color }
+{}
+
+int MusicalContext::getOrderIndex () const noexcept
 {
-    _regionSequence->_addPlaybackRegion (this);
+    return static_cast<int> (ARA::index_of (_document->getMusicalContexts (), this));
 }
 
-PlaybackRegion::~PlaybackRegion ()
-{
-    _regionSequence->_removePlaybackRegion (this);
-}
+/*******************************************************************************/
 
-// Note that setRegionsequence handles removing this from the old
-// region sequence and adding this to the new region sequence
-void PlaybackRegion::setRegionSequence (RegionSequence* regionSequence)
-{
-    if (regionSequence == _regionSequence)
-        return;
-
-    _regionSequence->_removePlaybackRegion (this);
-    _regionSequence = regionSequence;
-    _regionSequence->_addPlaybackRegion (this);
-}
+Document::Document (std::string name)
+: _name { name }
+{}
