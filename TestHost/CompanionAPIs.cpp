@@ -454,8 +454,7 @@ class Connection : public ARA::IPC::Connection
 {
 public:
     Connection (ARA::IPC::MessageHandler&& messageHandler, std::unique_ptr<IPCMessageChannel> && mainThreadChannel, std::unique_ptr<IPCMessageChannel> && otherThreadsChannel)
-    : ARA::IPC::Connection { std::move (messageHandler), &_runReceiveLoop, this },
-      _mainThreadChannel { mainThreadChannel.get () }
+    : ARA::IPC::Connection { std::move (messageHandler), [channel = mainThreadChannel.get ()] { channel->runReceiveLoop (10); } }
     {
         setMainThreadChannel (std::move (mainThreadChannel));
         setOtherThreadsChannel (std::move (otherThreadsChannel));
@@ -476,20 +475,6 @@ public:
     {
         return true;
     }
-
-    bool runReceiveLoop (int32_t milliseconds)
-    {
-        return _mainThreadChannel->runReceiveLoop (milliseconds);
-    }
-
-private:
-    static void _runReceiveLoop (void* connection)
-    {
-        static_cast<Connection*> (connection)->runReceiveLoop (10);
-    }
-
-private:
-    IPCMessageChannel* const _mainThreadChannel;
 };
 
 class IPCPlugInInstance : public PlugInInstance, protected ARA::IPC::RemoteCaller
@@ -865,7 +850,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
                                                 });
 
     while (!_shutDown)
-        static_cast<Connection *> (proxy.getConnection ())->runReceiveLoop (100 /*ms*/);
+        static_cast<IPCMessageChannel *> (proxy.getConnection ()->getMainThreadDispatcher ()->getMessageChannel ())->runReceiveLoop (100 /*ms*/);
 
     _plugInEntry.reset ();
 
