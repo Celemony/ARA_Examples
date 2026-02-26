@@ -189,7 +189,7 @@ public:
             const auto analysisTargetTime { analysisStartTime + progress * analysisTargetDuration };
             const auto timeToSleep { analysisTargetTime - ARA_GET_CURRENT_TIME () };
             if (timeToSleep > 0.0)
-                std::this_thread::sleep_for (std::chrono::milliseconds { std::llround (timeToSleep * 1000) } );
+                std::this_thread::sleep_for (std::chrono::milliseconds { std::llround (timeToSleep * 1000) });
 #endif
         }
 
@@ -291,7 +291,7 @@ public:
             }
 
             analysisCallbacks->notifyAnalysisProgressUpdated (static_cast<float> (i) / static_cast<float> (count));
-            std::this_thread::sleep_for (std::chrono::milliseconds { std::llround (sliceDuration * 1000) } );
+            std::this_thread::sleep_for (std::chrono::milliseconds { std::llround (sliceDuration * 1000) });
         }
 #endif
 
