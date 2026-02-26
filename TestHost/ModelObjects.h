@@ -150,13 +150,16 @@ private:
 class RegionSequence
 {
 public:
-    RegionSequence (Document* document, std::string name, MusicalContext* musicalContext, ARA::ARAColor color);
+    RegionSequence (Document* document, std::string name, std::string persistentID, MusicalContext* musicalContext, ARA::ARAColor color);
     ~RegionSequence ();
 
     Document* getDocument () const noexcept { return _document; }
 
     const std::string& getName () const noexcept { return _name; }
     void setName (std::string name) { _name = name; }
+
+    const std::string& getPersistentID () const noexcept { return _persistentID; }
+    void setPersistentID (std::string persistentID) { _persistentID = persistentID; }
 
     int getOrderIndex () const noexcept;
 
@@ -174,6 +177,7 @@ public:
 private:
     Document* const _document;
     std::string _name;
+    std::string _persistentID;
     MusicalContext* _musicalContext;
     ARA::ARAColor _color;
     std::vector<PlaybackRegion*> _playbackRegions;
