@@ -140,7 +140,7 @@ public:
 
         ::SetEvent (_dataReceived);
 
-        _channel->getMessageDispatcher ()->routeReceivedMessage (messageID, std::move (decoder));
+        _channel->routeReceivedMessage (messageID, std::move (decoder));
         return true;
     }
 
@@ -250,7 +250,7 @@ private:
 #else
         auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
 #endif
-        channel->getMessageDispatcher ()->routeReceivedMessage (messageID, std::move (decoder));
+        channel->routeReceivedMessage (messageID, std::move (decoder));
         return nullptr;
     }
 
