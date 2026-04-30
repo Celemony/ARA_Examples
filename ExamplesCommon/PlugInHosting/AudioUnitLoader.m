@@ -204,8 +204,8 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, b
         @autoreleasepool
         {
             // simply blocking the thread is not allowed here, so we need to add proper NSRunLoop around the instantiation process
-            NSRunLoop * runloop = [NSRunLoop currentRunLoop];
-            [runloop performBlock:^void (void)
+            NSRunLoop * runLoop = [NSRunLoop currentRunLoop];
+            [runLoop performBlock:^void (void)
             {
                 const AudioComponentInstantiationOptions options =
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
@@ -227,7 +227,7 @@ AudioUnitInstance AudioUnitOpenInstance(AudioUnitComponent audioUnitComponent, b
             }];
             // loading out-of-process can take a considerable amount of time, so loop for up to a second if needed
             for (int i = 0; (i < 100) && (result->v3AudioUnit == nil); ++i)
-                [runloop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+                [runLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
         }
         ARA_INTERNAL_ASSERT(result->v3AudioUnit != nil);
     }
