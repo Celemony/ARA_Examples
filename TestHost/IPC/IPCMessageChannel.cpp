@@ -136,11 +136,11 @@ public:
 #endif
 
         const auto messageID { _sharedMemory->messageID };
-        const auto decoder { IPCXMLMessageDecoder::createWithMessageData (_sharedMemory->messageData, _sharedMemory->messageSize) };
+        auto decoder { IPCXMLMessageDecoder::createWithMessageData (_sharedMemory->messageData, _sharedMemory->messageSize) };
 
         ::SetEvent (_dataReceived);
 
-        _channel->getMessageDispatcher ()->routeReceivedMessage (messageID, decoder);
+        _channel->getMessageDispatcher ()->routeReceivedMessage (messageID, std::move (decoder));
         return true;
     }
 
@@ -246,11 +246,11 @@ private:
     {
         auto channel { static_cast<IPCMessageChannel*> (info) };
 #if USE_ARA_CF_ENCODING
-        const auto decoder { ARA::IPC::CFMessageDecoder::createWithMessageData (messageData) };
+        auto decoder { ARA::IPC::CFMessageDecoder::createWithMessageData (messageData) };
 #else
-        const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
+        auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
 #endif
-        channel->getMessageDispatcher ()->routeReceivedMessage (messageID, decoder);
+        channel->getMessageDispatcher ()->routeReceivedMessage (messageID, std::move (decoder));
         return nullptr;
     }
 
@@ -306,34 +306,30 @@ private:
 //------------------------------------------------------------------------------
 
 
-IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID)
+std::unique_ptr<IPCMessageChannel> IPCMessageChannel::createPublishingID (const std::string& channelID)
 {
-    auto channel { new IPCMessageChannel {} };
-    channel->_sendPort = new IPCSendPort { channelID + ".from_server" };
-    channel->_receivePort = new IPCReceivePort { channelID + ".to_server", channel };
+    auto channel { std::make_unique<IPCMessageChannel> ()};
+    channel->_sendPort = std::make_unique<IPCSendPort> (channelID + ".from_server");
+    channel->_receivePort = std::make_unique<IPCReceivePort> (channelID + ".to_server", channel.get ());
     return channel;
 }
 
-IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID)
+std::unique_ptr<IPCMessageChannel> IPCMessageChannel::createConnectedToID (const std::string& channelID)
 {
-    auto channel { new IPCMessageChannel {} };
-    channel->_receivePort = new IPCReceivePort { channelID + ".from_server", channel };
-    channel->_sendPort = new IPCSendPort { channelID + ".to_server" };
+    auto channel { std::make_unique<IPCMessageChannel> ()};
+    channel->_receivePort = std::make_unique<IPCReceivePort> ( channelID + ".from_server", channel.get ());
+    channel->_sendPort = std::make_unique<IPCSendPort> (channelID + ".to_server");
     return channel;
 }
 
-IPCMessageChannel::~IPCMessageChannel ()
-{
-    delete _sendPort;
-    delete _receivePort;
-}
+IPCMessageChannel::~IPCMessageChannel () = default;
 
-void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, ARA::IPC::MessageEncoder* encoder)
+void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, std::unique_ptr<ARA::IPC::MessageEncoder> && encoder)
 {
 #if USE_ARA_CF_ENCODING
-    const auto messageData { static_cast<ARA::IPC::CFMessageEncoder*> (encoder)->createMessageEncoderData () };
+    const auto messageData { static_cast<ARA::IPC::CFMessageEncoder*> (encoder.get ())->createMessageEncoderData () };
 #else
-    const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder)->createEncodedMessage () };
+    const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder.get ())->createEncodedMessage () };
 #endif
 
     _sendPort->sendMessage (messageID, messageData);

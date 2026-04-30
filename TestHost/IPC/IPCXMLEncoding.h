@@ -57,8 +57,6 @@ protected:
 class IPCXMLMessageEncoder : public IPCXMLMessage, public ARA::IPC::MessageEncoder
 {
 public:
-    IPCXMLMessageEncoder () = default;
-
     void appendInt32 (MessageArgumentKey argKey, int32_t argValue) override;
     void appendInt64 (MessageArgumentKey argKey, int64_t argValue) override;
     void appendSize (MessageArgumentKey argKey, size_t argValue) override;
@@ -66,7 +64,7 @@ public:
     void appendDouble (MessageArgumentKey argKey, double argValue) override;
     void appendString (MessageArgumentKey argKey, const char * argValue) override;
     void appendBytes (MessageArgumentKey argKey, const uint8_t * argValue, size_t argSize, bool copy) override;
-    ARA::IPC::MessageEncoder* appendSubMessage (MessageArgumentKey argKey) override;
+    std::unique_ptr<ARA::IPC::MessageEncoder> appendSubMessage (MessageArgumentKey argKey) override;
 
     // to be used by IPCMessageChannel only: encoding to channel-internal datas format
 #if defined (__APPLE__)
@@ -75,8 +73,13 @@ public:
     std::string createEncodedMessage () const;
 #endif
 
+    static std::unique_ptr<IPCXMLMessageEncoder> create () { return std::unique_ptr<IPCXMLMessageEncoder> { new IPCXMLMessageEncoder {} }; }
+    static std::unique_ptr<IPCXMLMessageEncoder> createWithXML (std::shared_ptr<pugi::xml_document> dictionary, pugi::xml_node root)
+                                                           { return std::unique_ptr<IPCXMLMessageEncoder> { new IPCXMLMessageEncoder { dictionary, root } }; }
+
 private:
     using IPCXMLMessage::IPCXMLMessage;
+    IPCXMLMessageEncoder () = default;
 
     pugi::xml_attribute _appendAttribute (const MessageArgumentKey argKey);
 };
@@ -86,9 +89,9 @@ class IPCXMLMessageDecoder : public IPCXMLMessage, public ARA::IPC::MessageDecod
 public:
     // to be used by IPCMessageChannel only: encoding from channel-internal datas format
 #if defined (__APPLE__)
-    static IPCXMLMessageDecoder* createWithMessageData (CFDataRef data);
+    static std::unique_ptr<IPCXMLMessageDecoder> createWithMessageData (CFDataRef data);
 #else
-    static IPCXMLMessageDecoder* createWithMessageData (const char* data, const size_t dataSize);
+    static std::unique_ptr<IPCXMLMessageDecoder> createWithMessageData (const char* data, const size_t dataSize);
 #endif
 
     bool readInt32 (MessageArgumentKey argKey, int32_t* argValue) const override;
@@ -99,7 +102,7 @@ public:
     bool readString (MessageArgumentKey argKey, const char** argValue) const override;
     bool readBytesSize (MessageArgumentKey argKey, size_t* argSize) const override;
     void readBytes (MessageArgumentKey argKey, uint8_t* argValue) const override;
-    MessageDecoder* readSubMessage (const MessageArgumentKey argKey) const override;
+    std::unique_ptr<MessageDecoder> readSubMessage (const MessageArgumentKey argKey) const override;
     bool hasDataForKey (MessageArgumentKey argKey) const override;
 
 private:

@@ -453,20 +453,20 @@ private:
 class Connection : public ARA::IPC::Connection
 {
 public:
-    Connection (ARA::IPC::MessageHandler&& messageHandler, IPCMessageChannel* mainThreadChannel, IPCMessageChannel* otherThreadsChannel)
+    Connection (ARA::IPC::MessageHandler&& messageHandler, std::unique_ptr<IPCMessageChannel> && mainThreadChannel, std::unique_ptr<IPCMessageChannel> && otherThreadsChannel)
     : ARA::IPC::Connection { std::move (messageHandler), &_runReceiveLoop, this },
-      _mainThreadChannel { mainThreadChannel }
+      _mainThreadChannel { mainThreadChannel.get () }
     {
-        setMainThreadChannel (mainThreadChannel);
-        setOtherThreadsChannel (otherThreadsChannel);
+        setMainThreadChannel (std::move (mainThreadChannel));
+        setOtherThreadsChannel (std::move (otherThreadsChannel));
     }
 
-    ARA::IPC::MessageEncoder* createEncoder () override
+    std::unique_ptr<ARA::IPC::MessageEncoder> createEncoder () override
     {
 #if USE_ARA_CF_ENCODING
-        return new ARA::IPC::CFMessageEncoder {};
+        return ARA::IPC::CFMessageEncoder::create ();
 #else
-        return new IPCXMLMessageEncoder {};
+        return IPCXMLMessageEncoder::create ();
 #endif
     }
 
@@ -749,9 +749,9 @@ bool _shutDown { false };
 class ProxyHost : public ARA::IPC::ProxyHost
 {
 public:
-    ProxyHost (IPCMessageChannel* mainThreadChannel, IPCMessageChannel* otherThreadsChannel)
+    ProxyHost (std::unique_ptr<IPCMessageChannel> && mainThreadChannel, std::unique_ptr<IPCMessageChannel> && otherThreadsChannel)
     : ARA::IPC::ProxyHost { std::make_unique<Connection> ([this] (auto&& ...args) { handleReceivedMessage (args...); },
-                                                          mainThreadChannel, otherThreadsChannel) }
+                                                          std::move (mainThreadChannel), std::move (otherThreadsChannel)) }
     {}
 
     void handleReceivedMessage (const ARA::IPC::MessageID messageID, const ARA::IPC::MessageDecoder* const decoder,
