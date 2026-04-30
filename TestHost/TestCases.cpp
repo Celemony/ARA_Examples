@@ -1031,8 +1031,7 @@ void testAudioFileChunkLoading (PlugInEntry* plugInEntry, const AudioFileList& a
         araDocumentController->endEditing ();
 
         // log the restored audio source content
-        for (auto i { 0U }; i < araFactory->analyzeableContentTypesCount; ++i)
-            araDocumentController->logAvailableContent (audioSource);
+        araDocumentController->logAvailableContent (audioSource);
 
         ++index;
     }
@@ -1063,8 +1062,7 @@ void testAudioFileChunkSaving (PlugInEntry* plugInEntry, AudioFileList& audioFil
     for (const auto& audioSource : document->getAudioSources ())
     {
         // log the audio source content to store
-        for (auto i { 0U }; i < araFactory->analyzeableContentTypesCount; ++i)
-            araDocumentController->logAvailableContent (audioSource.get ());
+        araDocumentController->logAvailableContent (audioSource.get ());
 
         // store archive for this audio source
         MemoryArchive archive { araFactory->documentArchiveID };
