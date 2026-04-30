@@ -638,7 +638,7 @@ private:
                     IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix) },
       _proxyPlugIn { &_connection }
     {
-        _connection.setMessageHandler (&_proxyPlugIn);
+        _connection.setMessageHandler (ARA::IPC::ProxyPlugIn::handleReceivedMessage);
         validateAndSetFactory (getFactoryFunction (toIPCRef (&_connection)));
     }
 
@@ -768,11 +768,11 @@ public:
     ProxyHost (Connection* connection)
     : ARA::IPC::ProxyHost { connection }
     {
-        connection->setMessageHandler (this);
+        connection->setMessageHandler ([this] (auto&& ...args) { handleReceivedMessage (args...); });
     }
 
     void handleReceivedMessage (const ARA::IPC::MessageID messageID, const ARA::IPC::MessageDecoder* const decoder,
-                                ARA::IPC::MessageEncoder* const replyEncoder) override
+                                ARA::IPC::MessageEncoder* const replyEncoder)
     {
         if (!ARA::IPC::MethodID::isCustomMessageID (messageID))
         {
