@@ -107,9 +107,9 @@ static const clap_plugin_audio_ports_t s_my_plug_audio_ports = {
 
 // internal helper that makes sure the requests describes a valid configuration with ins == outs
 // returns 0 on failure
-uint32_t my_plug_get_validated_channel_count_for_configuration(const my_plug_t                                    *plugin,
-                                                               const struct clap_audio_port_configuration_request *requests,
-                                                               uint32_t                                            request_count) {
+static uint32_t my_plug_get_validated_channel_count_for_configuration(const my_plug_t                                    *plugin,
+                                                                      const struct clap_audio_port_configuration_request *requests,
+                                                                      uint32_t                                            request_count) {
    if (request_count > 2)
       return 0;
 

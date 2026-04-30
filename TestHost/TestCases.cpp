@@ -67,7 +67,7 @@ AudioFileList createDummyAudioFiles (size_t numFiles)
 // the entire audio modification is placed on the region sequence.
 // We can optionally request the plug-in to perform its audio source analysis immediately and
 // block until analysis completes, or time-stretch the region if the plug-in supports this.
-ARADocumentController* createHostAndBasicDocument (PlugInEntry* plugInEntry, std::unique_ptr<TestHost>& testHost, std::string documentName, bool requestPlugInAnalysisAndBlock, const AudioFileList& audioFiles)
+static ARADocumentController* createHostAndBasicDocument (PlugInEntry* plugInEntry, std::unique_ptr<TestHost>& testHost, std::string documentName, bool requestPlugInAnalysisAndBlock, const AudioFileList& audioFiles)
 {
     // create our ARA host and document
     if (testHost == nullptr)

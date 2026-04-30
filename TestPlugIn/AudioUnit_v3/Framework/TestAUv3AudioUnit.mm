@@ -268,7 +268,7 @@ API_AVAILABLE(macos(13.0), ios(16.0))
 NSObject<AUMessageChannel> * __strong _mainMessageChannel API_AVAILABLE(macos(13.0), ios(16.0)) = nil;
 NSObject<AUMessageChannel> * __strong _otherMessageChannel API_AVAILABLE(macos(13.0), ios(16.0)) = nil;
 
-void createSharedMessageChannelsIfNeeded() API_AVAILABLE(macos(13.0), ios(16.0)) {
+static void createSharedMessageChannelsIfNeeded() API_AVAILABLE(macos(13.0), ios(16.0)) {
     if (_mainMessageChannel)
         return;
 
@@ -279,7 +279,7 @@ void createSharedMessageChannelsIfNeeded() API_AVAILABLE(macos(13.0), ios(16.0))
 }
 
 __attribute__((destructor))
-void destroySharedMessageChannelsIfNeeded() {
+static void destroySharedMessageChannelsIfNeeded() {
     if (@available(macOS 13.0, iOS 16.0, *))
     {
         if (_mainMessageChannel)

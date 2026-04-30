@@ -79,7 +79,7 @@ ARA::ARAAssertFunction* assertFunctionReference { &assertFunction };
 ARA_SETUP_DEBUG_MESSAGE_PREFIX ("ARATestHost");
 
 
-AudioFileList parseAudioFiles (const std::vector<std::string>& args)
+static AudioFileList parseAudioFiles (const std::vector<std::string>& args)
 {
     AudioFileList parsedFiles;
     auto it { args.begin () };
@@ -105,7 +105,7 @@ AudioFileList parseAudioFiles (const std::vector<std::string>& args)
     return createDummyAudioFiles (1);
 }
 
-const std::vector<std::string> parseTestCases (const std::vector<std::string>& args)
+static const std::vector<std::string> parseTestCases (const std::vector<std::string>& args)
 {
     std::vector<std::string> parsedTests;
     auto it { args.begin () };

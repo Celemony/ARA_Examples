@@ -31,7 +31,7 @@ ARA_DISABLE_VST3_WARNINGS_END
 using namespace Steinberg;
 
 // helper to improve readability
-int32 getAudioBusChannelCount (const IPtr<Vst::Bus>& bus)
+static int32 getAudioBusChannelCount (const IPtr<Vst::Bus>& bus)
 {
     return Vst::SpeakerArr::getChannelCount (FCast<Vst::AudioBus> (bus.get ())->getArrangement ());
 }
