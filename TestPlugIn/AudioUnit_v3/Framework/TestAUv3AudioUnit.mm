@@ -60,10 +60,6 @@ API_AVAILABLE(macos(13.0), ios(16.0))
     return self;
 }
 
-- (void)dealloc {
-    ARA::IPC::ARAIPCAUProxyHostUninitializeMessageChannel(_messageChannelRef);
-}
-
 - (NSDictionary * _Nonnull)callAudioUnit:(NSDictionary *)message {
     return ARA::IPC::ARAIPCAUProxyHostCommandHandler(_messageChannelRef, message);
 }
