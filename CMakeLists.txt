@@ -69,6 +69,19 @@ endif()
 
 
 # ======================
+# configure deployment target for Apple platforms
+
+if(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET} OR ENV{MACOSX_DEPLOYMENT_TARGET} VERSION_LESS "10.15")
+    if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "macOS deployment target")
+    endif()
+endif()
+if (CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "10.15")
+    message(FATAL_ERROR "CMAKE_OSX_DEPLOYMENT_TARGET must be '10.15' or higher.")
+endif()
+
+
+# ======================
 # ARA SDK paths
 
 if(ARA_API_DIR)
@@ -270,10 +283,6 @@ elseif(APPLE)
     endif()
     set(CMAKE_OSX_SYSROOT "macosx${mac_os_sdk_version}")
     unset(mac_os_sdk_version)
-
-    if(CMAKE_OSX_DEPLOYMENT_TARGET AND (CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "10.9"))
-        message(FATAL_ERROR "CMAKE_OSX_DEPLOYMENT_TARGET must be '10.9' or higher.")
-    endif()
 elseif(UNIX)
     set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 else()
