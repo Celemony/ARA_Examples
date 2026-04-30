@@ -146,6 +146,7 @@ void testPropertyUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFi
     // flush the updated properties to the ARA graph using the document controller
     auto& audioSource { document->getAudioSources ().front () };
     ARA_LOG ("Updating the name of audio source %p (ARAAudioSourceRef %p)", audioSource.get (), araDocumentController->getRef (audioSource.get ()));
+    const auto originalName { audioSource->getName () };
     audioSource->setName ("Updated Audio Source Name");
     araDocumentController->updateAudioSourceProperties (audioSource.get ());
 
@@ -164,6 +165,9 @@ void testPropertyUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFi
 
     // end the edit cycle once we're done updating the properties
     araDocumentController->endEditing ();
+
+    // restore original name in underlying file object
+    audioSource->setName (originalName);
 }
 
 /*******************************************************************************/
