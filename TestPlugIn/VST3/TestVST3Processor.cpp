@@ -170,20 +170,11 @@ const ARA::ARAFactory* PLUGIN_API TestVST3Processor::getFactory ()
 }
 
 //-----------------------------------------------------------------------------
-#if ARA_SUPPORT_VERSION_1
-const ARA::ARAPlugInExtensionInstance* PLUGIN_API TestVST3Processor::bindToDocumentController (ARA::ARADocumentControllerRef documentControllerRef)
-{
-    ARA_VALIDATE_API_STATE (ARA::PlugIn::DocumentController::getUsedApiGeneration () < ARA::kARAAPIGeneration_2_0_Draft);
-    constexpr auto allRoles = ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole;
-    return _araPlugInExtension.bindToDocumentController (documentControllerRef, allRoles, allRoles);
-}
-#else
 const ARA::ARAPlugInExtensionInstance* PLUGIN_API TestVST3Processor::bindToDocumentController (ARA::ARADocumentControllerRef /*documentControllerRef*/)
 {
     ARA_VALIDATE_API_STATE (false && "call is deprecated in ARA 2, host must not call this");
     return nullptr;
 }
-#endif
 
 //-----------------------------------------------------------------------------
 const ARA::ARAPlugInExtensionInstance* PLUGIN_API TestVST3Processor::bindToDocumentControllerWithRoles (ARA::ARADocumentControllerRef documentControllerRef,

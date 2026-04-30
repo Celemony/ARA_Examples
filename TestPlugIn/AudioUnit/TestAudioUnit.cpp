@@ -86,9 +86,6 @@ OSStatus TestAudioUnit::GetPropertyInfo( AudioUnitPropertyID    inID,
                 outDataSize = sizeof(ARA::ARAAudioUnitFactory);
                 return noErr;
 
-#if ARA_SUPPORT_VERSION_1
-            case ARA::kAudioUnitProperty_ARAPlugInExtensionBinding:
-#endif
             case ARA::kAudioUnitProperty_ARAPlugInExtensionBindingWithRoles:
                 outWritable = false;
                 outDataSize = sizeof(ARA::ARAAudioUnitPlugInExtensionBinding);
@@ -117,32 +114,14 @@ OSStatus TestAudioUnit::GetProperty(    AudioUnitPropertyID inID,
                 return noErr;
             }
 
-#if ARA_SUPPORT_VERSION_1
-            case ARA::kAudioUnitProperty_ARAPlugInExtensionBinding:
-#endif
             case ARA::kAudioUnitProperty_ARAPlugInExtensionBindingWithRoles:
             {
                 if (((ARA::ARAAudioUnitPlugInExtensionBinding *) outData)->inOutMagicNumber != ARA::kARAAudioUnitMagic)
                     return kAudioUnitErr_InvalidProperty;   // if the magic value isn't found, the property ID is re-used outside the ARA context with different, unsupported sematics
 
-                ARA::ARAPlugInInstanceRoleFlags knownRoles;
-                ARA::ARAPlugInInstanceRoleFlags assignedRoles;
-#if ARA_SUPPORT_VERSION_1
-                if (inID == ARA::kAudioUnitProperty_ARAPlugInExtensionBinding)
-                {
-                    ARA_VALIDATE_API_STATE(ARA::PlugIn::DocumentController::getUsedApiGeneration() < ARA::kARAAPIGeneration_2_0_Draft);
-                    knownRoles = ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole;
-                    assignedRoles = ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole;
-
-                }
-                else
-#endif
-                {
-                    knownRoles = ((ARA::ARAAudioUnitPlugInExtensionBinding *) outData)->knownRoles;
-                    assignedRoles = ((ARA::ARAAudioUnitPlugInExtensionBinding *) outData)->assignedRoles;
-                }
-
-                auto documentControllerRef = ((ARA::ARAAudioUnitPlugInExtensionBinding *) outData)->inDocumentControllerRef;
+                const auto documentControllerRef = ((ARA::ARAAudioUnitPlugInExtensionBinding *) outData)->inDocumentControllerRef;
+                const auto knownRoles = ((ARA::ARAAudioUnitPlugInExtensionBinding *) outData)->knownRoles;
+                const auto assignedRoles = ((ARA::ARAAudioUnitPlugInExtensionBinding *) outData)->assignedRoles;
                 const auto instance = _araPlugInExtension.bindToARA(documentControllerRef, knownRoles, assignedRoles);
                 ((ARA::ARAAudioUnitPlugInExtensionBinding *) outData)->outPlugInExtension = instance;
                 return (instance) ? noErr : kAudioUnitErr_CannotDoInCurrentContext;

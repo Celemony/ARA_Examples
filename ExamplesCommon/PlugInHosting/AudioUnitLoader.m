@@ -323,15 +323,6 @@ const ARAPlugInExtensionInstance * AudioUnitBindToARADocumentController(AudioUni
         ARAAudioUnitPlugInExtensionBinding audioUnitBinding = { kARAAudioUnitMagic, controllerRef, NULL, knownRoles, assignedRoles };
 
         OSStatus ARA_MAYBE_UNUSED_VAR(status) = AudioUnitGetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAPlugInExtensionBindingWithRoles, kAudioUnitScope_Global, 0, &audioUnitBinding, &propertySize);
-#if defined(ARA_SUPPORT_VERSION_1) && (ARA_SUPPORT_VERSION_1)
-        if (status != noErr)
-        {
-            propertySize = offsetof(ARAAudioUnitPlugInExtensionBinding, knownRoles);
-            expectedPropertySize = propertySize;
-            status = AudioUnitGetProperty(audioUnitInstance->v2AudioUnit, kAudioUnitProperty_ARAPlugInExtensionBinding, kAudioUnitScope_Global, 0, &audioUnitBinding, &propertySize);
-        }
-#endif
-
         ARA_VALIDATE_API_CONDITION(status == noErr);
         ARA_VALIDATE_API_CONDITION(propertySize == expectedPropertySize);
         ARA_VALIDATE_API_CONDITION(audioUnitBinding.inOutMagicNumber == kARAAudioUnitMagic);
