@@ -451,7 +451,7 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
         // plug-ins must deal with archives containing more data than actually being restored.
         // to test this, we delete our first source, then restore again.
         araDocumentController->beginEditing ();
-        auto sourceToRemove { document->getAudioSources().front ().get () };
+        auto sourceToRemove { document->getAudioSources ().front ().get () };
         auto modificationToRemove { sourceToRemove->getAudioModifications ().front ().get () };
         auto regionToRemove { modificationToRemove->getPlaybackRegions ().front ().get () };
         testHost->removePlaybackRegion (document, regionToRemove);
