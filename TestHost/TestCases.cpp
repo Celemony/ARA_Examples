@@ -720,7 +720,7 @@ void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 // using the companion API rendering methods
 // Can optionally use an ARA plug-in's time stretching capabilities to stretch a playback region -
 // try loading Melodyne to see this feature in action
-void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingIfSupported, const AudioFileList& audioFiles)
+void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimestretchingIfSupported, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("playback rendering (with time stretching if supported)");
 
@@ -815,24 +815,24 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingI
         logRenderResults ();
 
         // optionally perform the render again if the plug-in supports time stretching
-        if (enableTimeStretchingIfSupported)
+        if (enableTimestretchingIfSupported)
         {
             const auto supportedTransformationFlags { plugInEntry->getARAFactory ()->supportedPlaybackTransformationFlags };
             if ((supportedTransformationFlags & ARA::kARAPlaybackTransformationTimestretch) != 0)
             {
-                constexpr double timeStretchFactor { 0.75 };
-                ARA_LOG ("Applying time stretch factor of %lg to all playback regions assigned to playback renderer %p", timeStretchFactor, playbackRenderer.getRef ());
+                constexpr double timestretchFactor { 0.75 };
+                ARA_LOG ("Applying time stretch factor of %lg to all playback regions assigned to playback renderer %p", timestretchFactor, playbackRenderer.getRef ());
 
                 araDocumentController->beginEditing ();
                 for (auto& playbackRegion : playbackRegions)
                 {
                     playbackRegion->setTransformationFlags (ARA::kARAPlaybackTransformationTimestretch + playbackRegion->getTransformationFlags ());
-                    playbackRegion->setDurationInPlaybackTime (timeStretchFactor * playbackRegion->getDurationInPlaybackTime ());
+                    playbackRegion->setDurationInPlaybackTime (timestretchFactor * playbackRegion->getDurationInPlaybackTime ());
                     araDocumentController->updatePlaybackRegionProperties (playbackRegion);
                 }
                 araDocumentController->endEditing ();
 
-                endOfPlaybackRegions *= timeStretchFactor;
+                endOfPlaybackRegions *= timestretchFactor;
                 endOfPlaybackRegionSamples = ARA::samplePositionAtTime (endOfPlaybackRegions, renderSampleRate);
 
                 ARA_LOG ("Rendering %lu region(s) assigned to playback renderer %p with sample rate %lgHz", playbackRegions.size (), playbackRenderer.getRef (), renderSampleRate);

@@ -62,7 +62,7 @@ void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 // using the companion API rendering methods
 // Can optionally use an ARA plug-in's time stretching capabilities to stretch a playback region -
 // try loading Melodyne to see this feature in action
-void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingIfSupported, const AudioFileList& audioFiles);
+void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimestretchingIfSupported, const AudioFileList& audioFiles);
 
 // Demonstrates how to communicate view selection and region sequence hiding
 // (albeit this is of rather limited use in a non-UI application)

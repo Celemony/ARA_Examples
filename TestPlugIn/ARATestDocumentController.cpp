@@ -602,7 +602,7 @@ void ARATestDocumentController::willRemovePlaybackRegionFromRegionSequence (ARA:
 void ARATestDocumentController::willUpdatePlaybackRegionProperties (ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::PlugIn::PropertiesPtr<ARA::ARAPlaybackRegionProperties> newProperties) noexcept
 {
     if ((playbackRegion->isTimestretchEnabled () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretch) != 0) ) ||
-        (playbackRegion->isTimeStretchReflectingTempo () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretchReflectingTempo) != 0) ) ||
+        (playbackRegion->isTimestretchReflectingTempo () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretchReflectingTempo) != 0) ) ||
         (playbackRegion->getStartInAudioModificationTime () != newProperties->startInModificationTime) ||
         (playbackRegion->getDurationInAudioModificationTime () != newProperties->durationInModificationTime) ||
         (playbackRegion->getStartInPlaybackTime () != newProperties->startInPlaybackTime) ||
