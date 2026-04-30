@@ -135,8 +135,7 @@ VST3Binary VST3LoadBinary (const char* binaryName)
     CFRelease (url);
     ARA_INTERNAL_ASSERT (vst3Binary->libHandle);
 
-    Boolean ARA_MAYBE_UNUSED_VAR (didLoad);
-    didLoad = CFBundleLoadExecutable (vst3Binary->libHandle);
+    [[maybe_unused]] const auto didLoad { CFBundleLoadExecutable (vst3Binary->libHandle) };
     ARA_INTERNAL_ASSERT (didLoad);
 
     const auto initBinaryFunc { (bundleEntryPtr) CFBundleGetFunctionPointerForName (vst3Binary->libHandle, CFSTR ("bundleEntry")) };
@@ -151,11 +150,11 @@ VST3Binary VST3LoadBinary (const char* binaryName)
 #endif
 
     ARA_INTERNAL_ASSERT (initBinaryFunc);
-    bool ARA_MAYBE_UNUSED_VAR (entrySucceeded);
+    [[maybe_unused]] const bool entrySucceeded
 #if defined (_WIN32)
-    entrySucceeded = initBinaryFunc ();
+                                               { initBinaryFunc () };
 #else
-    entrySucceeded = initBinaryFunc (vst3Binary->libHandle);
+                                               { initBinaryFunc (vst3Binary->libHandle) };
 #endif
     ARA_INTERNAL_ASSERT (entrySucceeded);
 
@@ -170,8 +169,7 @@ VST3Binary VST3LoadBinary (const char* binaryName)
     for (int32 i = 0; i < vst3Binary->pluginFactory->countClasses (); ++i)
     {
         PClassInfo classInfo;
-        tresult ARA_MAYBE_UNUSED_VAR (result);
-        result = vst3Binary->pluginFactory->getClassInfo (i, &classInfo);
+        [[maybe_unused]] auto result { vst3Binary->pluginFactory->getClassInfo (i, &classInfo) };
         ARA_INTERNAL_ASSERT (result == Steinberg::kResultOk);
 
         // find and instantiate all ARA::IMainFactory classes and ensure they have unique names and IDs
@@ -275,8 +273,7 @@ VST3Effect VST3CreateEffect (VST3Binary vst3Binary, const char* optionalPlugInNa
     for (int32 i = 0; i < vst3Binary->pluginFactory->countClasses (); ++i)
     {
         PClassInfo classInfo;
-        tresult ARA_MAYBE_UNUSED_VAR (result);
-        result = vst3Binary->pluginFactory->getClassInfo (i, &classInfo);
+        [[maybe_unused]] auto result { vst3Binary->pluginFactory->getClassInfo (i, &classInfo) };
         ARA_INTERNAL_ASSERT (result == Steinberg::kResultOk);
 
         if (std::strcmp (kVstAudioEffectClass, classInfo.category) == 0)
@@ -340,8 +337,7 @@ void VST3StartRendering (VST3Effect vst3Effect, int32_t channelCount, int32_t ma
     vst3Effect->channelCount = channelCount;
 
     ProcessSetup setup = { kRealtime, kSample32, maxBlockSize, sampleRate };
-    tresult ARA_MAYBE_UNUSED_VAR (result);
-    result = processor->setupProcessing (setup);
+    [[maybe_unused]] auto result { processor->setupProcessing (setup) };
     ARA_INTERNAL_ASSERT (result == kResultOk);
 
     SpeakerArrangement arrangement;
@@ -411,8 +407,7 @@ void VST3RenderBuffer (VST3Effect vst3Effect, int32_t blockSize, double sampleRa
     data.outputs = &outputs;
     data.processContext = &context;
 
-    tresult ARA_MAYBE_UNUSED_VAR (result);
-    result = processor->process (data);
+    [[maybe_unused]] const auto result { processor->process (data) };
     ARA_INTERNAL_ASSERT (result == kResultOk);
 }
 
@@ -420,8 +415,7 @@ void VST3StopRendering (VST3Effect vst3Effect)
 {
     ARA_INTERNAL_ASSERT (vst3Effect->channelCount != 0);
 
-    tresult ARA_MAYBE_UNUSED_VAR (result);
-    result = vst3Effect->component->setActive (false);
+    [[maybe_unused]] auto result { vst3Effect->component->setActive (false) };
     ARA_INTERNAL_ASSERT (result == kResultOk);
 
     result = vst3Effect->component->activateBus (kAudio, kInput, 0, false);
@@ -434,8 +428,7 @@ void VST3StopRendering (VST3Effect vst3Effect)
 
 void VST3DestroyEffect (VST3Effect vst3Effect)
 {
-    tresult ARA_MAYBE_UNUSED_VAR (result);
-    result = vst3Effect->component->terminate ();
+    [[maybe_unused]] const auto result { vst3Effect->component->terminate () };
     ARA_INTERNAL_ASSERT (result == kResultOk);
     vst3Effect->component = nullptr;
     delete vst3Effect;

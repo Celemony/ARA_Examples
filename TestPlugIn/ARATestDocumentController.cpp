@@ -788,7 +788,7 @@ ARA::PlugIn::ContentReader* ARATestDocumentController::doCreatePlaybackRegionCon
 
 /*******************************************************************************/
 
-void ARATestDocumentController::doRequestAudioSourceContentAnalysis (ARA::PlugIn::AudioSource* audioSource, std::vector<ARA::ARAContentType> const& ARA_MAYBE_UNUSED_ARG (contentTypes)) noexcept
+void ARATestDocumentController::doRequestAudioSourceContentAnalysis (ARA::PlugIn::AudioSource* audioSource, [[maybe_unused]] std::vector<ARA::ARAContentType> const& contentTypes) noexcept
 {
     ARA_INTERNAL_ASSERT (contentTypes.size () == 1);
     ARA_INTERNAL_ASSERT (contentTypes[0] == ARA::kARAContentTypeNotes);
@@ -805,7 +805,7 @@ void ARATestDocumentController::doRequestAudioSourceContentAnalysis (ARA::PlugIn
         startOrScheduleAnalysisOfAudioSource (testAudioSource);
 }
 
-bool ARATestDocumentController::doIsAudioSourceContentAnalysisIncomplete (const ARA::PlugIn::AudioSource* audioSource, ARA::ARAContentType ARA_MAYBE_UNUSED_ARG (type)) noexcept
+bool ARATestDocumentController::doIsAudioSourceContentAnalysisIncomplete (const ARA::PlugIn::AudioSource* audioSource, [[maybe_unused]] ARA::ARAContentType type) noexcept
 {
     ARA_INTERNAL_ASSERT (type == ARA::kARAContentTypeNotes);
 

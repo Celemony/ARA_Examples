@@ -103,8 +103,7 @@ int main (int argc, const char* argv[])
         }
 
         icstdsp::AudioFile audioFile;
-        int ARA_MAYBE_UNUSED_VAR (err);
-        err = audioFile.Load (it.c_str ());
+        [[maybe_unused]] const auto err { audioFile.Load (it.c_str ()) };
         if (err == icstdsp::NOFILE)
         {
             ARA_LOG ("Audio File '%s' not found, will be created.", it.c_str ());
