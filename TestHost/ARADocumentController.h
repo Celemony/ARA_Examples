@@ -49,7 +49,7 @@ ARA_MAP_HOST_REF (ArchiveBase, ARA::ARAArchiveReaderHostRef, ARA::ARAArchiveWrit
 // These property typedefs implicitly version our properties structs according to the last member
 using DocumentProperties = ARA::SizedStruct<&ARA::ARADocumentProperties::name>;
 using MusicalContextProperties = ARA::SizedStruct<&ARA::ARAMusicalContextProperties::color>;
-using RegionSequenceProperties = ARA::SizedStruct<&ARA::ARARegionSequenceProperties::color>;
+using RegionSequenceProperties = ARA::SizedStruct<&ARA::ARARegionSequenceProperties::persistentID>;
 using AudioSourceProperties = ARA::SizedStruct<&ARA::ARAAudioSourceProperties::channelArrangement>;
 using AudioModificationProperties = ARA::SizedStruct<&ARA::ARAAudioModificationProperties::persistentID>;
 using PlaybackRegionProperties = ARA::SizedStruct<&ARA::ARAPlaybackRegionProperties::color>;

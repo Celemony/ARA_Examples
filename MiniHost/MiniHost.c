@@ -324,7 +324,8 @@ int main(int argc, const char * argv[])
     ARAMusicalContextRef musicalContextRef;
 
     ARARegionSequenceProperties regionSequenceProperties = { ARA_IMPLEMENTED_STRUCT_SIZE(ARARegionSequenceProperties, color), "Track 1", 0,
-                                                             NULL /* this ref for context must be set properly before using the struct! */, NULL /* no color available */ };
+                                                             NULL /* this ref for context must be set properly before using the struct! */,
+                                                             NULL /* no color available */, "regionSequenceTestPersistentID" };
     ARARegionSequenceRef regionSequenceRef;
 
     ARAAudioSourceProperties audioSourceProperties = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAAudioSourceProperties, merits64BitSamples),

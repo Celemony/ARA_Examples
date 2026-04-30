@@ -81,9 +81,10 @@ AudioSource::AudioSource (Document* document, AudioFileBase* audioFile, std::str
 
 /*******************************************************************************/
 
-RegionSequence::RegionSequence (Document * document, std::string name, MusicalContext * musicalContext, ARA::ARAColor color)
+RegionSequence::RegionSequence (Document * document, std::string name, std::string persistentID, MusicalContext * musicalContext, ARA::ARAColor color)
 : _document { document },
   _name { name },
+  _persistentID { persistentID },
   _musicalContext { musicalContext },
   _color { color }
 {

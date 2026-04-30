@@ -154,7 +154,8 @@ const RegionSequenceProperties ARADocumentController::getRegionSequencePropertie
         regionSequence->getName ().c_str (),
         regionSequence->getOrderIndex (),
         getRef (regionSequence->getMusicalContext ()),
-        &regionSequence->getColor ()
+        &regionSequence->getColor (),
+        regionSequence->getPersistentID ().c_str ()
     };
 }
 
