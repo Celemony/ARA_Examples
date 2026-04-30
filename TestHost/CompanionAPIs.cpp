@@ -937,11 +937,7 @@ void PlugInEntry::validateAndSetFactory (const ARA::ARAFactory* factory)
 
     // ensure that this plug-in is supported by our test host
     ARA_INTERNAL_ASSERT (factory->lowestSupportedApiGeneration <= ARA::kARAAPIGeneration_3_0_Draft);
-#if ARA_CPU_ARM
     ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_2_0_Final);
-#else
-    ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_2_0_Draft);
-#endif
 
     _factory = factory;
 }

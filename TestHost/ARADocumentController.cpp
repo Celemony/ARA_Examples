@@ -299,11 +299,6 @@ void ARADocumentController::updatePlaybackRegionProperties (PlaybackRegion* play
 
 /*******************************************************************************/
 
-bool ARADocumentController::supportsPartialPersistency ()
-{
-    return _documentController->supportsPartialPersistency ();
-}
-
 bool ARADocumentController::storeObjectsToArchive (ArchiveBase* archive, const ARA::ARAStoreObjectsFilter* filter)
 {
     ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
@@ -318,32 +313,6 @@ bool ARADocumentController::restoreObjectsFromArchive (const ArchiveBase* archiv
     ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
     _currentArchive = archive;
     const auto result { _documentController->restoreObjectsFromArchive (toHostRef (archive), filter) };
-    _currentArchive = nullptr;
-    return result;
-}
-
-bool ARADocumentController::storeDocumentToArchive (ArchiveBase* archive)
-{
-    ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
-    _currentArchive = archive;
-    const auto result { _documentController->storeDocumentToArchive (toHostRef (archive)) };
-    _currentArchive = nullptr;
-    return result;
-}
-
-bool ARADocumentController::beginRestoringDocumentFromArchive (const ArchiveBase* archive)
-{
-    ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
-    _currentArchive = archive;
-    _isEditingDocument = true;
-    return _documentController->beginRestoringDocumentFromArchive (toHostRef (archive));
-}
-
-bool ARADocumentController::endRestoringDocumentFromArchive (const ArchiveBase* archive)
-{
-    ARA_INTERNAL_ASSERT (_currentArchive == archive);
-    const auto result { _documentController->endRestoringDocumentFromArchive (toHostRef (archive)) };
-    _isEditingDocument = false;
     _currentArchive = nullptr;
     return result;
 }

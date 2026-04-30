@@ -350,8 +350,6 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 {
     ARA_LOG_TEST_HOST_FUNC ("archiving");
 
-    bool supportsARA2Persistency { false };                 // will be properly set after creating document controller
-
     MemoryArchive archive { plugInEntry->getARAFactory ()->documentArchiveID };
 
     // create and archive the document,
@@ -362,7 +360,6 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
         // create basic ARA model graph and perform analysis
         std::unique_ptr<TestHost> testHost;
         auto araDocumentController { createHostAndBasicDocument (plugInEntry, testHost, "testArchiving", true, audioFiles) };
-        supportsARA2Persistency = araDocumentController->supportsPartialPersistency ();
 
         // log the audio source and modification content as reference
         for (const auto& audioSource : araDocumentController->getDocument ()->getAudioSources ())
@@ -386,11 +383,7 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
         }
 
         // store our analysis results
-        bool archivingSuccess { false };
-        if (supportsARA2Persistency)
-            archivingSuccess = araDocumentController->storeObjectsToArchive (&archive);
-        else
-            archivingSuccess = araDocumentController->storeDocumentToArchive (&archive);
+        bool archivingSuccess { araDocumentController->storeObjectsToArchive (&archive) };
         ARA_VALIDATE_API_STATE (archivingSuccess);      // our archive writer implementation never returns false, so this must always succeed
     }
 
@@ -405,11 +398,7 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
         auto araDocumentController { testHost->getDocumentController (document) };
 
         // begin the document edit cycle to configure and restore the document
-        bool unarchivingSuccess { true };
-        if (supportsARA2Persistency)
-            araDocumentController->beginEditing ();
-        else
-            unarchivingSuccess = araDocumentController->beginRestoringDocumentFromArchive (&archive);
+        araDocumentController->beginEditing ();
 
         // add a musical context and describe our timeline
         auto musicalContext { testHost->addMusicalContext (document, "ARA Test Musical Context", { 1.0f, 0.0f, 0.0f }) };
@@ -437,15 +426,8 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
         }
 
         // inject state and end the document edit cycle
-        if (supportsARA2Persistency)
-        {
-            unarchivingSuccess = araDocumentController->restoreObjectsFromArchive (&archive);
-            araDocumentController->endEditing ();
-        }
-        else
-        {
-            unarchivingSuccess = araDocumentController->endRestoringDocumentFromArchive (&archive) && unarchivingSuccess;
-        }
+        auto unarchivingSuccess { araDocumentController->restoreObjectsFromArchive (&archive) };
+        araDocumentController->endEditing ();
         ARA_VALIDATE_API_STATE (unarchivingSuccess);    // our archive reader implementation never returns false, and the archive
                                                         // was created on the same machine, so this call must always succeed
 
@@ -464,31 +446,28 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 
         // plug-ins must deal with archives containing more data than actually being restored.
         // to test this, we delete our first source, then restore again.
-        if (supportsARA2Persistency)
+        araDocumentController->beginEditing ();
+        auto sourceToRemove { document->getAudioSources().front ().get () };
+        auto modificationToRemove { sourceToRemove->getAudioModifications ().front ().get () };
+        auto regionToRemove { modificationToRemove->getPlaybackRegions ().front ().get () };
+        testHost->removePlaybackRegion (document, regionToRemove);
+        testHost->removeAudioModification (document, modificationToRemove);
+        testHost->removeAudioSource (document, sourceToRemove);
+
+        unarchivingSuccess = araDocumentController->restoreObjectsFromArchive (&archive);
+        ARA_VALIDATE_API_STATE (unarchivingSuccess);
+        araDocumentController->endEditing ();
+
+        // log the restored audio source and modification content to verify proper restoration
+        for (const auto& audioSource : document->getAudioSources ())
         {
-            araDocumentController->beginEditing ();
-            auto sourceToRemove { document->getAudioSources().front ().get () };
-            auto modificationToRemove { sourceToRemove->getAudioModifications ().front ().get () };
-            auto regionToRemove { modificationToRemove->getPlaybackRegions ().front ().get () };
-            testHost->removePlaybackRegion (document, regionToRemove);
-            testHost->removeAudioModification (document, modificationToRemove);
-            testHost->removeAudioSource (document, sourceToRemove);
+            ARA_LOG ("Audio source %p (ARAAudioSourceRef %p) with persistent ID \"%s\" has been restored", audioSource.get (), araDocumentController->getRef (audioSource.get ()), audioSource->getPersistentID ().c_str ());
+            araDocumentController->logAvailableContent (audioSource.get ());
 
-            unarchivingSuccess = araDocumentController->restoreObjectsFromArchive (&archive);
-            ARA_VALIDATE_API_STATE (unarchivingSuccess);
-            araDocumentController->endEditing ();
-
-            // log the restored audio source and modification content to verify proper restoration
-            for (const auto& audioSource : document->getAudioSources ())
+            for (const auto& audioModification : audioSource->getAudioModifications ())
             {
-                ARA_LOG ("Audio source %p (ARAAudioSourceRef %p) with persistent ID \"%s\" has been restored", audioSource.get (), araDocumentController->getRef (audioSource.get ()), audioSource->getPersistentID ().c_str ());
-                araDocumentController->logAvailableContent (audioSource.get ());
-
-                for (const auto& audioModification : audioSource->getAudioModifications ())
-                {
-                    ARA_LOG ("Audio modification %p (ARAAudioModificationRef %p) with persistent ID \"%s\" has been restored", audioModification.get (), araDocumentController->getRef (audioModification.get ()), audioModification->getPersistentID ().c_str ());
-                    araDocumentController->logAvailableContent (audioModification.get ());
-                }
+                ARA_LOG ("Audio modification %p (ARAAudioModificationRef %p) with persistent ID \"%s\" has been restored", audioModification.get (), araDocumentController->getRef (audioModification.get ()), audioModification->getPersistentID ().c_str ());
+                araDocumentController->logAvailableContent (audioModification.get ());
             }
         }
     }
@@ -512,11 +491,6 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
         // create basic ARA model graph and perform analysis
         std::unique_ptr<TestHost> testHost;
         auto araDocumentController { createHostAndBasicDocument (plugInEntry, testHost, "testSplitArchives", true, audioFiles) };
-        if (!araDocumentController->supportsPartialPersistency ())
-        {
-            ARA_LOG ("ARA2 Partial Persistency not supported by plug-in %s, skipping split archives test", plugInEntry->getARAFactory ()->plugInName);
-            return;
-        }
 
         // log the audio source and modification content as reference
         for (const auto& audioSource : araDocumentController->getDocument ()->getAudioSources ())
@@ -667,12 +641,6 @@ void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     ARA_LOG_TEST_HOST_FUNC ("drag and drop");
 
     std::unique_ptr<TestHost> testHost;
-    auto testDocController { createHostAndBasicDocument (plugInEntry, testHost, "ARA2PersistencyTestDoc", false, {}) };
-    if (!testDocController->supportsPartialPersistency ())
-    {
-        ARA_LOG ("ARA2 Partial Persistency not supported by plug-in %s, skipping drag and drop test", plugInEntry->getARAFactory ()->plugInName);
-        return;
-    }
 
     // create our "drag" document with two audio sources and perform analysis
     auto dragDocumentController { createHostAndBasicDocument (plugInEntry, testHost, "Drag Document", true, audioFiles) };
