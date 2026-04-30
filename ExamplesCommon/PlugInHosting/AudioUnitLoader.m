@@ -482,7 +482,7 @@ void ConfigureBussesArray(AUAudioUnitBusArray * bussesArray, UInt32 channelCount
 void AudioUnitStartRendering(AudioUnitInstance audioUnitInstance, UInt32 channelCount, UInt32 maxBlockSize, double sampleRate)
 {
     ARA_INTERNAL_ASSERT(audioUnitInstance->audioBuffers == NULL);
-    audioUnitInstance->audioBuffers = malloc(sizeof(UInt32) + channelCount * sizeof(AudioBuffer));
+    audioUnitInstance->audioBuffers = malloc(offsetof(AudioBufferList, mBuffers) + channelCount * sizeof(AudioBuffer));
     audioUnitInstance->audioBuffers->mNumberBuffers = channelCount;
 
     if (audioUnitInstance->isAUv2)
