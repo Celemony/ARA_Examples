@@ -508,7 +508,7 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
         }
 
         // store document data
-        const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAStoreObjectsFilter, audioModificationRefs)> storeDocumentDataFilter { ARA::kARATrue,
+        const ARA::SizedStruct<&ARA::ARAStoreObjectsFilter::audioModificationRefs> storeDocumentDataFilter { ARA::kARATrue,
                                                                                                                            0U, nullptr,
                                                                                                                            0U, nullptr
                                                                                                                          };
@@ -520,7 +520,7 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
         {
             audioSourcePersistentIDs.push_back (audioSource->getPersistentID ());
             const auto audioSourceRef { araDocumentController->getRef (audioSource.get ()) };
-            const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAStoreObjectsFilter, audioModificationRefs)> storeAudioSourceFilter { ARA::kARAFalse,
+            const ARA::SizedStruct<&ARA::ARAStoreObjectsFilter::audioModificationRefs> storeAudioSourceFilter { ARA::kARAFalse,
                                                                                                                               1U, &audioSourceRef,
                                                                                                                               0U, nullptr
                                                                                                                             };
@@ -532,7 +532,7 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
             {
                 audioModificationPersistentIDs[audioSource->getPersistentID ()].push_back (audioModification->getPersistentID ());
                 const auto audioModificationRef { araDocumentController->getRef (audioModification.get ()) };
-                const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAStoreObjectsFilter, audioModificationRefs)> storeAudioModificationFilter { ARA::kARAFalse,
+                const ARA::SizedStruct<&ARA::ARAStoreObjectsFilter::audioModificationRefs> storeAudioModificationFilter { ARA::kARAFalse,
                                                                                                                                         0U, nullptr,
                                                                                                                                         1U, &audioModificationRef
                                                                                                                                       };
@@ -571,7 +571,7 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
 
             // inject audio source state
             const auto audioSourcePersistentID { audioSource->getPersistentID ().c_str () };
-            const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARARestoreObjectsFilter, audioModificationCurrentIDs)> restoreAudioSourceFilter { ARA::kARAFalse,
+            const ARA::SizedStruct<&ARA::ARARestoreObjectsFilter::audioModificationCurrentIDs> restoreAudioSourceFilter { ARA::kARAFalse,
                                                                                                                                         1U, &audioSourcePersistentID, nullptr,
                                                                                                                                         0U, nullptr, nullptr
                                                                                                                                        };
@@ -587,7 +587,7 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
 
                 // inject audio modification state
                 const auto audioModificationPersistentID { audioModification->getPersistentID ().c_str () };
-                const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARARestoreObjectsFilter, audioModificationCurrentIDs)> restoreAudioModificationFilter { ARA::kARAFalse,
+                const ARA::SizedStruct<&ARA::ARARestoreObjectsFilter::audioModificationCurrentIDs> restoreAudioModificationFilter { ARA::kARAFalse,
                                                                                                                                                   0U, nullptr, nullptr,
                                                                                                                                                   1U, &audioModificationPersistentID, nullptr
                                                                                                                                                 };
@@ -607,7 +607,7 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
         }
 
         // finally, inject document data and end the document edit cycle
-        ARA::SizedStruct<ARA_STRUCT_MEMBER (ARARestoreObjectsFilter, audioModificationCurrentIDs)> restoreDocumentDataFilter { ARA::kARATrue,
+        ARA::SizedStruct<&ARA::ARARestoreObjectsFilter::audioModificationCurrentIDs> restoreDocumentDataFilter { ARA::kARATrue,
                                                                                                                                0U, nullptr, nullptr,
                                                                                                                                0U, nullptr, nullptr
                                                                                                                              };
@@ -661,7 +661,7 @@ void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     // use a StoreObjectsFilter to create a "drag" archive containing only draggedAudioSource / Modification
     auto draggedAudioSourceRef { dragDocumentController->getRef (draggedAudioSource) };
     auto draggedAudioModificationRef { dragDocumentController->getRef (draggedAudioModification) };
-    const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAStoreObjectsFilter, audioModificationRefs)> storeObjectsFilter { ARA::kARATrue,
+    const ARA::SizedStruct<&ARA::ARAStoreObjectsFilter::audioModificationRefs> storeObjectsFilter { ARA::kARATrue,
                                                                                                                   1U, &draggedAudioSourceRef,
                                                                                                                   1U, &draggedAudioModificationRef
                                                                                                                 };
@@ -690,7 +690,7 @@ void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     const auto audioModificationArchiveID { draggedAudioModification->getPersistentID ().c_str () };
     const auto audioSourceCurrentID { dropAudioSource->getPersistentID ().c_str () };
     const auto audioModificationCurrentID { dropAudioModification->getPersistentID ().c_str () };
-    const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARARestoreObjectsFilter, audioModificationCurrentIDs)> restoreObjectsFilter { ARA::kARATrue,
+    const ARA::SizedStruct<&ARA::ARARestoreObjectsFilter::audioModificationCurrentIDs> restoreObjectsFilter { ARA::kARATrue,
                                                                                                                             1U, &audioSourceArchiveID, &audioSourceCurrentID,
                                                                                                                             1U, &audioModificationArchiveID, &audioModificationCurrentID
                                                                                                                           };
@@ -869,7 +869,7 @@ void testEditorView (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
     auto editorView { plugInInstance->getEditorView () };
 
     // Selection demonstration
-    using Selection = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAViewSelection, timeRange)>;
+    using Selection = ARA::SizedStruct<&ARA::ARAViewSelection::timeRange>;
 
     // create a "selection" containing all playback regions in the document and notify the editor view
     std::vector<ARA::ARAPlaybackRegionRef> playbackRegionRefs;
@@ -1007,7 +1007,7 @@ void testAudioFileChunkLoading (PlugInEntry* plugInEntry, const AudioFileList& a
         // partial persistence - restore this audio source using the archive stored in the XML data
         const auto oldID { persistentID.c_str () };
         const auto newID { newPersistentID.c_str () };
-        const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARARestoreObjectsFilter, audioModificationCurrentIDs)> restoreObjectsFilter { ARA::kARAFalse,
+        const ARA::SizedStruct<&ARA::ARARestoreObjectsFilter::audioModificationCurrentIDs> restoreObjectsFilter { ARA::kARAFalse,
                                                                                                                                 1U, &oldID, &newID,
                                                                                                                                 0U, nullptr, nullptr
                                                                                                                               };

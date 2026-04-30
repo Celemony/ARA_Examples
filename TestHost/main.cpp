@@ -201,7 +201,7 @@ int main (int argc, const char* argv[])
 
     ARA_LOG ("    plug-in does%s support content-based fades.", ((factory->supportedPlaybackTransformationFlags & ARA::kARAPlaybackTransformationContentBasedFades) != 0) ? "" : " not");
 
-    ARA_LOG ("    plug-in does%s support storing audio file chunks.", (factory.implements<ARA_STRUCT_MEMBER (ARAFactory, supportsStoringAudioFileChunks)> () &&
+    ARA_LOG ("    plug-in does%s support storing audio file chunks.", (factory.implements<&ARA::ARAFactory::supportsStoringAudioFileChunks> () &&
                                                                       (factory->supportsStoringAudioFileChunks != ARA::kARAFalse)) ? "" : " not");
 
     // parse any optional test cases or audio files
