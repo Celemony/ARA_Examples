@@ -55,7 +55,7 @@ private:
 };
 
 
-static void addChunk (AudioFileBase&& audioFile, bool openAutomatically)
+static void addChunkAndSave (AudioFileBase&& audioFile, bool openAutomatically, const std::string& path)
 {
     const auto persistentID { "audioSource1" };
     const auto documentArchiveID { TEST_FILECHUNK_ARCHIVE_ID };
@@ -83,8 +83,7 @@ static void addChunk (AudioFileBase&& audioFile, bool openAutomatically)
                                          persistentID, archive);
 
     // store audio file
-    auto wavFileName { audioFile.getName () };
-    auto success { audioFile.saveToFile (audioFile.getName ()) };
+    auto success { audioFile.saveToFile (path) };
     ARA_INTERNAL_ASSERT (success);
 }
 
@@ -103,16 +102,16 @@ int main (int argc, const char* argv[])
         }
 
         icstdsp::AudioFile audioFile;
-        [[maybe_unused]] const auto err { audioFile.Load (it.c_str ()) };
+        const auto err { audioFile.Load (it.c_str ()) };
         if (err == icstdsp::NOFILE)
         {
             ARA_LOG ("Audio File '%s' not found, will be created.", it.c_str ());
-            addChunk (SineAudioFile { it, 5.0, 44100.0, 1 }, openAutomatically);
+            addChunkAndSave (SineAudioFile { it, 5.0, 44100.0, 1 }, openAutomatically, it);
         }
         else
         {
             ARA_INTERNAL_ASSERT (err == 0);
-            addChunk (AudioDataFile { it, std::move (audioFile) }, openAutomatically);
+            addChunkAndSave (AudioDataFile { it, std::move (audioFile) }, openAutomatically, it);
         }
     }
     return 0;

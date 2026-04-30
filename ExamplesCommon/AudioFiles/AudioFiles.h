@@ -97,7 +97,7 @@ private:
 class AudioDataFile : public AudioFileBase
 {
 public:
-    AudioDataFile (const std::string& name, icstdsp::AudioFile&& audioFile);
+    AudioDataFile (const std::string& path, icstdsp::AudioFile&& audioFile);
 
     int64_t getSampleCount () const noexcept override { return _audioFile.GetSize (); }
     double getSampleRate () const noexcept override { return _audioFile.GetRate (); }

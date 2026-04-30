@@ -29,6 +29,7 @@
 #include <cstring>
 #include <vector>
 #include <sstream>
+#include <filesystem>
 
 
 /*******************************************************************************/
@@ -228,8 +229,17 @@ bool SineAudioFile::saveToFile (const std::string& path)
 
 /*******************************************************************************/
 
-AudioDataFile::AudioDataFile (const std::string& name, icstdsp::AudioFile&& audioFile)
-: AudioFileBase { name },
+inline static const std::string filenameHelper (const std::string& path)
+{
+    std::filesystem::path fp { path };
+    if (fp.has_filename ())
+        return fp.filename ().string ();
+    else
+        return path;
+}
+
+AudioDataFile::AudioDataFile (const std::string& path, icstdsp::AudioFile&& audioFile)
+: AudioFileBase { filenameHelper (path) },
   _audioFile { std::move (audioFile) }
 {
     unsigned int dataLength { 0 };
