@@ -60,6 +60,14 @@ AudioFileList createDummyAudioFiles (size_t numFiles)
     return dummyFiles;
 }
 
+// Helper function to give individual color to region sequences or playback regions
+inline static ARA::ARAColor getUniqueColorForIndex (size_t i)
+{
+    const auto remainder { i % 3 };
+    const auto value { 3.0f / static_cast<float> (i - remainder + 3) };
+    return { (remainder != 0) ? value : 0.0f, (remainder != 1) ? value : 0.0f, (remainder != 2) ? value : 0.0f };
+}
+
 /*******************************************************************************/
 // Using the supplied binary, this function creates an instance of the TestHost with a document
 // that contains a musical context with one region sequence. Per file provided in the file list,
@@ -83,12 +91,8 @@ static ARADocumentController* createHostAndBasicDocument (PlugInEntry* plugInEnt
     araDocumentController->beginEditing ();
 
     // add a musical context and describe our timeline
-    auto musicalContext { testHost->addMusicalContext (document, "ARA Test Musical Context", { 1.0f, 0.0f, 0.0f }) };
+    auto musicalContext { testHost->addMusicalContext (document, "ARA Test Musical Context", ARA::ARAColor {}) };
 
-    // add a region sequence to describe our arrangement with a single track
-    auto regionSequence { testHost->addRegionSequence (document, "Track 1", "regionSequencePersistentID 0", musicalContext, { 0.0f, 1.0f, 0.0f }) };
-
-    double position { 0.0 };
     for (size_t i { 0 }; i < audioFiles.size (); ++i)
     {
         // add an audio source based on the audio file
@@ -100,11 +104,15 @@ static ARADocumentController* createHostAndBasicDocument (PlugInEntry* plugInEnt
         const std::string audioModificationPersistentID { "audioModificationTestPersistentID " + std::to_string (i) };
         auto audioModification { testHost->addAudioModification (document, audioSource, audioModificationName, audioModificationPersistentID) };
 
+        // add region sequence to place the audio on
+        const std::string regionSequenceName { "Track for " + audioSource->getName () };
+        const std::string regionSequencePersistentID { "regionSequenceTestPersistentID " + std::to_string (i) };
+        auto regionSequence { testHost->addRegionSequence (document, regionSequenceName.c_str (), regionSequencePersistentID.c_str (), musicalContext, getUniqueColorForIndex (i)) };
+
         // add a playback region encompassing the entire audio source to render modifications in our musical context,
         // enabling time stretching if requested & supported
         const auto duration { audioSource->getDuration () };
-        testHost->addPlaybackRegion (document, audioModification, ARA::kARAPlaybackTransformationNoChanges, 0.0, duration, position, duration, regionSequence, "Test playback region", { 0.0f, 0.0f, 1.0f });
-        position += duration;
+        testHost->addPlaybackRegion (document, audioModification, ARA::kARAPlaybackTransformationNoChanges, 0.0, duration, 0.0, duration, regionSequence, "Test playback region", regionSequence->getColor ());
     }
 
     // end the document edit cycle
@@ -367,8 +375,8 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 
     MemoryArchive archive { plugInEntry->getARAFactory ()->documentArchiveID };
 
-    // create and archive the document,
-    // caching the audio source / modification persistent IDs
+    // create and archive the document, caching all persistent IDs
+    std::vector<std::string> regionSequencePersistentIDs;
     std::vector<std::string> audioSourcePersistentIDs;
     std::map<std::string, std::vector<std::string>> audioModificationPersistentIDs;
     {
@@ -396,6 +404,10 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
             for (const auto& audioModification : audioSource->getAudioModifications ())
                 audioModificationPersistentIDs[audioSource->getPersistentID ()].push_back (audioModification->getPersistentID ());
         }
+        for (const auto& regionSequence : araDocumentController->getDocument ()->getRegionSequences ())
+            regionSequencePersistentIDs.push_back (regionSequence->getPersistentID ());
+        // this simplistic implementation requires a region sequence per audio source
+        ARA_INTERNAL_ASSERT (audioSourcePersistentIDs.size () == regionSequencePersistentIDs.size ());
 
         // store our analysis results
         bool archivingSuccess { araDocumentController->storeObjectsToArchive (&archive) };
@@ -416,16 +428,16 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
         araDocumentController->beginEditing ();
 
         // add a musical context and describe our timeline
-        auto musicalContext { testHost->addMusicalContext (document, "ARA Test Musical Context", { 1.0f, 0.0f, 0.0f }) };
+        auto musicalContext { testHost->addMusicalContext (document, "ARA Test Musical Context", ARA::ARAColor {}) };
 
-        // add a region sequence to describe our arrangement with a single track
-        auto regionSequence { testHost->addRegionSequence (document, "Track 1", "regionSequencePersistentID 0", musicalContext, { 0.0f, 1.0f, 0.0f }) };
-
-        // recreate the audio sources / modifications based on our cached persistent IDs
+        // recreate the audio sources / modifications and region sequences based on our cached persistent IDs
         for (size_t i { 0 }; i < audioFiles.size (); ++i)
         {
             auto audioSource { testHost->addAudioSource (document, audioFiles[i].get (), audioSourcePersistentIDs[i]) };
             araDocumentController->enableAudioSourceSamplesAccess (audioSource, true);
+
+            const std::string regionSequenceName { "Track for " + audioSource->getName () };
+            auto regionSequence { testHost->addRegionSequence (document, regionSequenceName.c_str (), regionSequencePersistentIDs[i], musicalContext, getUniqueColorForIndex (i)) };
 
             for (size_t j { 0 }; j < audioModificationPersistentIDs[audioSource->getPersistentID ()].size (); ++j)
             {
@@ -436,7 +448,7 @@ void testArchiving (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
                 const auto playbackDuration { audioSource->getDuration () };
                 testHost->addPlaybackRegion (document, audioModification, ARA::kARAPlaybackTransformationNoChanges,
                                                 0.0, audioSource->getDuration (), static_cast<double> (i) * playbackDuration, playbackDuration,
-                                                regionSequence, "Test playback region", { 0.0f, 0.0f, 1.0f });
+                                                regionSequence, "Test playback region", regionSequence->getColor ());
             }
         }
 
@@ -592,7 +604,7 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
         araDocumentController->beginEditing ();
 
         // add a musical context and describe our timeline
-        auto musicalContext { testHost->addMusicalContext (document, "ARA Test Musical Context", { 1.0f, 0.0f, 0.0f }) };
+        auto musicalContext { testHost->addMusicalContext (document, "ARA Test Musical Context", ARA::ARAColor {}) };
 
         // recreate the region sequences based on our cached persistent IDs
         bool unarchivingSuccess { false };
@@ -601,7 +613,7 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
         {
             // recreate region sequence
             std::string trackName { "Track " + std::to_string (i + 1) };
-            testHost->addRegionSequence (document, trackName, regionSequencePersistentIDs[i], musicalContext, { 0.0f, 1.0f, 0.0f });
+            testHost->addRegionSequence (document, trackName, regionSequencePersistentIDs[i], musicalContext, getUniqueColorForIndex (i));
             
             rawRegionSequencePersistentIDs.push_back (regionSequencePersistentIDs[i].c_str ());
         }
@@ -655,7 +667,7 @@ void testSplitArchives (PlugInEntry* plugInEntry, const AudioFileList& audioFile
                 const auto playbackDuration { audioSource->getDuration () };
                 testHost->addPlaybackRegion (document, audioModification, ARA::kARAPlaybackTransformationNoChanges,
                                                 0.0, audioSource->getDuration (), static_cast<double> (i) * playbackDuration, playbackDuration,
-                                                regionSequence, "Test playback region", { 0.0f, 0.0f, 1.0f });
+                                                regionSequence, "Test playback region", regionSequence->getColor ());
             }
 
             // enable audio source access
@@ -1021,8 +1033,9 @@ void testAudioFileChunkLoading (PlugInEntry* plugInEntry, const AudioFileList& a
     auto araDocumentController { createHostAndBasicDocument (plugInEntry, testHost, "testAudioFileChunkLoading", false, {}) };
     const auto araFactory { plugInEntry->getARAFactory () };
     const auto document { araDocumentController->getDocument () };
+    const auto musicalContext { document->getMusicalContexts ().front ().get () };
 
-    auto index { 0 };
+    auto index { 0U };
     for (const auto& audioFile : audioFiles)
     {
         // find matching ARA archive
@@ -1077,11 +1090,16 @@ void testAudioFileChunkLoading (PlugInEntry* plugInEntry, const AudioFileList& a
 
         araDocumentController->enableAudioSourceSamplesAccess (audioSource, true);
 
-        // add audio modification and playback region
+        // add audio modification, region sequence and playback region
         const std::string audioModificationPersistentID { "audioModificationTestPersistentID " + std::to_string (index) };
-        const auto duration { audioSource->getDuration () };
         auto audioModification { testHost->addAudioModification (document, audioSource, audioFile->getName () + " Modification", audioModificationPersistentID.c_str ()) };
-        testHost->addPlaybackRegion (document, audioModification, ARA::kARAPlaybackTransformationNoChanges, 0.0, duration, 0.0, duration, document->getRegionSequences ()[0].get (), audioFile->getName () + "Playback Region", ARA::ARAColor {});
+
+        const std::string regionSequenceName { "Track for " + audioSource->getName () };
+        const std::string regionSequencePersistentID { "regionSequenceTestPersistentID " + std::to_string (index) };
+        auto regionSequence { testHost->addRegionSequence (document, regionSequenceName.c_str (), regionSequencePersistentID.c_str (), musicalContext, getUniqueColorForIndex (index)) };
+
+        const auto duration { audioSource->getDuration () };
+        testHost->addPlaybackRegion (document, audioModification, ARA::kARAPlaybackTransformationNoChanges, 0.0, duration, 0.0, duration, regionSequence, audioFile->getName () + "Playback Region", regionSequence->getColor ());
 
         // conclude loading chunk
         araDocumentController->endEditing ();
