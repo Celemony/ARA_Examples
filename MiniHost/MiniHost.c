@@ -282,10 +282,14 @@ static void ARA_CALL ARANotifyDocumentDataChanged(ARAModelUpdateControllerHostRe
 {
     ARA_LOG("document data was updated");
 }
-static const ARAModelUpdateControllerInterface hostModelUpdateControllerInterface = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAModelUpdateControllerInterface, notifyDocumentDataChanged),
+static void ARA_CALL ARANotifyRegionSequenceChanged(ARAModelUpdateControllerHostRef controllerHostRef, ARARegionSequenceHostRef regionSequenceHostRef)
+{
+    ARA_LOG("region sequence data was updated");
+}
+static const ARAModelUpdateControllerInterface hostModelUpdateControllerInterface = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAModelUpdateControllerInterface, notifyRegionSequenceDataChanged),
                                                                                         &ARANotifyAudioSourceAnalysisProgress, &ARANotifyAudioSourceContentChanged,
                                                                                         &ARANotifyAudioModificationContentChanged, &ARANotifyPlaybackRegionContentChanged,
-                                                                                        &ARANotifyDocumentDataChanged };
+                                                                                        &ARANotifyDocumentDataChanged, &ARANotifyRegionSequenceChanged };
 
 // asserts
 #if ARA_VALIDATE_API_CALLS

@@ -129,3 +129,13 @@ void ARAModelUpdateController::notifyDocumentDataChanged () noexcept
 
     ARA_LOG ("document data was updated");
 }
+
+void ARAModelUpdateController::notifyRegionSequenceDataChanged (ARA::ARARegionSequenceHostRef regionSequenceHostRef) noexcept
+{
+    const auto regionSequence = fromHostRef (regionSequenceHostRef);
+    ARA_VALIDATE_API_ARGUMENT (regionSequence, ARA::contains (getDocument ()->getRegionSequences (), regionSequence));
+    ARA_VALIDATE_API_STATE (_araDocumentController->isPollingModelUpdates ());
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
+
+    ARA_LOG ("data of region sequence %p (ARARegionSequenceRef ref %p) was updated", regionSequence, _araDocumentController->getRef (regionSequence));
+}

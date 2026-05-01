@@ -56,6 +56,8 @@ public:
 
     void notifyDocumentDataChanged () noexcept override;
 
+    void notifyRegionSequenceDataChanged (ARA::ARARegionSequenceHostRef regionSequenceHostRef) noexcept override;
+
     void setMinimalContentUpdateLogging (bool flag) { _minimalContentUpdateLogging = flag; }
 
 private:

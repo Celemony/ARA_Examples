@@ -589,25 +589,28 @@ void ARATestDocumentController::doUpdateMusicalContextContent (ARA::PlugIn::Musi
 // just like some alignment plug-in would have - this state would be updated when adding or removing
 // regions to the arrangement or when their time ranges or stretching mode changes.
 
-void ARATestDocumentController::didAddPlaybackRegionToRegionSequence (ARA::PlugIn::RegionSequence* /*regionSequence*/, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
+void ARATestDocumentController::didAddPlaybackRegionToRegionSequence (ARA::PlugIn::RegionSequence* regionSequence, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
 {
-    notifyDocumentDataChanged ();
+    notifyRegionSequenceDataChanged (regionSequence);
 }
 
-void ARATestDocumentController::willRemovePlaybackRegionFromRegionSequence (ARA::PlugIn::RegionSequence* /*regionSequence*/, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
+void ARATestDocumentController::willRemovePlaybackRegionFromRegionSequence (ARA::PlugIn::RegionSequence* regionSequence, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
 {
-    notifyDocumentDataChanged ();
+    notifyRegionSequenceDataChanged (regionSequence);
 }
 
 void ARATestDocumentController::willUpdatePlaybackRegionProperties (ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::PlugIn::PropertiesPtr<ARA::ARAPlaybackRegionProperties> newProperties) noexcept
 {
-    if ((playbackRegion->isTimestretchEnabled () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretch) != 0) ) ||
-        (playbackRegion->isTimestretchReflectingTempo () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretchReflectingTempo) != 0) ) ||
-        (playbackRegion->getStartInAudioModificationTime () != newProperties->startInModificationTime) ||
-        (playbackRegion->getDurationInAudioModificationTime () != newProperties->durationInModificationTime) ||
-        (playbackRegion->getStartInPlaybackTime () != newProperties->startInPlaybackTime) ||
-        (playbackRegion->getDurationInPlaybackTime () != newProperties->durationInPlaybackTime))
-        notifyDocumentDataChanged ();
+    if (const auto regionSequence { playbackRegion->getRegionSequence () }) // upon creation, there will be no region sequence set yet -
+    {                                                                       // the update will happen later upon didAddPlaybackRegionToRegionSequence ()
+        if ((playbackRegion->isTimestretchEnabled () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretch) != 0)) ||
+            (playbackRegion->isTimestretchReflectingTempo () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretchReflectingTempo) != 0)) ||
+            (playbackRegion->getStartInAudioModificationTime () != newProperties->startInModificationTime) ||
+            (playbackRegion->getDurationInAudioModificationTime () != newProperties->durationInModificationTime) ||
+            (playbackRegion->getStartInPlaybackTime () != newProperties->startInPlaybackTime) ||
+            (playbackRegion->getDurationInPlaybackTime () != newProperties->durationInPlaybackTime))
+            notifyRegionSequenceDataChanged (regionSequence);
+    }
 }
 
 /*******************************************************************************/
