@@ -235,6 +235,9 @@ void testContentUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFil
                                                      {  6,  6, { 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x05, 0x00, 0x06, 0x00, 0x00 }, "F#6", 28.0 },
                                                      {  6,  6, { 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00 }, "F#6", 32.0 } };
 
+    const std::vector<ARA::ARAContentLyricsEntry> lyrics { { "Hel", ARA::kARAFalse, "en", 0, nullptr, nullptr, ARA::kARAContentGradeInitial, 0.0  },
+                                                           { "lo", ARA::kARATrue, "en", 0, nullptr, nullptr, ARA::kARAContentGradeInitial, 1.0  } };
+
     std::vector<ARA::ARAContentNote> notes (12);
     for (size_t i { 0 }; i < notes.size (); ++i)
     {
@@ -259,7 +262,7 @@ void testContentUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFil
     araDocumentController->updateMusicalContextContent (musicalContext.get (), nullptr, musicalContextUpdateScope);
     araDocumentController->endEditing ();
 
-    ARA_LOG ("Updating audio source %p (ARAAudioSourceRef %p) with new notes, tempo, bar signature, tuning, key signature, and chord data", audioSource.get (), araDocumentController->getRef (audioSource.get ()));
+    ARA_LOG ("Updating audio source %p (ARAAudioSourceRef %p) with new notes, tempo, bar signature, tuning, key signature, chord data and lyrics", audioSource.get (), araDocumentController->getRef (audioSource.get ()));
     constexpr auto audioSourceUpdateScope { musicalContextUpdateScope + ARA::ContentUpdateScopes::notesAreAffected () };
     araDocumentController->beginEditing ();
     audioSource->setNotes (notes);
