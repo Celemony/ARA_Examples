@@ -2,7 +2,7 @@
 //! \file       AudioFiles.cpp
 //!             classes representing audio files
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -29,6 +29,7 @@
 #include <cstring>
 #include <vector>
 #include <sstream>
+#include <filesystem>
 
 
 /*******************************************************************************/
@@ -93,11 +94,7 @@ public:
 
         persistentID = archive.child_value (ARA::kARAXMLName_PersistentID);
 
-#if __cplusplus >= 201703L
         return base64_decode (std::string_view { archive.child_value (ARA::kARAXMLName_ArchiveData) }, true);
-#else
-        return base64_decode (archive.child_value (ARA::kARAXMLName_ArchiveData), true);
-#endif
     }
 
     void setAudioSourceData (const std::string& documentArchiveID, bool openAutomatically,
@@ -232,8 +229,17 @@ bool SineAudioFile::saveToFile (const std::string& path)
 
 /*******************************************************************************/
 
-AudioDataFile::AudioDataFile (const std::string& name, icstdsp::AudioFile&& audioFile)
-: AudioFileBase { name },
+inline static const std::string filenameHelper (const std::string& path)
+{
+    std::filesystem::path fp { path };
+    if (fp.has_filename ())
+        return fp.filename ().string ();
+    else
+        return path;
+}
+
+AudioDataFile::AudioDataFile (const std::string& path, icstdsp::AudioFile&& audioFile)
+: AudioFileBase { filenameHelper (path) },
   _audioFile { std::move (audioFile) }
 {
     unsigned int dataLength { 0 };

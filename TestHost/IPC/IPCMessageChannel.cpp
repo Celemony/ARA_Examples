@@ -3,7 +3,7 @@
 //!             Proof-of-concept implementation of MessageChannel
 //!             for the ARA SDK TestHost (error handling is limited to assertions).
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2012-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2012-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -45,7 +45,6 @@
 //------------------------------------------------------------------------------
 #if defined (_WIN32)
 //------------------------------------------------------------------------------
-
 
 class IPCMessagePort
 {
@@ -136,13 +135,20 @@ public:
 #endif
 
         const auto messageID { _sharedMemory->messageID };
-        const auto decoder { IPCXMLMessageDecoder::createWithMessageData (_sharedMemory->messageData, _sharedMemory->messageSize) };
+        auto decoder { IPCXMLMessageDecoder::createWithMessageData (_sharedMemory->messageData, _sharedMemory->messageSize) };
 
         ::SetEvent (_dataReceived);
 
-        _channel->getMessageDispatcher ()->routeReceivedMessage (messageID, decoder);
+        _channel->routeReceivedMessage (messageID, std::move (decoder));
         return true;
     }
+
+#if USE_ARA_BACKGROUND_IPC
+    std::thread::id getReceiveThreadID ()
+    {
+        return _receiveThread->get_id ();
+    }
+#endif
 
 private:
     IPCMessageChannel* const _channel;
@@ -185,7 +191,6 @@ public:
 //------------------------------------------------------------------------------
 #elif defined (__APPLE__)
 //------------------------------------------------------------------------------
-
 
 class IPCReceivePort
 {
@@ -241,16 +246,23 @@ public:
         return (CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.001 * milliseconds, true) != kCFRunLoopRunTimedOut);
     }
 
+#if USE_ARA_BACKGROUND_IPC
+    std::thread::id getReceiveThreadID ()
+    {
+        return _receiveThread->get_id ();
+    }
+#endif
+
 private:
     static CFDataRef _portCallback (CFMessagePortRef /*port*/, SInt32 messageID, CFDataRef messageData, void* info)
     {
         auto channel { static_cast<IPCMessageChannel*> (info) };
 #if USE_ARA_CF_ENCODING
-        const auto decoder { ARA::IPC::CFMessageDecoder::createWithMessageData (messageData) };
+        auto decoder { ARA::IPC::CFMessageDecoder::createWithMessageData (messageData) };
 #else
-        const auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
+        auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
 #endif
-        channel->getMessageDispatcher ()->routeReceivedMessage (messageID, decoder);
+        channel->routeReceivedMessage (messageID, std::move (decoder));
         return nullptr;
     }
 
@@ -292,7 +304,7 @@ public:
 
     void sendMessage (ARA::IPC::MessageID messageID, CFDataRef messageData)
     {
-        const auto ARA_MAYBE_UNUSED_VAR (result) { CFMessagePortSendRequest (_port, messageID, messageData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
+        [[maybe_unused]] const auto result { CFMessagePortSendRequest (_port, messageID, messageData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
         ARA_INTERNAL_ASSERT (result == kCFMessagePortSuccess);
     }
 
@@ -306,34 +318,30 @@ private:
 //------------------------------------------------------------------------------
 
 
-IPCMessageChannel* IPCMessageChannel::createPublishingID (const std::string& channelID)
+std::unique_ptr<IPCMessageChannel> IPCMessageChannel::createPublishingID (const std::string& channelID)
 {
-    auto channel { new IPCMessageChannel {} };
-    channel->_sendPort = new IPCSendPort { channelID + ".from_server" };
-    channel->_receivePort = new IPCReceivePort { channelID + ".to_server", channel };
+    auto channel { std::make_unique<IPCMessageChannel> ()};
+    channel->_sendPort = std::make_unique<IPCSendPort> (channelID + ".from_server");
+    channel->_receivePort = std::make_unique<IPCReceivePort> (channelID + ".to_server", channel.get ());
     return channel;
 }
 
-IPCMessageChannel* IPCMessageChannel::createConnectedToID (const std::string& channelID)
+std::unique_ptr<IPCMessageChannel> IPCMessageChannel::createConnectedToID (const std::string& channelID)
 {
-    auto channel { new IPCMessageChannel {} };
-    channel->_receivePort = new IPCReceivePort { channelID + ".from_server", channel };
-    channel->_sendPort = new IPCSendPort { channelID + ".to_server" };
+    auto channel { std::make_unique<IPCMessageChannel> ()};
+    channel->_receivePort = std::make_unique<IPCReceivePort> ( channelID + ".from_server", channel.get ());
+    channel->_sendPort = std::make_unique<IPCSendPort> (channelID + ".to_server");
     return channel;
 }
 
-IPCMessageChannel::~IPCMessageChannel ()
-{
-    delete _sendPort;
-    delete _receivePort;
-}
+IPCMessageChannel::~IPCMessageChannel () = default;
 
-void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, ARA::IPC::MessageEncoder* encoder)
+void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, std::unique_ptr<ARA::IPC::MessageEncoder> && encoder)
 {
 #if USE_ARA_CF_ENCODING
-    const auto messageData { static_cast<ARA::IPC::CFMessageEncoder*> (encoder)->createMessageEncoderData () };
+    const auto messageData { static_cast<ARA::IPC::CFMessageEncoder*> (encoder.get ())->createMessageEncoderData () };
 #else
-    const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder)->createEncodedMessage () };
+    const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder.get ())->createEncodedMessage () };
 #endif
 
     _sendPort->sendMessage (messageID, messageData);
@@ -344,10 +352,27 @@ void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, ARA::IPC::Me
 #endif
 }
 
+bool IPCMessageChannel::receivesMessagesOnCurrentThread ()
+{
+#if USE_ARA_BACKGROUND_IPC
+    return _receivePort->getReceiveThreadID () == std::this_thread::get_id ();
+#else
+    return _receiveThreadID == std::this_thread::get_id ();
+#endif
+}
+
+bool IPCMessageChannel::waitForMessageOnCurrentThread ()
+{
+#if !USE_ARA_BACKGROUND_IPC
+    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _receiveThreadID);
+#endif
+    return _receivePort->runReceiveLoop (10);
+}
+
 bool IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
 {
 #if !USE_ARA_BACKGROUND_IPC
-    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _receiveThread);
+    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _receiveThreadID);
 #endif
     return _receivePort->runReceiveLoop (milliseconds);
 }

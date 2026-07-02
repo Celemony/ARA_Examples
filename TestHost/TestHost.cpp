@@ -2,7 +2,7 @@
 //! \file       TestHost.cpp
 //!             class that maintains the model graph and ARA document controller
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -92,9 +92,9 @@ void TestHost::removeMusicalContext (Document* document, MusicalContext* musical
     document->removeMusicalContext (musicalContext);
 }
 
-RegionSequence* TestHost::addRegionSequence (Document* document, std::string name, MusicalContext* musicalContext, ARA::ARAColor color)
+RegionSequence* TestHost::addRegionSequence (Document* document, std::string name, std::string persistentID, MusicalContext* musicalContext, ARA::ARAColor color)
 {
-    document->addRegionSequence (std::make_unique<RegionSequence> (document, name, musicalContext, color));
+    document->addRegionSequence (std::make_unique<RegionSequence> (document, name, persistentID, musicalContext, color));
     auto regionSequence = document->getRegionSequences ().back ().get ();
     if (auto araDocumentController = getDocumentController (document))
         araDocumentController->addRegionSequence (regionSequence);

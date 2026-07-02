@@ -2,7 +2,7 @@
 //! \file       main.cpp
 //!             main implementation of the SDK testhost example
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -79,7 +79,7 @@ ARA::ARAAssertFunction* assertFunctionReference { &assertFunction };
 ARA_SETUP_DEBUG_MESSAGE_PREFIX ("ARATestHost");
 
 
-AudioFileList parseAudioFiles (const std::vector<std::string>& args)
+static AudioFileList parseAudioFiles (const std::vector<std::string>& args)
 {
     AudioFileList parsedFiles;
     auto it { args.begin () };
@@ -91,8 +91,7 @@ AudioFileList parseAudioFiles (const std::vector<std::string>& args)
                ((*it)[0] != '-'))
         {
             icstdsp::AudioFile audioFile;
-            int ARA_MAYBE_UNUSED_VAR (err);
-            err = audioFile.Load (it->c_str ());
+            [[maybe_unused]] const auto err { audioFile.Load (it->c_str ()) };
             ARA_INTERNAL_ASSERT (err == 0);
             parsedFiles.emplace_back (std::make_shared<AudioDataFile> (*it++, std::move (audioFile)));
         }
@@ -105,7 +104,7 @@ AudioFileList parseAudioFiles (const std::vector<std::string>& args)
     return createDummyAudioFiles (1);
 }
 
-const std::vector<std::string> parseTestCases (const std::vector<std::string>& args)
+static const std::vector<std::string> parseTestCases (const std::vector<std::string>& args)
 {
     std::vector<std::string> parsedTests;
     auto it { args.begin () };
@@ -201,8 +200,16 @@ int main (int argc, const char* argv[])
 
     ARA_LOG ("    plug-in does%s support content-based fades.", ((factory->supportedPlaybackTransformationFlags & ARA::kARAPlaybackTransformationContentBasedFades) != 0) ? "" : " not");
 
-    ARA_LOG ("    plug-in does%s support storing audio file chunks.", (factory.implements<ARA_STRUCT_MEMBER (ARAFactory, supportsStoringAudioFileChunks)> () &&
+    ARA_LOG ("    plug-in does%s support storing audio file chunks.", (factory.implements<&ARA::ARAFactory::supportsStoringAudioFileChunks> () &&
                                                                       (factory->supportsStoringAudioFileChunks != ARA::kARAFalse)) ? "" : " not");
+
+    ARA_LOG ("    plug-in can%s be used with sample-based audio sources.", (!factory.implements<&ARA::ARAFactory::supportsSampleBasedAudioSources> () ||
+                                                                           (factory->supportsSampleBasedAudioSources != ARA::kARAFalse)) ? "" : " not");
+    ARA_LOG ("    plug-in can%s be used with content-only audio sources.", (factory.implements<&ARA::ARAFactory::supportsContentOnlyAudioSources> () &&
+                                                                           (factory->supportsContentOnlyAudioSources != ARA::kARAFalse)) ? "" : " not");
+
+    ARA_LOG ("    plug-in does%s require preset audio sources.", (factory.implements<&ARA::ARAFactory::requiresPresetAudioSources> () &&
+                                                                 (factory->requiresPresetAudioSources != ARA::kARAFalse)) ? "" : " not");
 
     // parse any optional test cases or audio files
     auto audioFiles { parseAudioFiles (args) };

@@ -3,7 +3,7 @@
 //!             VST3 audio effect class for the ARA test plug-in,
 //!             originally created using the VST project generator from the Steinberg VST3 SDK
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2012-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2012-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -31,7 +31,7 @@ ARA_DISABLE_VST3_WARNINGS_END
 using namespace Steinberg;
 
 // helper to improve readability
-int32 getAudioBusChannelCount (const IPtr<Vst::Bus>& bus)
+static int32 getAudioBusChannelCount (const IPtr<Vst::Bus>& bus)
 {
     return Vst::SpeakerArr::getChannelCount (FCast<Vst::AudioBus> (bus.get ())->getArrangement ());
 }
@@ -170,20 +170,11 @@ const ARA::ARAFactory* PLUGIN_API TestVST3Processor::getFactory ()
 }
 
 //-----------------------------------------------------------------------------
-#if ARA_SUPPORT_VERSION_1
-const ARA::ARAPlugInExtensionInstance* PLUGIN_API TestVST3Processor::bindToDocumentController (ARA::ARADocumentControllerRef documentControllerRef)
-{
-    ARA_VALIDATE_API_STATE (ARA::PlugIn::DocumentController::getUsedApiGeneration () < ARA::kARAAPIGeneration_2_0_Draft);
-    constexpr auto allRoles = ARA::kARAPlaybackRendererRole | ARA::kARAEditorRendererRole | ARA::kARAEditorViewRole;
-    return _araPlugInExtension.bindToDocumentController (documentControllerRef, allRoles, allRoles);
-}
-#else
 const ARA::ARAPlugInExtensionInstance* PLUGIN_API TestVST3Processor::bindToDocumentController (ARA::ARADocumentControllerRef /*documentControllerRef*/)
 {
     ARA_VALIDATE_API_STATE (false && "call is deprecated in ARA 2, host must not call this");
     return nullptr;
 }
-#endif
 
 //-----------------------------------------------------------------------------
 const ARA::ARAPlugInExtensionInstance* PLUGIN_API TestVST3Processor::bindToDocumentControllerWithRoles (ARA::ARADocumentControllerRef documentControllerRef,

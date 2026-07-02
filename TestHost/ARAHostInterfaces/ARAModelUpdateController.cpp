@@ -2,7 +2,7 @@
 //! \file       ARAModelUpdateController.cpp
 //!             implementation of the host ARAModelUpdateControllerInterface
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -128,4 +128,14 @@ void ARAModelUpdateController::notifyDocumentDataChanged () noexcept
     ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
 
     ARA_LOG ("document data was updated");
+}
+
+void ARAModelUpdateController::notifyRegionSequenceDataChanged (ARA::ARARegionSequenceHostRef regionSequenceHostRef) noexcept
+{
+    const auto regionSequence = fromHostRef (regionSequenceHostRef);
+    ARA_VALIDATE_API_ARGUMENT (regionSequence, ARA::contains (getDocument ()->getRegionSequences (), regionSequence));
+    ARA_VALIDATE_API_STATE (_araDocumentController->isPollingModelUpdates ());
+    ARA_VALIDATE_API_THREAD (_araDocumentController->wasCreatedOnCurrentThread ());
+
+    ARA_LOG ("data of region sequence %p (ARARegionSequenceRef ref %p) was updated", regionSequence, _araDocumentController->getRef (regionSequence));
 }

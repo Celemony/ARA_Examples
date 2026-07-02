@@ -2,7 +2,7 @@
 //! \file       TestHost.h
 //!             class that maintains the model graph and ARA document controller
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -48,7 +48,7 @@ public:
     MusicalContext* addMusicalContext (Document* document, std::string name, ARA::ARAColor color);
     void removeMusicalContext (Document* document, MusicalContext* musicalContext);
 
-    RegionSequence* addRegionSequence (Document* document, std::string name, MusicalContext* musicalContext, ARA::ARAColor color);
+    RegionSequence* addRegionSequence (Document* document, std::string name, std::string persistentID, MusicalContext* musicalContext, ARA::ARAColor color);
     void removeRegionSequence (Document* document, RegionSequence* regionSequence);
 
     AudioSource* addAudioSource (Document* document, AudioFileBase* audioFile, std::string persistentID);

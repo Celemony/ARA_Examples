@@ -2,7 +2,7 @@
 //! \file       ARADocumentController.h
 //!             provides access the plug-in document controller
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -47,12 +47,12 @@ ARA_MAP_HOST_REF (PlaybackRegion, ARA::ARAPlaybackRegionHostRef)
 ARA_MAP_HOST_REF (ArchiveBase, ARA::ARAArchiveReaderHostRef, ARA::ARAArchiveWriterHostRef)
 
 // These property typedefs implicitly version our properties structs according to the last member
-using DocumentProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARADocumentProperties, name)>;
-using MusicalContextProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAMusicalContextProperties, color)>;
-using RegionSequenceProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARARegionSequenceProperties, color)>;
-using AudioSourceProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAAudioSourceProperties, channelArrangement)>;
-using AudioModificationProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAAudioModificationProperties, persistentID)>;
-using PlaybackRegionProperties = ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAPlaybackRegionProperties, color)>;
+using DocumentProperties = ARA::SizedStruct<&ARA::ARADocumentProperties::name>;
+using MusicalContextProperties = ARA::SizedStruct<&ARA::ARAMusicalContextProperties::color>;
+using RegionSequenceProperties = ARA::SizedStruct<&ARA::ARARegionSequenceProperties::persistentID>;
+using AudioSourceProperties = ARA::SizedStruct<&ARA::ARAAudioSourceProperties::channelArrangement>;
+using AudioModificationProperties = ARA::SizedStruct<&ARA::ARAAudioModificationProperties::persistentID>;
+using PlaybackRegionProperties = ARA::SizedStruct<&ARA::ARAPlaybackRegionProperties::color>;
 
 // Forward declarations of our controller implementations
 class ARAAudioAccessController;
@@ -110,17 +110,9 @@ public:
     /*******************************************************************************/
     // Archiving functions
 
-    // ARA2 style archiving (aka "partial persistency")
-    bool supportsPartialPersistency ();
     bool storeObjectsToArchive (ArchiveBase* archive, const ARA::ARAStoreObjectsFilter* filter = nullptr);
     bool restoreObjectsFromArchive (const ArchiveBase* archive, const ARA::ARARestoreObjectsFilter* filter = nullptr);
 
-    // ARA1 style monolithic document archiving functions
-    bool storeDocumentToArchive (ArchiveBase* archive);
-    bool beginRestoringDocumentFromArchive (const ArchiveBase* archive);
-    bool endRestoringDocumentFromArchive (const ArchiveBase* archive);
-
-    // audio file chunk authoring
     bool supportsStoringAudioFileChunks ();
     bool storeAudioSourceToAudioFileChunk (ArchiveBase* archive, AudioSource* audioSource, ARA::ARAPersistentID* documentArchiveID, bool* openAutomatically);
 
@@ -156,8 +148,6 @@ public:
     }
 
     void setMinimalContentUpdateLogging (bool flag);
-
-    void logAudioModificationPreservesAudioSourceSignalIfSupported (AudioModification* audioModification);
 
     /*******************************************************************************/
     // Public accessors

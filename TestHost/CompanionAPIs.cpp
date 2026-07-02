@@ -3,7 +3,7 @@
 //!             used by the test host to load a companion API plug-in binary
 //!             and create / destroy plug-in instances with ARA2 roles
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -29,7 +29,6 @@
 
 #if defined (__APPLE__)
     #include "ExamplesCommon/PlugInHosting/AudioUnitLoader.h"
-    #include <CoreFoundation/CoreFoundation.h>
 #endif
 
 #ifndef ARA_ENABLE_CLAP
@@ -94,7 +93,7 @@ constexpr auto otherChannelIDSuffix { ".other" };
     _Pragma ("GCC diagnostic ignored \"-Wunused-template\"")
 #endif
 
-ARA_MAP_IPC_REF (ARA::IPC::Connection, ARA::IPC::ARAIPCConnectionRef)
+ARA_MAP_IPC_REF (ARA::IPC::ProxyPlugIn, ARA::IPC::ARAIPCProxyPlugInRef)
 
 #if defined (__GNUC__)
     _Pragma ("GCC diagnostic pop")
@@ -149,11 +148,6 @@ static const std::string _createChannelID ()
 void PlugInInstance::validateAndSetPlugInExtensionInstance (const ARA::ARAPlugInExtensionInstance* plugInExtensionInstance, ARA::ARAPlugInInstanceRoleFlags assignedRoles)
 {
     ARA_VALIDATE_API_STATE (plugInExtensionInstance != nullptr);
-
-#if ARA_SUPPORT_VERSION_1
-    if (_factory->highestSupportedApiGeneration < kARAAPIGeneration_2_0_Draft)
-        return;
-#endif
 
     if ((assignedRoles & ARA::kARAPlaybackRendererRole) != 0)
         ARA_VALIDATE_API_INTERFACE (plugInExtensionInstance->playbackRendererInterface, ARAPlaybackRendererInterface);
@@ -309,14 +303,14 @@ private:
 #if defined (__APPLE__)
 
 // very crude conversion from string to OSType
-OSType parseOSType (const std::string& idString)
+static OSType parseOSType (const std::string& idString)
 {
     ARA_INTERNAL_ASSERT (idString.size () == sizeof (OSType));
     return static_cast<uint32_t> (idString[3])        | (static_cast<uint32_t> (idString[2]) << 8) |
           (static_cast<uint32_t> (idString[1]) << 16) | (static_cast<uint32_t> (idString[0]) << 24);
 }
 
-std::string createAUEntryDescription (const std::string& type, const std::string& subType, const std::string& manufacturer)
+static std::string createAUEntryDescription (const std::string& type, const std::string& subType, const std::string& manufacturer)
 {
     return std::string { "Audio Unit (" } + type + " - " + subType + " - " + manufacturer + ")";
 }
@@ -329,7 +323,7 @@ public:
       _audioUnitComponent { AudioUnitPrepareComponentWithIDs (parseOSType (type), parseOSType (subType), parseOSType (manufacturer)) }
     {
         AudioUnitInstance audioUnitInstance = AudioUnitOpenInstance (_audioUnitComponent, useIPCIfPossible);
-        validateAndSetFactory (AudioUnitGetARAFactory (audioUnitInstance/*, &_connectionRef*/));
+        validateAndSetFactory (AudioUnitGetARAFactory (audioUnitInstance, &_proxyPlugInRef));
         AudioUnitCloseInstance (audioUnitInstance);
     }
 
@@ -338,41 +332,33 @@ public:
         AudioUnitCleanupComponent (_audioUnitComponent);
     }
 
-/*
     bool usesIPC () const override
     {
-        return _connectionRef != nullptr;
+        return _proxyPlugInRef != nullptr;
     }
-*/
 
     void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress) override
     {
-/*
         if (usesIPC ())
-            ARA::IPC::ARAIPCProxyPlugInInitializeARA (_connectionRef, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
+            ARA::IPC::ARAIPCProxyPlugInInitializeARA (_proxyPlugInRef, getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
         else
-*/
             PlugInEntry::initializeARA (assertFunctionAddress);
     }
 
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
-/*
         if (usesIPC ())
-            return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_connectionRef, getARAFactory ()->factoryID, hostInstance, properties);
+            return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (_proxyPlugInRef, getARAFactory ()->factoryID, hostInstance, properties);
         else
-*/
             return PlugInEntry::createDocumentControllerWithDocument (hostInstance, properties);
     }
 
     void uninitializeARA () override
     {
-/*
         if (usesIPC ())
-            ARA::IPC::ARAIPCProxyPlugInUninitializeARA (_connectionRef, getARAFactory ()->factoryID);
+            ARA::IPC::ARAIPCProxyPlugInUninitializeARA (_proxyPlugInRef, getARAFactory ()->factoryID);
         else
-*/
             PlugInEntry::uninitializeARA ();
     }
 
@@ -384,14 +370,14 @@ public:
 
 private:
     AudioUnitComponent const _audioUnitComponent;
-//  ARA::IPC::ARAIPCConnectionRef _connectionRef {};
+    ARA::IPC::ARAIPCProxyPlugInRef _proxyPlugInRef {};
 };
 
 #endif // defined (__APPLE__)
 
 /*******************************************************************************/
 
-std::string createEntryDescription (const std::string& apiName, const std::string& binaryName, const std::string& optionalPlugInName)
+static std::string createEntryDescription (const std::string& apiName, const std::string& binaryName, const std::string& optionalPlugInName)
 {
     return apiName + " " + ((optionalPlugInName.empty ()) ? "" : optionalPlugInName + " ") + "@ " + binaryName;
 }
@@ -464,47 +450,23 @@ private:
 
 #if ARA_ENABLE_IPC
 
-class Connection : public ARA::IPC::Connection
+static std::unique_ptr<ARA::IPC::Connection> createConnection (ARA::IPC::MessageHandler&& messageHandler,
+                                                               std::unique_ptr<IPCMessageChannel> && mainThreadChannel, std::unique_ptr<IPCMessageChannel> && otherThreadsChannel)
 {
-public:
-    Connection (IPCMessageChannel* mainThreadChannel, IPCMessageChannel* otherThreadsChannel)
-    : ARA::IPC::Connection { &_runReceiveLoop, this },
-      _mainThreadChannel { mainThreadChannel }
-    {
-        setMainThreadChannel (mainThreadChannel);
-        setOtherThreadsChannel (otherThreadsChannel);
-    }
-
-    ARA::IPC::MessageEncoder* createEncoder () override
-    {
+    auto result { std::make_unique<ARA::IPC::Connection> (
 #if USE_ARA_CF_ENCODING
-        return new ARA::IPC::CFMessageEncoder {};
+                             &ARA::IPC::CFMessageEncoder::create,
 #else
-        return new IPCXMLMessageEncoder {};
+                             &IPCXMLMessageEncoder::create,
 #endif
-    }
-
-    // \todo currently not implemented, we rely on running on the same machine for now
-    //       C++20 offers std::endian which allows for a simple implementation upon connecting...
-    bool receiverEndianessMatches ()  override
-    {
-        return true;
-    }
-
-   bool runReceiveLoop (int32_t milliseconds)
-    {
-        return _mainThreadChannel->runReceiveLoop (milliseconds);
-    }
-
-private:
-    static void _runReceiveLoop (void* connection)
-    {
-        static_cast<Connection*> (connection)->runReceiveLoop (10);
-    }
-
-private:
-    IPCMessageChannel* const _mainThreadChannel;
-};
+                             std::move (messageHandler),
+                             true,  // \todo set properly - we rely on running on the same machine for now
+                                    //       C++20 offers std::endian which allows for a simple implementation upon connecting...
+                             [channel = mainThreadChannel.get ()] { channel->runReceiveLoop (10); }) };
+    result->setMainThreadChannel (std::move (mainThreadChannel));
+    result->setOtherThreadsChannel (std::move (otherThreadsChannel));
+    return result;
+}
 
 class IPCPlugInInstance : public PlugInInstance, protected ARA::IPC::RemoteCaller
 {
@@ -622,30 +584,29 @@ struct RemoteLauncher
 class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher
 {
 private:
-    static const ARA::ARAFactory* defaultGetFactory (ARA::IPC::ARAIPCConnectionRef connection)
+    static const ARA::ARAFactory* defaultGetFactory (ARA::IPC::ARAIPCProxyPlugInRef proxyPlugInRef)
     {
-        const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (connection) };
+        const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (proxyPlugInRef) };
         ARA_INTERNAL_ASSERT (count > 0);
-        return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (connection, 0U);
+        return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (proxyPlugInRef, 0U);
     }
 
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
                     const std::string& channelID,
-                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCConnectionRef)>& getFactoryFunction)
+                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCProxyPlugInRef)>& getFactoryFunction)
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, channelID },
-      _connection { IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix),
-                    IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix) },
-      _proxyPlugIn { &_connection }
+      _proxyPlugIn { createConnection (ARA::IPC::ProxyPlugIn::handleReceivedMessage,
+                                       IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix),
+                                       IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix)) }
     {
-        _connection.setMessageHandler (&_proxyPlugIn);
-        validateAndSetFactory (getFactoryFunction (toIPCRef (&_connection)));
+        validateAndSetFactory (getFactoryFunction (toIPCRef (&_proxyPlugIn)));
     }
 
 public:
     // \todo the current ARA IPC implementation does not support sending ARA asserts to the host...
     IPCPlugInEntry (std::string&& description, const std::string& launchArgs,
-                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCConnectionRef)>& getFactoryFunction = defaultGetFactory)
+                    const std::function<const ARA::ARAFactory* (ARA::IPC::ARAIPCProxyPlugInRef)>& getFactoryFunction = defaultGetFactory)
     : IPCPlugInEntry { std::move (description), launchArgs, _createChannelID (), getFactoryFunction }
     {}
 
@@ -659,38 +620,30 @@ public:
         return true;
     }
 
-#if !USE_ARA_BACKGROUND_IPC
-    void idleThreadForDuration (int32_t milliseconds) override
-    {
-        _connection.runReceiveLoop (milliseconds);
-    }
-#endif
-
     void initializeARA (ARA::ARAAssertFunction* /*assertFunctionAddress*/) override
     {
-        ARA::IPC::ARAIPCProxyPlugInInitializeARA (toIPCRef (&_connection), getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
+        ARA::IPC::ARAIPCProxyPlugInInitializeARA (toIPCRef (&_proxyPlugIn), getARAFactory ()->factoryID, getDesiredAPIGeneration (getARAFactory ()));
     }
 
     const ARA::ARADocumentControllerInstance* createDocumentControllerWithDocument (const ARA::ARADocumentControllerHostInstance* hostInstance,
                                                                                     const ARA::ARADocumentProperties* properties) override
     {
-        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (toIPCRef (&_connection), getARAFactory ()->factoryID, hostInstance, properties);
+        return ARA::IPC::ARAIPCProxyPlugInCreateDocumentControllerWithDocument (toIPCRef (&_proxyPlugIn), getARAFactory ()->factoryID, hostInstance, properties);
     }
 
     void uninitializeARA () override
     {
-        ARA::IPC::ARAIPCProxyPlugInUninitializeARA (toIPCRef (&_connection), getARAFactory ()->factoryID);
+        ARA::IPC::ARAIPCProxyPlugInUninitializeARA (toIPCRef (&_proxyPlugIn), getARAFactory ()->factoryID);
     }
 
     std::unique_ptr<PlugInInstance> createPlugInInstance () override
     {
         ARA::IPC::ARAIPCPlugInInstanceRef remoteInstanceRef {};
         _proxyPlugIn.remoteCall (remoteInstanceRef, kIPCCreateEffectMethodID);
-        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, &_connection);
+        return std::make_unique<IPCPlugInInstance> (remoteInstanceRef, _proxyPlugIn.getConnection ());
     }
 
 private:
-    Connection _connection;
     ARA::IPC::ProxyPlugIn _proxyPlugIn;
 };
 
@@ -702,22 +655,22 @@ protected:
     IPCGenericPlugInEntry (const std::string& commandLineArg, const std::string& apiName, const std::string& binaryName, const std::string& optionalPlugInName)
     : IPCPlugInEntry { createEntryDescription (apiName, binaryName, optionalPlugInName),
                         commandLineArg + " " + binaryName + " " + optionalPlugInName,
-                        [&optionalPlugInName] (ARA::IPC::ARAIPCConnectionRef connection) -> const ARA::ARAFactory*
+                        [&optionalPlugInName] (ARA::IPC::ARAIPCProxyPlugInRef proxyPlugInRef) -> const ARA::ARAFactory*
                         {
-                            const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (connection) };
+                            const auto count { ARA::IPC::ARAIPCProxyPlugInGetFactoriesCount (proxyPlugInRef) };
                             ARA_INTERNAL_ASSERT (count > 0);
 
                             if (optionalPlugInName.empty ())
-                                return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (connection, 0U);
+                                return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (proxyPlugInRef, 0U);
 
                             for (auto i { 0U }; i < count; ++i)
                             {
-                                auto factory { ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (connection, i) };
+                                auto factory { ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (proxyPlugInRef, i) };
                                 if (0 == std::strcmp (factory->plugInName, optionalPlugInName.c_str ()))
                                     return factory;
                             }
                             ARA_INTERNAL_ASSERT (false);
-                            return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (connection, 0U);
+                            return ARA::IPC::ARAIPCProxyPlugInGetFactoryAtIndex (proxyPlugInRef, 0U);
                         } }
     {}
 };
@@ -765,14 +718,13 @@ bool _shutDown { false };
 class ProxyHost : public ARA::IPC::ProxyHost
 {
 public:
-    ProxyHost (Connection* connection)
-    : ARA::IPC::ProxyHost { connection }
-    {
-        connection->setMessageHandler (this);
-    }
+    ProxyHost (std::unique_ptr<IPCMessageChannel> && mainThreadChannel, std::unique_ptr<IPCMessageChannel> && otherThreadsChannel)
+    : ARA::IPC::ProxyHost { createConnection ([this] (auto&& ...args) { handleReceivedMessage (args...); },
+                                              std::move (mainThreadChannel), std::move (otherThreadsChannel)) }
+    {}
 
     void handleReceivedMessage (const ARA::IPC::MessageID messageID, const ARA::IPC::MessageDecoder* const decoder,
-                                ARA::IPC::MessageEncoder* const replyEncoder) override
+                                ARA::IPC::MessageEncoder* const replyEncoder)
     {
         if (!ARA::IPC::MethodID::isCustomMessageID (messageID))
         {
@@ -866,9 +818,12 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
 {
     _plugInEntry = std::move (plugInEntry);
 
-    Connection connection { IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix),
-                            IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix) };
-    ProxyHost proxy { &connection };
+    auto mainThreadMessageChannel { IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix) };
+    auto otherThreadsMessageChannel { IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix) };
+    
+    auto waitLoop { [messageChannel = mainThreadMessageChannel.get ()] { messageChannel->runReceiveLoop (100 /*ms*/); } };
+
+    ProxyHost proxy { std::move (mainThreadMessageChannel), std::move (otherThreadsMessageChannel) };
 
     ARA::IPC::ARAIPCProxyHostAddFactory (_plugInEntry->getARAFactory ());
     ARA::IPC::ARAIPCProxyHostSetBindingHandler ([] (ARA::IPC::ARAIPCPlugInInstanceRef plugInInstanceRef,
@@ -883,7 +838,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
                                                 });
 
     while (!_shutDown)
-        connection.runReceiveLoop (100 /*ms*/);
+        waitLoop ();
 
     _plugInEntry.reset ();
 
@@ -950,21 +905,15 @@ void PlugInEntry::validateAndSetFactory (const ARA::ARAFactory* factory)
         ARA_INTERNAL_ASSERT ((factory->supportedPlaybackTransformationFlags & ARA::kARAPlaybackTransformationContentBasedFades) == ARA::kARAPlaybackTransformationContentBasedFades);
 
     // ensure that this plug-in is supported by our test host
-    ARA_INTERNAL_ASSERT (factory->lowestSupportedApiGeneration <= ARA::kARAAPIGeneration_2_0_Final);
-#if ARA_SUPPORT_VERSION_1
-    ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_1_0_Final);
-#elif ARA_CPU_ARM
+    ARA_INTERNAL_ASSERT (factory->lowestSupportedApiGeneration <= ARA::kARAAPIGeneration_3_0_Draft);
     ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_2_0_Final);
-#else
-    ARA_INTERNAL_ASSERT (factory->highestSupportedApiGeneration >= ARA::kARAAPIGeneration_2_0_Draft);
-#endif
 
     _factory = factory;
 }
 
 ARA::ARAAPIGeneration PlugInEntry::getDesiredAPIGeneration (const ARA::ARAFactory* const factory)
 {
-    ARA::ARAAPIGeneration desiredApiGeneration { ARA::kARAAPIGeneration_2_0_Final };
+    ARA::ARAAPIGeneration desiredApiGeneration { ARA::kARAAPIGeneration_3_0_Draft };
     if (desiredApiGeneration > factory->highestSupportedApiGeneration)
         desiredApiGeneration = factory->highestSupportedApiGeneration;
     return desiredApiGeneration;
@@ -975,7 +924,7 @@ void PlugInEntry::initializeARA (ARA::ARAAssertFunction* assertFunctionAddress)
     ARA_INTERNAL_ASSERT (_factory);
 
     // initialize ARA factory with interface configuration
-    const ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAInterfaceConfiguration, assertFunctionAddress)> interfaceConfig = { getDesiredAPIGeneration (_factory), assertFunctionAddress };
+    const ARA::SizedStruct<&ARA::ARAInterfaceConfiguration::assertFunctionAddress> interfaceConfig = { getDesiredAPIGeneration (_factory), assertFunctionAddress };
     _factory->initializeARAWithConfiguration (&interfaceConfig);
 }
 

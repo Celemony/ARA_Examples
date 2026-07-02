@@ -2,7 +2,7 @@
 //! \file       CLAPLoader.c
 //!             CLAP specific ARA implementation for the SDK's hosting examples
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2022-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2022-2026, Celemony Software GmbH, All Rights Reserved.
 //!             Developed in cooperation with Timo Kaluza (defiantnerd)
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
@@ -130,6 +130,7 @@ CLAPBinary CLAPLoadBinary(const char * binaryName)
     return clapBinary;
 }
 
+void CLAPValidateDescHasARA(CLAPBinary clapBinary, const char * plugin_id);
 void CLAPValidateDescHasARA(CLAPBinary clapBinary, const char * plugin_id)
 {
     const clap_plugin_factory_t * factory = (const clap_plugin_factory_t *)clapBinary->entry->get_factory(CLAP_PLUGIN_FACTORY_ID);
@@ -187,11 +188,13 @@ const ARAFactory * CLAPGetARAFactory(CLAPBinary clapBinary, const char * optiona
     }
 }
 
+const void * host_get_extension(const clap_host_t * ARA_MAYBE_UNUSED_ARG(host), const char * ARA_MAYBE_UNUSED_ARG(extension_id));
 const void * host_get_extension(const clap_host_t * ARA_MAYBE_UNUSED_ARG(host), const char * ARA_MAYBE_UNUSED_ARG(extension_id))
 {
     return NULL;
 }
 
+void host_request_dummy(const clap_host_t * ARA_MAYBE_UNUSED_ARG(host));
 void host_request_dummy(const clap_host_t * ARA_MAYBE_UNUSED_ARG(host))
 {
 }
@@ -382,16 +385,19 @@ void CLAPStartRendering(CLAPPlugIn clapPlugIn, uint32_t channelCount, uint32_t m
     clapPlugIn->plugin->start_processing(clapPlugIn->plugin);
 }
 
+uint32_t CLAP_ABI input_events_size(const struct clap_input_events* list);
 uint32_t CLAP_ABI input_events_size(const struct clap_input_events* list)
 {
     return 0;
 }
 
+const clap_event_header_t* CLAP_ABI input_events_get(const struct clap_input_events* list, uint32_t index);
 const clap_event_header_t* CLAP_ABI input_events_get(const struct clap_input_events* list, uint32_t index)
 {
     return NULL;
 }
 
+bool CLAP_ABI output_events_try_push(const struct clap_output_events* list, const clap_event_header_t* event);
 bool CLAP_ABI output_events_try_push(const struct clap_output_events* list, const clap_event_header_t* event)
 {
   return false;

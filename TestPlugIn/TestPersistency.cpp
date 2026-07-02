@@ -2,7 +2,7 @@
 //! \file       TestPersistency.cpp
 //!             archiver/unarchiver implementation for the ARA test plug-in
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -129,18 +129,7 @@ size_t TestUnarchiver::readSize () noexcept
 {
     uint64_t data { read8ByteData () };
 
-#if __cplusplus >= 201703L
     if constexpr (sizeof (size_t) < sizeof (uint64_t))
-#else
-    #if defined (_MSC_VER)
-        __pragma (warning(push))
-        __pragma (warning(disable : 4127))
-    #endif
-    if (sizeof (size_t) < sizeof (uint64_t))
-    #if defined (_MSC_VER)
-        __pragma (warning(pop))
-    #endif
-#endif
     {
         if (data > std::numeric_limits<size_t>::max ())
         {

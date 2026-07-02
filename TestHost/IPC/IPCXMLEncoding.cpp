@@ -3,7 +3,7 @@
 //!             Proof-of-concept pugixml-based implementation of ARAIPCMessageEn-/Decoder
 //!             for the ARA SDK TestHost (error handling is limited to assertions).
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2012-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2012-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -101,9 +101,9 @@ pugi::xml_attribute IPCXMLMessageEncoder::_appendAttribute (const MessageArgumen
     return _root.append_attribute (_getEncodedKey (argKey));
 }
 
-ARA::IPC::MessageEncoder* IPCXMLMessageEncoder::appendSubMessage (const MessageArgumentKey argKey)
+std::unique_ptr<ARA::IPC::MessageEncoder> IPCXMLMessageEncoder::appendSubMessage (const MessageArgumentKey argKey)
 {
-    return new IPCXMLMessageEncoder { _dictionary, _root.append_child (_getEncodedKey (argKey)) };
+    return IPCXMLMessageEncoder::createWithXML (_dictionary, _root.append_child (_getEncodedKey (argKey)));
 }
 
 #if defined (__APPLE__)
@@ -142,21 +142,21 @@ std::string IPCXMLMessageEncoder::createEncodedMessage () const
 
 
 #if defined (__APPLE__)
-IPCXMLMessageDecoder* IPCXMLMessageDecoder::createWithMessageData (CFDataRef data)
+std::unique_ptr<IPCXMLMessageDecoder> IPCXMLMessageDecoder::createWithMessageData (CFDataRef data)
 {
     const auto dataSize { static_cast<size_t> (CFDataGetLength (data)) };
     if (dataSize == 0)
         return nullptr;
 
-    return new IPCXMLMessageDecoder { reinterpret_cast<const char *> (CFDataGetBytePtr (data)), dataSize };
+    return std::unique_ptr<IPCXMLMessageDecoder> { new IPCXMLMessageDecoder { reinterpret_cast<const char *> (CFDataGetBytePtr (data)), dataSize } };
 }
 #else
-IPCXMLMessageDecoder* IPCXMLMessageDecoder::createWithMessageData (const char* data, const size_t dataSize)
+std::unique_ptr<IPCXMLMessageDecoder> IPCXMLMessageDecoder::createWithMessageData (const char* data, const size_t dataSize)
 {
     if (dataSize == 0)
         return nullptr;
 
-    return new IPCXMLMessageDecoder { data, dataSize };
+    return std::unique_ptr<IPCXMLMessageDecoder> { new IPCXMLMessageDecoder { data, dataSize } };
 }
 #endif
 
@@ -251,11 +251,7 @@ bool IPCXMLMessageDecoder::readBytesSize (const MessageArgumentKey argKey, size_
         return false;
     }
     _bytesCacheKey = argKey;
-#if __cplusplus >= 201703L
     _bytesCacheData = base64_decode (std::string_view { attribute.as_string () }, false);
-#else
-    _bytesCacheData = base64_decode (std::string { attribute.as_string () }, false);
-#endif
     *argSize = _bytesCacheData.size ();
     return true;
 }
@@ -269,22 +265,18 @@ void IPCXMLMessageDecoder::readBytes (const MessageArgumentKey argKey, uint8_t* 
     const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
     ARA_INTERNAL_ASSERT (!attribute.empty ());
 
-#if __cplusplus >= 201703L
     const auto decodedData { base64_decode (std::string_view { attribute.as_string () }, false) };
-#else
-    const auto decodedData { base64_decode (std::string { attribute.as_string () }, false) };
-#endif
     std::memcpy (argValue, decodedData.c_str (), decodedData.size ());
 }
 
-ARA::IPC::MessageDecoder* IPCXMLMessageDecoder::readSubMessage (const MessageArgumentKey argKey) const
+std::unique_ptr<ARA::IPC::MessageDecoder> IPCXMLMessageDecoder::readSubMessage (const MessageArgumentKey argKey) const
 {
     ARA_INTERNAL_ASSERT (!_root.empty ());
     const auto child { _root.child (_getEncodedKey (argKey)) };
     if (child.empty ())
         return nullptr;
 
-    return new IPCXMLMessageDecoder { _dictionary, child };
+    return std::unique_ptr<IPCXMLMessageDecoder> { new IPCXMLMessageDecoder { _dictionary, child } };
 }
 
 bool IPCXMLMessageDecoder::hasDataForKey (const MessageArgumentKey argKey) const

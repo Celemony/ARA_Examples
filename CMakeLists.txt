@@ -1,7 +1,7 @@
 # ======================
 # ARA Examples CMake Integration
 #
-# Copyright (c) 2020-2025, Celemony Software GmbH, All Rights Reserved.
+# Copyright (c) 2020-2026, Celemony Software GmbH, All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,6 +65,19 @@ unset(optional_build_type_subfolder)
 
 if(APPLE AND NOT CMAKE_OSX_ARCHITECTURES)
     set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD)" CACHE STRING "macOS architecture(s) - defaults to Xcode standard archs instead of CMake build platform" FORCE)
+endif()
+
+
+# ======================
+# configure deployment target for Apple platforms
+
+if(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET} OR ENV{MACOSX_DEPLOYMENT_TARGET} VERSION_LESS "10.15")
+    if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "macOS deployment target")
+    endif()
+endif()
+if (CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "10.15")
+    message(FATAL_ERROR "CMAKE_OSX_DEPLOYMENT_TARGET must be '10.15' or higher.")
 endif()
 
 
@@ -163,6 +176,8 @@ set(CMAKE_SUPPRESS_REGENERATION ON)
 set(CMAKE_XCODE_GENERATE_TOP_LEVEL_PROJECT_ONLY ON)
 set(CMAKE_XCODE_GENERATE_SCHEME ${ARA_SETUP_DEBUGGING})
 
+# this triggers a warning when using CLAP because they are using install()
+# \todo there seems to be no way to silence the warning?
 set(CMAKE_SKIP_INSTALL_RULES YES)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -208,7 +223,7 @@ if(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD)
     endif()
 
     string(REGEX MATCH "[Cc]\\+\\+" temp CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD)
-    if (CMAKE_CXX_EXTENSIONS)
+    if(CMAKE_CXX_EXTENSIONS)
         if((temp AND NOT CMAKE_CXX_EXTENSIONS) OR
            (NOT temp AND CMAKE_CXX_EXTENSIONS))
             message(FATAL_ERROR "Conflicting C++ standards set in general versus Xcode-specific configuration.")
@@ -224,21 +239,17 @@ if(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD)
 endif()
 
 if(CMAKE_CXX_STANDARD)
-    if(NOT(CMAKE_CXX_STANDARD VERSION_GREATER_EQUAL 11 AND
+    if(NOT(CMAKE_CXX_STANDARD VERSION_GREATER_EQUAL 17 AND
            CMAKE_CXX_STANDARD VERSION_LESS 98))
-       message(FATAL_ERROR "This project require C++11 or newer.")
+       message(FATAL_ERROR "This project require C++17 or newer.")
     endif()
 else()
-    if(MSVC)
-        set(CMAKE_CXX_STANDARD 14)
-    else()
-        set(CMAKE_CXX_STANDARD 11)
-    endif()
+    set(CMAKE_CXX_STANDARD 17)
 endif()
 if(NOT CMAKE_CXX_EXTENSIONS)
     set(CMAKE_CXX_EXTENSIONS OFF)
 endif()
-set(CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 # ======================
@@ -261,13 +272,17 @@ set(CXX_STANDARD_REQUIRED ON)
 if(WIN32)
     # no special setup for Windows needed at this point.
 elseif(APPLE)
-    if (CMAKE_OSX_DEPLOYMENT_TARGET AND
-        CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "10.9")
-        message(FATAL_ERROR "CMAKE_OSX_DEPLOYMENT_TARGET must be '10.9' or higher.")
+    # CMAKE_OSX_SYSROOT also applies to other SDKs like iOS, tvOS, visionOS, or watchOS
+    if(CMAKE_OSX_SYSROOT AND (NOT CMAKE_OSX_SYSROOT STREQUAL ""))
+        if(NOT CMAKE_OSX_SYSROOT MATCHES ".+[Mm][Aa][Cc][Oo][Ss][X?x?]?[0123456789]+\.[0123456789]+\.sdk")
+            message(FATAL_ERROR "CMake support for Apple platforms is currently limited to macOS.")
+        endif()
+        execute_process(COMMAND xcrun --sdk "${CMAKE_OSX_SYSROOT}" --show-sdk-version OUTPUT_VARIABLE mac_os_sdk_version OUTPUT_STRIP_TRAILING_WHITESPACE)
+    else()
+        execute_process(COMMAND xcrun --sdk macosx --show-sdk-version OUTPUT_VARIABLE mac_os_sdk_version OUTPUT_STRIP_TRAILING_WHITESPACE)
     endif()
-    if(NOT CMAKE_OSX_SYSROOT MATCHES ".+[Mm][Aa][Cc][Oo][Ss][X?x?]?[0123456789]+\.[0123456789]+\.sdk")
-        message(FATAL_ERROR "CMake support for Apple platforms is currently limited to macOS.")
-    endif()
+    set(CMAKE_OSX_SYSROOT "macosx${mac_os_sdk_version}")
+    unset(mac_os_sdk_version)
 elseif(UNIX)
     set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 else()
@@ -295,6 +310,15 @@ if(MSVC)
         $<IF:$<CONFIG:Debug>,/ZI,/Zi>
         /diagnostics:column
     )
+
+    # /Zc:__cplusplus, added in Visual Studio 2017 version 15.7, is required to make __cplusplus
+    # accurate, see https://devblogs.microsoft.com/cppblog/msvc-now-correctly-reports-__cplusplus/
+    if(MSVC_VERSION GREATER_EQUAL 1914)
+        add_compile_options(
+            /Zc:__cplusplus
+        )
+    endif()
+
 elseif(GCC_STYLE_COMPILER)
     add_compile_options(
         $<IF:$<CONFIG:Debug>,-O0,-Os>
@@ -483,7 +507,6 @@ if(ARA_ENABLE_AUDIO_UNIT)
     )
 
     set_target_properties(AudioUnitSDK PROPERTIES
-        CXX_STANDARD 17
         FOLDER "3rdParty"
         XCODE_GENERATE_SCHEME OFF
         XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
@@ -866,7 +889,7 @@ function(configure_ARA_Examples_target target)
 
     # language standards
     target_compile_features(${target} PRIVATE
-        cxx_std_11
+        cxx_std_14
         c_std_11
     )
 
@@ -990,7 +1013,7 @@ function(ara_configure_binary_package target extension apple_plist_file)
         list(APPEND target_resources
             ${apple_plist_file}
         )
-        if (NOT ${extension} MATCHES "framework")
+        if(NOT ${extension} MATCHES "framework")
             list(APPEND target_resources
                 "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/macOS/ARAExamples.icns"
             )
@@ -1110,8 +1133,7 @@ endif()
 # ARA_Library (including ARA_API)
 message(STATUS "Importing ARA_Library (including ARA_API)")
 add_subdirectory("${ARA_LIBRARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/ARA_Library.build" EXCLUDE_FROM_ALL)
-#set_target_properties(ARA_Host_Library ARA_PlugIn_Library ARA_IPC_Library PROPERTIES
-set_target_properties(ARA_Host_Library ARA_PlugIn_Library PROPERTIES
+set_target_properties(ARA_Host_Library ARA_PlugIn_Library ARA_IPC_Library PROPERTIES
     FOLDER "ARA_Library"
     XCODE_GENERATE_SCHEME OFF
     XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
@@ -1119,8 +1141,7 @@ set_target_properties(ARA_Host_Library ARA_PlugIn_Library PROPERTIES
 
 # for debug builds, these are enabled automatically by the ARA SDK, as is appropriate for actual products
 # - but for our examples/tests here, we want to enable these also for release builds
-#foreach(target ARA_Host_Library ARA_PlugIn_Library ARA_IPC_Library)
-foreach(target ARA_Host_Library ARA_PlugIn_Library)
+foreach(target ARA_Host_Library ARA_PlugIn_Library ARA_IPC_Library)
     target_compile_definitions(${target} PUBLIC
         -DARA_VALIDATE_API_CALLS=1
         -DARA_ENABLE_INTERNAL_ASSERTS=1
@@ -1232,8 +1253,7 @@ target_link_libraries(ARATestPlugInCommon PUBLIC
 )
 
 # \todo add IPC implementation for Linux
-#if(APPLE OR WIN32)
-if(0)
+if(APPLE OR WIN32)
     target_link_libraries(ARATestPlugInCommon PUBLIC
         ARA_IPC_Library
     )
@@ -1262,7 +1282,7 @@ endif()
 # ======================
 # audio plug-in target VST3 Test Plug-In
 
-if (ARA_ENABLE_VST3)
+if(ARA_ENABLE_VST3)
 
     if(APPLE)
         add_library(ARATestPlugInVST3 MODULE "")
@@ -1346,7 +1366,6 @@ if(ARA_ENABLE_AUDIO_UNIT)
     )
 
     set_target_properties(ARATestPlugInAudioUnit PROPERTIES
-        CXX_STANDARD 17
         FOLDER "Examples/ARATestPlugIn"
         OUTPUT_NAME "ARATestPlugIn"
     )
@@ -1392,8 +1411,7 @@ endif(ARA_ENABLE_AUDIO_UNIT)
 # ======================
 # audio plug-in target Audio Unit v3 App Extension Test Plug-In, including the required dummy app
 
-#if(APPLE)
-if(FALSE)
+if(APPLE)
 
     add_library(ARATestPlugInAUv3Framework SHARED
         "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Framework/BufferedAudioBus.hpp"
@@ -1544,7 +1562,7 @@ endif(APPLE)
 
 if(ARA_ENABLE_CLAP)
 
-    if (APPLE)
+    if(APPLE)
         add_library(ARATestPlugInCLAP MODULE "")
     else()
         add_library(ARATestPlugInCLAP SHARED "")
@@ -1659,7 +1677,7 @@ target_link_libraries(ARAMiniHost PRIVATE
     ARA_API
     ARAExamplesCommon
     ARA_Host_Library
-#   ARA_IPC_Library
+    ARA_IPC_Library
 )
 
 if(ARA_ENABLE_VST3)
@@ -1780,8 +1798,7 @@ elseif(UNIX)
 endif()
 
 # \todo add IPC implementation for Linux
-#if(APPLE OR WIN32)
-if(FALSE)
+if(APPLE OR WIN32)
     target_sources(ARATestHost PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCMessageChannel.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/TestHost/IPC/IPCMessageChannel.cpp"
@@ -1807,9 +1824,9 @@ if(ARA_SETUP_DEBUGGING)
     if(ARA_ENABLE_AUDIO_UNIT)
         add_dependencies(ARATestHost ARATestPlugInAudioUnit)
     endif()
-#   if(APPLE)
-#       add_dependencies(ARATestHost ARATestPlugInAUv3App)
-#   endif()
+    if(APPLE)
+        add_dependencies(ARATestHost ARATestPlugInAUv3App)
+    endif()
     if(ARA_ENABLE_CLAP)
         add_dependencies(ARATestHost ARATestPlugInCLAP)
     endif()

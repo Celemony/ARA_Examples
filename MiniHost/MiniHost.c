@@ -2,7 +2,7 @@
 //! \file       MiniHost.c
 //!             Implementation of a minimal ARA host example.
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2012-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2012-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -282,10 +282,14 @@ static void ARA_CALL ARANotifyDocumentDataChanged(ARAModelUpdateControllerHostRe
 {
     ARA_LOG("document data was updated");
 }
-static const ARAModelUpdateControllerInterface hostModelUpdateControllerInterface = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAModelUpdateControllerInterface, notifyDocumentDataChanged),
+static void ARA_CALL ARANotifyRegionSequenceChanged(ARAModelUpdateControllerHostRef controllerHostRef, ARARegionSequenceHostRef regionSequenceHostRef)
+{
+    ARA_LOG("region sequence data was updated");
+}
+static const ARAModelUpdateControllerInterface hostModelUpdateControllerInterface = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAModelUpdateControllerInterface, notifyRegionSequenceDataChanged),
                                                                                         &ARANotifyAudioSourceAnalysisProgress, &ARANotifyAudioSourceContentChanged,
                                                                                         &ARANotifyAudioModificationContentChanged, &ARANotifyPlaybackRegionContentChanged,
-                                                                                        &ARANotifyDocumentDataChanged };
+                                                                                        &ARANotifyDocumentDataChanged, &ARANotifyRegionSequenceChanged };
 
 // asserts
 #if ARA_VALIDATE_API_CALLS
@@ -300,7 +304,7 @@ static ARAAssertFunction * assertFunctionReference = &assertFunction;
 int main(int argc, const char * argv[])
 {
     ARAInterfaceConfiguration interfaceConfig = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAInterfaceConfiguration, assertFunctionAddress),
-                                                  kARAAPIGeneration_2_0_Final, NULL /* asserts will be configured later if needed */ };
+                                                  kARAAPIGeneration_2_3_Final, NULL /* asserts will be configured later if needed */ };
 
     const ARAPlugInExtensionInstance * plugInInstance = NULL;
 
@@ -324,7 +328,8 @@ int main(int argc, const char * argv[])
     ARAMusicalContextRef musicalContextRef;
 
     ARARegionSequenceProperties regionSequenceProperties = { ARA_IMPLEMENTED_STRUCT_SIZE(ARARegionSequenceProperties, color), "Track 1", 0,
-                                                             NULL /* this ref for context must be set properly before using the struct! */, NULL /* no color available */ };
+                                                             NULL /* this ref for context must be set properly before using the struct! */,
+                                                             NULL /* no color available */, "regionSequenceTestPersistentID" };
     ARARegionSequenceRef regionSequenceRef;
 
     ARAAudioSourceProperties audioSourceProperties = { ARA_IMPLEMENTED_STRUCT_SIZE(ARAAudioSourceProperties, merits64BitSamples),
@@ -387,7 +392,7 @@ int main(int argc, const char * argv[])
         ARA_WARN("this plug-in doesn't support ARA.");
         return -1;
     }
-    if (factory->lowestSupportedApiGeneration > kARAAPIGeneration_2_0_Final)
+    if (factory->lowestSupportedApiGeneration > kARAAPIGeneration_2_3_Final)
     {
         ARA_WARN("this plug-in only supports newer generations of ARA.");
         return -1;

@@ -3,7 +3,7 @@
 //!             Proof-of-concept implementation of MessageChannel
 //!             for the ARA SDK TestHost (error handling is limited to assertions).
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2012-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2012-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -67,15 +67,18 @@ public:
     ~IPCMessageChannel () override;
 
     // factory functions for send and receive channels
-    static IPCMessageChannel* createPublishingID (const std::string& channelID);
-    static IPCMessageChannel* createConnectedToID (const std::string& channelID);
+    static std::unique_ptr<IPCMessageChannel> createPublishingID (const std::string& channelID);
+    static std::unique_ptr<IPCMessageChannel> createConnectedToID (const std::string& channelID);
 
     // message receiving
     // waits up to the specified amount of milliseconds for an incoming event and processes it
     // returns true if some event was processed during that time
     bool runReceiveLoop (int32_t milliseconds);
 
-    void sendMessage (ARA::IPC::MessageID messageID, ARA::IPC::MessageEncoder* encoder) override;
+    void sendMessage (ARA::IPC::MessageID messageID, std::unique_ptr<ARA::IPC::MessageEncoder> && encoder) override;
+
+    bool receivesMessagesOnCurrentThread () override;
+    bool waitForMessageOnCurrentThread () override;
 
 protected:
     using ARA::IPC::MessageChannel::MessageChannel;
@@ -84,11 +87,11 @@ private:
     friend class IPCReceivePort;
 
 #if !USE_ARA_BACKGROUND_IPC
-    std::thread::id _receiveThread { std::this_thread::get_id () };
+    std::thread::id _receiveThreadID { std::this_thread::get_id () };
 #endif
 
-    IPCSendPort* _sendPort {};
-    IPCReceivePort* _receivePort {};
+    std::unique_ptr<IPCSendPort> _sendPort;
+    std::unique_ptr<IPCReceivePort> _receivePort;
 };
 
 #endif // ARA_ENABLE_IPC

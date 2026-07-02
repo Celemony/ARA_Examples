@@ -3,7 +3,7 @@
 //!             document controller implementation for the ARA test plug-in,
 //!             customizing the document controller and related base classes of the ARA library
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2012-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2012-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -211,7 +211,7 @@ public:
 
 private:
     const TestProcessingAlgorithm* const _algorithm;
-    ARA::SizedStruct<ARA_STRUCT_MEMBER (ARAProcessingAlgorithmProperties, name)> _algorithmProperties;
+    ARA::SizedStruct<&ARA::ARAProcessingAlgorithmProperties::name> _algorithmProperties;
 };
 
 /*******************************************************************************/
@@ -589,25 +589,28 @@ void ARATestDocumentController::doUpdateMusicalContextContent (ARA::PlugIn::Musi
 // just like some alignment plug-in would have - this state would be updated when adding or removing
 // regions to the arrangement or when their time ranges or stretching mode changes.
 
-void ARATestDocumentController::didAddPlaybackRegionToRegionSequence (ARA::PlugIn::RegionSequence* /*regionSequence*/, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
+void ARATestDocumentController::didAddPlaybackRegionToRegionSequence (ARA::PlugIn::RegionSequence* regionSequence, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
 {
-    notifyDocumentDataChanged ();
+    notifyRegionSequenceDataChanged (regionSequence);
 }
 
-void ARATestDocumentController::willRemovePlaybackRegionFromRegionSequence (ARA::PlugIn::RegionSequence* /*regionSequence*/, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
+void ARATestDocumentController::willRemovePlaybackRegionFromRegionSequence (ARA::PlugIn::RegionSequence* regionSequence, ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept
 {
-    notifyDocumentDataChanged ();
+    notifyRegionSequenceDataChanged (regionSequence);
 }
 
 void ARATestDocumentController::willUpdatePlaybackRegionProperties (ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::PlugIn::PropertiesPtr<ARA::ARAPlaybackRegionProperties> newProperties) noexcept
 {
-    if ((playbackRegion->isTimestretchEnabled () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretch) != 0) ) ||
-        (playbackRegion->isTimeStretchReflectingTempo () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretchReflectingTempo) != 0) ) ||
-        (playbackRegion->getStartInAudioModificationTime () != newProperties->startInModificationTime) ||
-        (playbackRegion->getDurationInAudioModificationTime () != newProperties->durationInModificationTime) ||
-        (playbackRegion->getStartInPlaybackTime () != newProperties->startInPlaybackTime) ||
-        (playbackRegion->getDurationInPlaybackTime () != newProperties->durationInPlaybackTime))
-        notifyDocumentDataChanged ();
+    if (const auto regionSequence { playbackRegion->getRegionSequence () }) // upon creation, there will be no region sequence set yet -
+    {                                                                       // the update will happen later upon didAddPlaybackRegionToRegionSequence ()
+        if ((playbackRegion->isTimestretchEnabled () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretch) != 0)) ||
+            (playbackRegion->isTimestretchReflectingTempo () != ((newProperties->transformationFlags & ARA::kARAPlaybackTransformationTimestretchReflectingTempo) != 0)) ||
+            (playbackRegion->getStartInAudioModificationTime () != newProperties->startInModificationTime) ||
+            (playbackRegion->getDurationInAudioModificationTime () != newProperties->durationInModificationTime) ||
+            (playbackRegion->getStartInPlaybackTime () != newProperties->startInPlaybackTime) ||
+            (playbackRegion->getDurationInPlaybackTime () != newProperties->durationInPlaybackTime))
+            notifyRegionSequenceDataChanged (regionSequence);
+    }
 }
 
 /*******************************************************************************/
@@ -788,7 +791,7 @@ ARA::PlugIn::ContentReader* ARATestDocumentController::doCreatePlaybackRegionCon
 
 /*******************************************************************************/
 
-void ARATestDocumentController::doRequestAudioSourceContentAnalysis (ARA::PlugIn::AudioSource* audioSource, std::vector<ARA::ARAContentType> const& ARA_MAYBE_UNUSED_ARG (contentTypes)) noexcept
+void ARATestDocumentController::doRequestAudioSourceContentAnalysis (ARA::PlugIn::AudioSource* audioSource, [[maybe_unused]] std::vector<ARA::ARAContentType> const& contentTypes) noexcept
 {
     ARA_INTERNAL_ASSERT (contentTypes.size () == 1);
     ARA_INTERNAL_ASSERT (contentTypes[0] == ARA::kARAContentTypeNotes);
@@ -805,7 +808,7 @@ void ARATestDocumentController::doRequestAudioSourceContentAnalysis (ARA::PlugIn
         startOrScheduleAnalysisOfAudioSource (testAudioSource);
 }
 
-bool ARATestDocumentController::doIsAudioSourceContentAnalysisIncomplete (const ARA::PlugIn::AudioSource* audioSource, ARA::ARAContentType ARA_MAYBE_UNUSED_ARG (type)) noexcept
+bool ARATestDocumentController::doIsAudioSourceContentAnalysisIncomplete (const ARA::PlugIn::AudioSource* audioSource, [[maybe_unused]] ARA::ARAContentType type) noexcept
 {
     ARA_INTERNAL_ASSERT (type == ARA::kARAContentTypeNotes);
 
@@ -883,13 +886,8 @@ void ARATestDocumentController::rendererDidAccessModelGraph (ARATestPlaybackRend
 
 void ARATestDocumentController::disableRendererModelGraphAccess () noexcept
 {
-#if __cplusplus >= 201703L
     static_assert (decltype (_renderersCanAccessModelGraph)::is_always_lock_free);
     static_assert (decltype (_countOfRenderersCurrentlyAccessingModelGraph)::is_always_lock_free);
-#else
-    ARA_INTERNAL_ASSERT (_renderersCanAccessModelGraph.is_lock_free ());
-    ARA_INTERNAL_ASSERT (_countOfRenderersCurrentlyAccessingModelGraph.is_lock_free ());
-#endif
 
     ARA_INTERNAL_ASSERT (_renderersCanAccessModelGraph);
     _renderersCanAccessModelGraph = false;
@@ -911,7 +909,7 @@ static constexpr std::array<ARA::ARAContentType, 1> analyzeableContentTypes { { 
 class ARATestFactoryConfig : public ARA::PlugIn::FactoryConfig
 {
 public:
-    ARA::ARAAPIGeneration getHighestSupportedApiGeneration () const noexcept override { return ARA::kARAAPIGeneration_2_3_Final; }
+    ARA::ARAAPIGeneration getHighestSupportedApiGeneration () const noexcept override { return ARA::kARAAPIGeneration_3_0_Draft; }
     const char* getFactoryID () const noexcept override { return TEST_FACTORY_ID; }
     const char* getPlugInName () const noexcept override { return TEST_PLUGIN_NAME; }
     const char* getManufacturerName () const noexcept override { return TEST_MANUFACTURER_NAME; }

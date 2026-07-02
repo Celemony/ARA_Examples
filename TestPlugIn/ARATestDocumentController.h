@@ -3,7 +3,7 @@
 //!             document controller implementation for the ARA test plug-in,
 //!             customizing the document controller and related base classes of the ARA library
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2012-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2012-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -112,6 +112,7 @@ protected:
     ARA::ARAContentGrade doGetAudioModificationContentGrade (const ARA::PlugIn::AudioModification* audioModification, ARA::ARAContentType type) noexcept override;
     ARA::PlugIn::ContentReader* doCreateAudioModificationContentReader (ARA::PlugIn::AudioModification* audioModification, ARA::ARAContentType type, const ARA::ARAContentTimeRange* range) noexcept override;
 
+    bool doIsPlaybackRegionPreservingAudioSourceSignal (ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept override { return true; }
     bool doIsPlaybackRegionContentAvailable (const ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::ARAContentType type) noexcept override;
     ARA::ARAContentGrade doGetPlaybackRegionContentGrade (const ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::ARAContentType type) noexcept override;
     ARA::PlugIn::ContentReader* doCreatePlaybackRegionContentReader (ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::ARAContentType type, const ARA::ARAContentTimeRange* range) noexcept override;

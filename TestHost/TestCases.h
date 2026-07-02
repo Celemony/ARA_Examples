@@ -2,7 +2,7 @@
 //! \file       TestCases.h
 //!             various tests simulating user interaction with the TestHost
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -62,7 +62,7 @@ void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 // using the companion API rendering methods
 // Can optionally use an ARA plug-in's time stretching capabilities to stretch a playback region -
 // try loading Melodyne to see this feature in action
-void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimeStretchingIfSupported, const AudioFileList& audioFiles);
+void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimestretchingIfSupported, const AudioFileList& audioFiles);
 
 // Demonstrates how to communicate view selection and region sequence hiding
 // (albeit this is of rather limited use in a non-UI application)

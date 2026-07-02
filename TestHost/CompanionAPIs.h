@@ -3,7 +3,7 @@
 //!             used by the test host to load a companion API plug-in binary
 //!             and create / destroy plug-in instances with ARA2 roles
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -29,8 +29,7 @@
 #include "ARA_Library/Debug/ARADebug.h"
 #include "ARA_Library/Dispatch/ARAHostDispatch.h"
 
-//#include "ARA_Library/IPC/ARAIPC.h"
-#define ARA_ENABLE_IPC 0
+#include "ARA_Library/IPC/ARAIPC.h"
 
 #include <string>
 #include <vector>
@@ -98,7 +97,7 @@ public:
 
     // If IPC is used, and the main thread is spinning in some loop for a prolonged time,
     // this call may be necessary to allow handling IPC in time.
-    virtual void idleThreadForDuration (int32_t milliseconds);
+    void idleThreadForDuration (int32_t milliseconds);
 
     // Initialize ARA before creating any document controllers
     virtual void initializeARA (ARA::ARAAssertFunction* assertFunctionAddress);

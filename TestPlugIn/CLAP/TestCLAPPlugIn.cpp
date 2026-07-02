@@ -3,7 +3,7 @@
 //!             CLAP implementation for the ARA test plug-in,
 //!             based on the plugin-template.c from the CLAP SDK
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2022-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2022-2026, Celemony Software GmbH, All Rights Reserved.
 //!             Developed in cooperation with Timo Kaluza (defiantnerd)
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
@@ -107,9 +107,9 @@ static const clap_plugin_audio_ports_t s_my_plug_audio_ports = {
 
 // internal helper that makes sure the requests describes a valid configuration with ins == outs
 // returns 0 on failure
-uint32_t my_plug_get_validated_channel_count_for_configuration(const my_plug_t                                    *plugin,
-                                                               const struct clap_audio_port_configuration_request *requests,
-                                                               uint32_t                                            request_count) {
+static uint32_t my_plug_get_validated_channel_count_for_configuration(const my_plug_t                                    *plugin,
+                                                                      const struct clap_audio_port_configuration_request *requests,
+                                                                      uint32_t                                            request_count) {
    if (request_count > 2)
       return 0;
 

@@ -1,0 +1,2 @@
+option ('vst3_sdk_path', type: 'string', value: '',
+    description: 'Path to the VST3 SDK root (defaults to ../../../vst3 relative to ARA_Examples)')

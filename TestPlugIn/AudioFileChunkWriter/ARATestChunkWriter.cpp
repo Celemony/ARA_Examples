@@ -2,7 +2,7 @@
 //! \file       ARATestChunkWriter.cpp
 //!             ARA audio file chunk authoring tool for the ARA test plug-in
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -55,7 +55,7 @@ private:
 };
 
 
-void addChunk (AudioFileBase&& audioFile, bool openAutomatically)
+static void addChunkAndSave (AudioFileBase&& audioFile, bool openAutomatically, const std::string& path)
 {
     const auto persistentID { "audioSource1" };
     const auto documentArchiveID { TEST_FILECHUNK_ARCHIVE_ID };
@@ -83,8 +83,7 @@ void addChunk (AudioFileBase&& audioFile, bool openAutomatically)
                                          persistentID, archive);
 
     // store audio file
-    auto wavFileName { audioFile.getName () };
-    auto success { audioFile.saveToFile (audioFile.getName ()) };
+    auto success { audioFile.saveToFile (path) };
     ARA_INTERNAL_ASSERT (success);
 }
 
@@ -103,17 +102,16 @@ int main (int argc, const char* argv[])
         }
 
         icstdsp::AudioFile audioFile;
-        int ARA_MAYBE_UNUSED_VAR (err);
-        err = audioFile.Load (it.c_str ());
+        const auto err { audioFile.Load (it.c_str ()) };
         if (err == icstdsp::NOFILE)
         {
             ARA_LOG ("Audio File '%s' not found, will be created.", it.c_str ());
-            addChunk (SineAudioFile { it, 5.0, 44100.0, 1 }, openAutomatically);
+            addChunkAndSave (SineAudioFile { it, 5.0, 44100.0, 1 }, openAutomatically, it);
         }
         else
         {
             ARA_INTERNAL_ASSERT (err == 0);
-            addChunk (AudioDataFile { it, std::move (audioFile) }, openAutomatically);
+            addChunkAndSave (AudioDataFile { it, std::move (audioFile) }, openAutomatically, it);
         }
     }
     return 0;

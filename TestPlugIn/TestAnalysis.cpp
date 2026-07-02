@@ -2,7 +2,7 @@
 //! \file       TestAnalysis.cpp
 //!             dummy implementation of audio source analysis for the ARA test plug-in
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -189,7 +189,7 @@ public:
             const auto analysisTargetTime { analysisStartTime + progress * analysisTargetDuration };
             const auto timeToSleep { analysisTargetTime - ARA_GET_CURRENT_TIME () };
             if (timeToSleep > 0.0)
-                std::this_thread::sleep_for (std::chrono::milliseconds { std::llround (timeToSleep * 1000) } );
+                std::this_thread::sleep_for (std::chrono::milliseconds { std::llround (timeToSleep * 1000) });
 #endif
         }
 
@@ -291,7 +291,7 @@ public:
             }
 
             analysisCallbacks->notifyAnalysisProgressUpdated (static_cast<float> (i) / static_cast<float> (count));
-            std::this_thread::sleep_for (std::chrono::milliseconds { std::llround (sliceDuration * 1000) } );
+            std::this_thread::sleep_for (std::chrono::milliseconds { std::llround (sliceDuration * 1000) });
         }
 #endif
 

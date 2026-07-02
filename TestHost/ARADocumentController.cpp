@@ -2,7 +2,7 @@
 //! \file       ARADocumentController.cpp
 //!             provides access the plug-in document controller
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -154,7 +154,8 @@ const RegionSequenceProperties ARADocumentController::getRegionSequencePropertie
         regionSequence->getName ().c_str (),
         regionSequence->getOrderIndex (),
         getRef (regionSequence->getMusicalContext ()),
-        &regionSequence->getColor ()
+        &regionSequence->getColor (),
+        regionSequence->getPersistentID ().c_str ()
     };
 }
 
@@ -299,11 +300,6 @@ void ARADocumentController::updatePlaybackRegionProperties (PlaybackRegion* play
 
 /*******************************************************************************/
 
-bool ARADocumentController::supportsPartialPersistency ()
-{
-    return _documentController->supportsPartialPersistency ();
-}
-
 bool ARADocumentController::storeObjectsToArchive (ArchiveBase* archive, const ARA::ARAStoreObjectsFilter* filter)
 {
     ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
@@ -318,32 +314,6 @@ bool ARADocumentController::restoreObjectsFromArchive (const ArchiveBase* archiv
     ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
     _currentArchive = archive;
     const auto result { _documentController->restoreObjectsFromArchive (toHostRef (archive), filter) };
-    _currentArchive = nullptr;
-    return result;
-}
-
-bool ARADocumentController::storeDocumentToArchive (ArchiveBase* archive)
-{
-    ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
-    _currentArchive = archive;
-    const auto result { _documentController->storeDocumentToArchive (toHostRef (archive)) };
-    _currentArchive = nullptr;
-    return result;
-}
-
-bool ARADocumentController::beginRestoringDocumentFromArchive (const ArchiveBase* archive)
-{
-    ARA_INTERNAL_ASSERT (_currentArchive == nullptr);
-    _currentArchive = archive;
-    _isEditingDocument = true;
-    return _documentController->beginRestoringDocumentFromArchive (toHostRef (archive));
-}
-
-bool ARADocumentController::endRestoringDocumentFromArchive (const ArchiveBase* archive)
-{
-    ARA_INTERNAL_ASSERT (_currentArchive == archive);
-    const auto result { _documentController->endRestoringDocumentFromArchive (toHostRef (archive)) };
-    _isEditingDocument = false;
     _currentArchive = nullptr;
     return result;
 }
@@ -475,15 +445,6 @@ void ARADocumentController::requestProcessingAlgorithmForAudioSource (AudioSourc
 void ARADocumentController::setMinimalContentUpdateLogging (bool flag)
 {
     getModelUpdateController ()->setMinimalContentUpdateLogging (flag);
-}
-
-void ARADocumentController::logAudioModificationPreservesAudioSourceSignalIfSupported (AudioModification* audioModification)
-{
-    if (!_documentController->supportsIsAudioModificationPreservingAudioSourceSignal ())
-        return;
-
-    ARA_LOG ("ARAAudioModificationRef %p %s audio source signal.", getRef (audioModification),
-             _documentController->isAudioModificationPreservingAudioSourceSignal ( getRef (audioModification)) ? "preserves" : "modifies");
 }
 
 /*******************************************************************************/

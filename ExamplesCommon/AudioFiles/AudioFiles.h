@@ -2,7 +2,7 @@
 //! \file       AudioFiles.h
 //!             classes representing audio files
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -97,7 +97,7 @@ private:
 class AudioDataFile : public AudioFileBase
 {
 public:
-    AudioDataFile (const std::string& name, icstdsp::AudioFile&& audioFile);
+    AudioDataFile (const std::string& path, icstdsp::AudioFile&& audioFile);
 
     int64_t getSampleCount () const noexcept override { return _audioFile.GetSize (); }
     double getSampleRate () const noexcept override { return _audioFile.GetRate (); }

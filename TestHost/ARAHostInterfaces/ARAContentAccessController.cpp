@@ -2,7 +2,7 @@
 //! \file       ARAContentAccessController.cpp
 //!             implementation of the host ARAContentAccessControllerInterface
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -55,6 +55,7 @@ std::unique_ptr<HostDataContentReader> ARAContentAccessController::createContent
         case ARA::kARAContentTypeStaticTuning: return std::make_unique<ContentReaderImplementation<ARA::ARAContentTuning>> (contentContainer->getTuning ());
         case ARA::kARAContentTypeKeySignatures: return std::make_unique<ContentReaderImplementation<ARA::ARAContentKeySignature>> (contentContainer->getKeySignatures ());
         case ARA::kARAContentTypeSheetChords: return std::make_unique<ContentReaderImplementation<ARA::ARAContentChord>> (contentContainer->getChords ());
+        case ARA::kARAContentTypeLyricEntries: return std::make_unique<ContentReaderImplementation<ARA::ARAContentLyricsEntry>> (contentContainer->getLyrics ());
         default: return nullptr;
     }
 }

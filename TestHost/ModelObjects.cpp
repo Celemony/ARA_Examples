@@ -2,7 +2,7 @@
 //! \file       ModelObjects.cpp
 //!             classes used to build the host model graph
 //! \project    ARA SDK Examples
-//! \copyright  Copyright (c) 2018-2025, Celemony Software GmbH, All Rights Reserved.
+//! \copyright  Copyright (c) 2018-2026, Celemony Software GmbH, All Rights Reserved.
 //! \license    Licensed under the Apache License, Version 2.0 (the "License");
 //!             you may not use this file except in compliance with the License.
 //!             You may obtain a copy of the License at
@@ -25,76 +25,6 @@
 
 #include "ModelObjects.h"
 #include "ARA_Library/Debug/ARADebug.h"
-
-/*******************************************************************************/
-
-Document::Document (std::string name)
-: _name { name }
-{}
-
-/*******************************************************************************/
-
-MusicalContext::MusicalContext (Document * document, std::string name, ARA::ARAColor color)
-: _document { document },
-  _name { name },
-  _color { color }
-{}
-
-int MusicalContext::getOrderIndex () const noexcept
-{
-    return static_cast<int> (ARA::index_of (_document->getMusicalContexts (), this));
-}
-
-/*******************************************************************************/
-
-RegionSequence::RegionSequence (Document * document, std::string name, MusicalContext * musicalContext, ARA::ARAColor color)
-: _document { document },
-  _name { name },
-  _musicalContext { musicalContext },
-  _color { color }
-{
-    _musicalContext->_addRegionSequence (this);
-}
-
-RegionSequence::~RegionSequence ()
-{
-    _musicalContext->_removeRegionSequence (this);
-}
-
-int RegionSequence::getOrderIndex () const noexcept
-{
-    return static_cast<int> (ARA::index_of (_document->getRegionSequences (), this));
-}
-
-void RegionSequence::setMusicalContext (MusicalContext* musicalContext)
-{
-    if (musicalContext == _musicalContext)
-        return;
-
-    _musicalContext->_removeRegionSequence (this);
-    _musicalContext = musicalContext;
-    _musicalContext->_addRegionSequence (this);
-}
-
-/*******************************************************************************/
-
-AudioSource::AudioSource (Document* document, AudioFileBase* audioFile, std::string persistentID)
-: _document { document },
-  _audioFile { audioFile },
-  _persistentID { persistentID }
-{
-    // at this point, only up to stereo formats are supported because the test code
-    // doesn't handle surround channel arrangements yet.
-    ARA_INTERNAL_ASSERT (_audioFile->getChannelCount () <= 2);
-}
-
-/*******************************************************************************/
-
-AudioModification::AudioModification (AudioSource * audioSource, std::string name, std::string persistentID)
-: _audioSource { audioSource },
-  _name { name },
-  _persistentID { persistentID }
-{}
 
 /*******************************************************************************/
 
@@ -128,3 +58,74 @@ void PlaybackRegion::setRegionSequence (RegionSequence* regionSequence)
     _regionSequence = regionSequence;
     _regionSequence->_addPlaybackRegion (this);
 }
+
+/*******************************************************************************/
+
+AudioModification::AudioModification (AudioSource * audioSource, std::string name, std::string persistentID)
+: _audioSource { audioSource },
+  _name { name },
+  _persistentID { persistentID }
+{}
+
+/*******************************************************************************/
+
+AudioSource::AudioSource (Document* document, AudioFileBase* audioFile, std::string persistentID)
+: _document { document },
+  _audioFile { audioFile },
+  _persistentID { persistentID }
+{
+    // at this point, only up to stereo formats are supported because the test code
+    // doesn't handle surround channel arrangements yet.
+    ARA_INTERNAL_ASSERT (_audioFile->getChannelCount () <= 2);
+}
+
+/*******************************************************************************/
+
+RegionSequence::RegionSequence (Document * document, std::string name, std::string persistentID, MusicalContext * musicalContext, ARA::ARAColor color)
+: _document { document },
+  _name { name },
+  _persistentID { persistentID },
+  _musicalContext { musicalContext },
+  _color { color }
+{
+    _musicalContext->_addRegionSequence (this);
+}
+
+RegionSequence::~RegionSequence ()
+{
+    _musicalContext->_removeRegionSequence (this);
+}
+
+int RegionSequence::getOrderIndex () const noexcept
+{
+    return static_cast<int> (ARA::index_of (_document->getRegionSequences (), this));
+}
+
+void RegionSequence::setMusicalContext (MusicalContext* musicalContext)
+{
+    if (musicalContext == _musicalContext)
+        return;
+
+    _musicalContext->_removeRegionSequence (this);
+    _musicalContext = musicalContext;
+    _musicalContext->_addRegionSequence (this);
+}
+
+/*******************************************************************************/
+
+MusicalContext::MusicalContext (Document * document, std::string name, ARA::ARAColor color)
+: _document { document },
+  _name { name },
+  _color { color }
+{}
+
+int MusicalContext::getOrderIndex () const noexcept
+{
+    return static_cast<int> (ARA::index_of (_document->getMusicalContexts (), this));
+}
+
+/*******************************************************************************/
+
+Document::Document (std::string name)
+: _name { name }
+{}
