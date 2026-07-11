@@ -183,7 +183,7 @@ public:
 
     int64_t getSampleCount () const noexcept { return _audioFile->getSampleCount (); }
     double getSampleRate () const noexcept { return _audioFile->getSampleRate (); }
-    double getDuration () const noexcept { return ARA::timeAtSamplePosition (getSampleCount (), getSampleRate ()); }
+    double getDuration () const noexcept { return _audioFile->getDuration (); }
     int getChannelCount () const noexcept { return _audioFile->getChannelCount (); }
     bool merits64BitSamples () const noexcept { return _audioFile->merits64BitSamples (); }
 

@@ -31,14 +31,28 @@ class ARAiXMLChunk;
 // Abstract interface for audio files.
 class AudioFileBase
 {
+protected:
+    AudioFileBase (const std::string& name, int64_t sampleCount, double sampleRate,
+                   double duration, int channelCount, bool merits64BitSamples)
+    : _name { name },
+      _sampleCount { sampleCount },
+      _sampleRate { sampleRate },
+      _duration { duration },
+      _channelCount { channelCount },
+      _merits64BitSamples { merits64BitSamples }
+    {}
+
 public:
-    AudioFileBase (const std::string& name) : _name { name } {}
     virtual ~AudioFileBase () { setiXMLChunk (nullptr); }
 
-    virtual int64_t getSampleCount () const noexcept = 0;
-    virtual double getSampleRate () const noexcept = 0;
-    virtual int getChannelCount () const noexcept = 0;
-    virtual bool merits64BitSamples () const noexcept = 0;
+    const std::string& getName () const noexcept { return _name; }
+    void setName (const std::string& name) noexcept { _name = name; }
+
+    int64_t getSampleCount () const noexcept { return _sampleCount; }
+    double getSampleRate () const noexcept { return _sampleRate; }
+    double getDuration () const noexcept { return _duration; }
+    int getChannelCount () const noexcept { return _channelCount; }
+    bool merits64BitSamples () const noexcept { return _merits64BitSamples; }
 
     virtual bool readSamples (int64_t samplePosition, int64_t samplesPerChannel,
                               void* const buffers[], bool use64BitSamples) noexcept = 0;
@@ -54,15 +68,17 @@ public:
 
     virtual bool saveToFile (const std::string& path) = 0;
 
-    const std::string& getName () const noexcept { return _name; }
-    void setName (const std::string& name) noexcept { _name = name; }
-
 protected:
     const ARAiXMLChunk* getiXMLChunk () const noexcept { return _iXMLChunk; }
     void setiXMLChunk (ARAiXMLChunk* chunk) noexcept;
 
 private:
     std::string _name;
+    const int64_t _sampleCount;
+    const double _sampleRate;
+    const double _duration;
+    const int _channelCount;
+    const bool _merits64BitSamples;
     ARAiXMLChunk* _iXMLChunk { nullptr };
 };
 
@@ -73,22 +89,11 @@ class SineAudioFile : public AudioFileBase
 {
 public:
     SineAudioFile (const std::string& name, double duration, double sampleRate, int channelCount);
-    SineAudioFile (const std::string& name, int64_t sampleCount, double sampleRate, int channelCount);
-
-    int64_t getSampleCount () const noexcept override { return _sampleCount; }
-    double getSampleRate () const noexcept override { return _sampleRate; }
-    int getChannelCount () const noexcept override { return _channelCount; }
-    bool merits64BitSamples () const noexcept override { return true; }
 
     bool readSamples (int64_t samplePosition, int64_t samplesPerChannel,
                       void* const buffers[], bool use64BitSamples) noexcept override;
 
     bool saveToFile (const std::string& path) override;
-
-private:
-    int64_t _sampleCount;
-    double _sampleRate;
-    int _channelCount;
 };
 
 /*******************************************************************************/
@@ -98,11 +103,6 @@ class AudioDataFile : public AudioFileBase
 {
 public:
     AudioDataFile (const std::string& path, icstdsp::AudioFile&& audioFile);
-
-    int64_t getSampleCount () const noexcept override { return _audioFile.GetSize (); }
-    double getSampleRate () const noexcept override { return _audioFile.GetRate (); }
-    int getChannelCount () const noexcept override { return static_cast<int> (_audioFile.GetChannels ()); }
-    bool merits64BitSamples () const noexcept override { return false; }
 
     bool readSamples (int64_t samplePosition, int64_t samplesPerChannel,
                       void* const buffers[], bool use64BitSamples) noexcept override;

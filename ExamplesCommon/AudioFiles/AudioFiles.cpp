@@ -184,14 +184,7 @@ std::string AudioFileBase::getiXMLARAAudioSourceData (const std::string& documen
 /*******************************************************************************/
 
 SineAudioFile::SineAudioFile (const std::string& name, double duration, double sampleRate, int32_t channelCount)
-: SineAudioFile { name, ARA::samplePositionAtTime (duration, sampleRate), sampleRate, channelCount }
-{}
-
-SineAudioFile::SineAudioFile (const std::string& name, int64_t sampleCount, double sampleRate, int32_t channelCount)
-: AudioFileBase { name },
-  _sampleCount { sampleCount },
-  _sampleRate { sampleRate },
-  _channelCount { channelCount }
+: AudioFileBase { name, ARA::samplePositionAtTime (duration, sampleRate), sampleRate, duration, channelCount, true }
 {}
 
 bool SineAudioFile::readSamples (int64_t samplePosition, int64_t samplesPerChannel,
@@ -239,7 +232,9 @@ inline static const std::string filenameHelper (const std::string& path)
 }
 
 AudioDataFile::AudioDataFile (const std::string& path, icstdsp::AudioFile&& audioFile)
-: AudioFileBase { filenameHelper (path) },
+: AudioFileBase { filenameHelper (path), audioFile.GetSize (), static_cast<double> (audioFile.GetRate ()),
+                  ARA::timeAtSamplePosition (audioFile.GetSize (), audioFile.GetRate ()),
+                  static_cast<int> (audioFile.GetChannels ()), false },
   _audioFile { std::move (audioFile) }
 {
     unsigned int dataLength { 0 };
