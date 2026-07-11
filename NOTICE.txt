@@ -15,3 +15,7 @@ This product bundles the AudioFile component of the ICST DSP library,
 extended to read and write iXML data chunks, developed by
 Celemony Software GmbH, which is available under the "2-clause BSD" license.
 For details, see 3rdParty/ICST_AudioFile.
+
+This product bundles midifile, developed by Craig Stuart Sapp,
+which is available under the "2-clause BSD" license.
+For details, see 3rdParty/midifile.

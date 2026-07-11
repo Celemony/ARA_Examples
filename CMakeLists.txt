@@ -578,6 +578,7 @@ endfunction()
 # fetch Git submodules if needed
 if((NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/cpp-base64/base64.h") OR
    (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/ICST_AudioFile/AudioFile.h") OR
+   (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/include/MidiFile.h") OR
    (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/pugixml/src/pugixml.hpp"))
     message(STATUS "Updating Git submodules")
     execute_process(COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}" submodule update --init --recursive RESULT_VARIABLE result)
@@ -604,6 +605,25 @@ add_library(ICST_AudioFile ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
     "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/ICST_AudioFile/LICENSE.txt"
 )
 configure_3rdParty_target(ICST_AudioFile)
+
+add_library(midifile ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/include/Binasc.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/include/MidiEvent.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/include/MidiEventList.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/include/MidiFile.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/include/MidiMessage.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/src/Binasc.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/src/MidiEvent.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/src/MidiEventList.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/src/MidiFile.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/src/MidiMessage.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/README.md"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/LICENSE.txt"
+)
+configure_3rdParty_target(midifile)
+target_include_directories(midifile PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/midifile/include"
+)
 
 add_library(pugixml ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
     "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/pugixml/src/pugiconfig.hpp"
@@ -1198,6 +1218,7 @@ set_target_properties(ARAExamplesCommon PROPERTIES
 target_link_libraries(ARAExamplesCommon PUBLIC
     cpp-base64
     ICST_AudioFile
+    midifile
     pugixml
 )
 

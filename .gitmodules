@@ -10,3 +10,7 @@
 	path = 3rdParty/ICST_AudioFile
 	url = https://github.com/Celemony/ICST_AudioFile
 	shallow = true
+[submodule "3rdParty/midifile"]
+	path = 3rdParty/midifile
+	url = https://github.com/craigsapp/midifile
+	shallow = true
