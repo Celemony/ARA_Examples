@@ -91,6 +91,17 @@ void ARADocumentController::endEditing ()
     ARA_INTERNAL_ASSERT (_isEditingDocument);
     _documentController->endEditing ();
     _isEditingDocument = false;
+
+    pollModelUpdates ();
+}
+
+void ARADocumentController::pollModelUpdates ()
+{
+    ARA_INTERNAL_ASSERT (!_isEditingDocument);
+
+    _isPollingModelUpdates = true;
+    _documentController->notifyModelUpdates ();
+    _isPollingModelUpdates = false;
 }
 
 /*******************************************************************************/
@@ -396,9 +407,7 @@ void ARADocumentController::requestAudioSourceContentAnalysis (AudioSource* audi
     while (true)
     {
         // Because this is our update loop, query the document controller for model updates here
-        _isPollingModelUpdates = true;
-        _documentController->notifyModelUpdates ();
-        _isPollingModelUpdates = false;
+        pollModelUpdates ();
 
         // Check if all analysis is done for the available analysis content types
         bool allDone { true };

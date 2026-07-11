@@ -80,6 +80,11 @@ public:
     void beginEditing ();
     void endEditing ();
 
+    // this would be called via a timer in an actual host outside edit cycles -
+    // in our dummy host it's called implicitly e.g. from endEditing() or from
+    // requestAudioSourceContentAnalysis() when bWaitUntilFinish is true
+    void pollModelUpdates ();
+
     // ARA model graph changes must go through these APIs in order
     // to synchronize the plug-in's representation with our own
     void updateDocumentProperties ();
