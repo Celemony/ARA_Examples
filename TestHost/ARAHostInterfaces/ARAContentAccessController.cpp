@@ -55,6 +55,7 @@ std::unique_ptr<HostDataContentReader> ARAContentAccessController::createContent
         case ARA::kARAContentTypeStaticTuning: return std::make_unique<ContentReaderImplementation<ARA::ARAContentTuning>> (contentContainer->getTuning ());
         case ARA::kARAContentTypeKeySignatures: return std::make_unique<ContentReaderImplementation<ARA::ARAContentKeySignature>> (contentContainer->getKeySignatures ());
         case ARA::kARAContentTypeSheetChords: return std::make_unique<ContentReaderImplementation<ARA::ARAContentChord>> (contentContainer->getChords ());
+        case ARA::kARAContentTypeLyricEntries: return std::make_unique<ContentReaderImplementation<ARA::ARAContentLyricsEntry>> (contentContainer->getLyrics ());
         default: return nullptr;
     }
 }

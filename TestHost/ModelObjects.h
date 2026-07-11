@@ -52,28 +52,25 @@ public:
     using EntryData = std::unique_ptr<std::vector<ContentType>>;
 
     void setNotes (std::vector<ARA::ARAContentNote> const& notes) { _notes = makeEntryData (notes); }
-    void clearNotes () { _notes.reset (); }
     const EntryData<ARA::ARAContentNote>& getNotes () const noexcept { return _notes; }
 
     void setTempoEntries (std::vector<ARA::ARAContentTempoEntry> const& tempoEntries) { _tempoEntries = makeEntryData (tempoEntries); }
-    void clearTempoEntries () { _tempoEntries.reset (); }
     const EntryData<ARA::ARAContentTempoEntry>& getTempoEntries () const noexcept { return _tempoEntries; }
 
     void setBarSignatures (std::vector<ARA::ARAContentBarSignature> const& barSignatures) { _barSignatures = makeEntryData (barSignatures); }
-    void clearBarSignatures () { _barSignatures.reset (); }
     const EntryData<ARA::ARAContentBarSignature>& getBarSignatures () const noexcept { return _barSignatures; }
 
     void setTuning (ARA::ARAContentTuning const& tuning) { _tuning = makeEntryData (std::vector<ARA::ARAContentTuning> { tuning }); }
-    void clearTuning () { _tuning.reset (); }
     const EntryData<ARA::ARAContentTuning>& getTuning () const noexcept { return _tuning; }
 
     void setKeySignatures (std::vector<ARA::ARAContentKeySignature> const& keySignatures) { _keySignatures = makeEntryData (keySignatures); }
-    void clearKeySignatures () { _keySignatures.reset (); }
     const EntryData<ARA::ARAContentKeySignature>& getKeySignatures () const noexcept { return _keySignatures; }
 
     void setChords (std::vector<ARA::ARAContentChord> const& chords) { _chords = makeEntryData (chords); }
-    void clearChords () { _chords.reset (); }
     const EntryData<ARA::ARAContentChord>& getChords () const noexcept { return _chords; }
+
+    void setLyrics (std::vector<ARA::ARAContentLyricsEntry> const& lyrics) { _lyrics = makeEntryData (lyrics); }
+    const EntryData<ARA::ARAContentLyricsEntry>& getLyrics () const noexcept { return _lyrics; }
 
 private:
     template<typename ContentType>
@@ -85,6 +82,7 @@ private:
     EntryData<ARA::ARAContentTuning> _tuning;
     EntryData<ARA::ARAContentKeySignature> _keySignatures;
     EntryData<ARA::ARAContentChord> _chords;
+    EntryData<ARA::ARAContentLyricsEntry> _lyrics;
 };
 
 /*******************************************************************************/
