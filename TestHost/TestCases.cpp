@@ -299,6 +299,22 @@ void testModificationCloning (PlugInEntry* plugInEntry, const AudioFileList& aud
     auto araDocumentController { createHostAndBasicDocument (plugInEntry, testHost, "testModificationCloning", true, audioFiles) };
     auto document { araDocumentController->getDocument () };
 
+    auto logFunction {
+        [&araDocumentController] (AudioModification* audioModification)
+        {
+            araDocumentController->logAvailableContent (audioModification);
+
+            if (araDocumentController->getDocumentController ()->supportsIsPlaybackRegionPreservingAudioSourceSignal ())
+            {
+                for (const auto& playbackRegion : audioModification->getPlaybackRegions ())
+                {
+                    const auto playbackRegionRef { araDocumentController->getRef (playbackRegion.get ()) };
+                    const auto isPreserving { araDocumentController->getDocumentController ()->isPlaybackRegionPreservingAudioSourceSignal (playbackRegionRef) };
+                    ARA_LOG ("ARAPlaybackRegionRef %p %s audio source signal.", playbackRegionRef, (isPreserving) ? "preserves" : "modifies");
+                }
+            }
+        } };
+
     // read all content for the original audio modification and playback region
     // and construct a vector of audio modifications to clone
     std::vector<AudioModification*> audioModificationsToClone;
@@ -306,9 +322,7 @@ void testModificationCloning (PlugInEntry* plugInEntry, const AudioFileList& aud
     {
         for (const auto& audioModification : audioSource->getAudioModifications ())
         {
-            araDocumentController->logAvailableContent (audioModification.get ());
-            araDocumentController->logAudioModificationPreservesAudioSourceSignalIfSupported (audioModification.get ());
-
+            logFunction (audioModification.get ());
             audioModificationsToClone.push_back (audioModification.get ());
         }
     }
@@ -342,10 +356,7 @@ void testModificationCloning (PlugInEntry* plugInEntry, const AudioFileList& aud
 
     // read back all the cloned audio modification content
     for (const auto& audioModificationClone : audioModificationClones)
-    {
-        araDocumentController->logAvailableContent (audioModificationClone);
-        araDocumentController->logAudioModificationPreservesAudioSourceSignalIfSupported (audioModificationClone);
-    }
+        logFunction (audioModificationClone);
 }
 
 /*******************************************************************************/

@@ -447,15 +447,6 @@ void ARADocumentController::setMinimalContentUpdateLogging (bool flag)
     getModelUpdateController ()->setMinimalContentUpdateLogging (flag);
 }
 
-void ARADocumentController::logAudioModificationPreservesAudioSourceSignalIfSupported (AudioModification* audioModification)
-{
-    if (!_documentController->supportsIsAudioModificationPreservingAudioSourceSignal ())
-        return;
-
-    ARA_LOG ("ARAAudioModificationRef %p %s audio source signal.", getRef (audioModification),
-             _documentController->isAudioModificationPreservingAudioSourceSignal ( getRef (audioModification)) ? "preserves" : "modifies");
-}
-
 /*******************************************************************************/
 
 ARAAudioAccessController* ARADocumentController::getAudioAccessController () const noexcept
