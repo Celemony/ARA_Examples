@@ -92,9 +92,9 @@ void TestHost::removeMusicalContext (Document* document, MusicalContext* musical
     document->removeMusicalContext (musicalContext);
 }
 
-RegionSequence* TestHost::addRegionSequence (Document* document, std::string name, MusicalContext* musicalContext, ARA::ARAColor color)
+RegionSequence* TestHost::addRegionSequence (Document* document, std::string name, std::string persistentID, MusicalContext* musicalContext, ARA::ARAColor color)
 {
-    document->addRegionSequence (std::make_unique<RegionSequence> (document, name, musicalContext, color));
+    document->addRegionSequence (std::make_unique<RegionSequence> (document, name, persistentID, musicalContext, color));
     auto regionSequence = document->getRegionSequences ().back ().get ();
     if (auto araDocumentController = getDocumentController (document))
         araDocumentController->addRegionSequence (regionSequence);
