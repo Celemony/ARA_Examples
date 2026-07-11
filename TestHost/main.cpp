@@ -203,6 +203,14 @@ int main (int argc, const char* argv[])
     ARA_LOG ("    plug-in does%s support storing audio file chunks.", (factory.implements<&ARA::ARAFactory::supportsStoringAudioFileChunks> () &&
                                                                       (factory->supportsStoringAudioFileChunks != ARA::kARAFalse)) ? "" : " not");
 
+    ARA_LOG ("    plug-in can%s be used with sample-based audio sources.", (!factory.implements<&ARA::ARAFactory::supportsSampleBasedAudioSources> () ||
+                                                                           (factory->supportsSampleBasedAudioSources != ARA::kARAFalse)) ? "" : " not");
+    ARA_LOG ("    plug-in can%s be used with content-only audio sources.", (factory.implements<&ARA::ARAFactory::supportsContentOnlyAudioSources> () &&
+                                                                           (factory->supportsContentOnlyAudioSources != ARA::kARAFalse)) ? "" : " not");
+
+    ARA_LOG ("    plug-in does%s require preset audio sources.", (factory.implements<&ARA::ARAFactory::requiresPresetAudioSources> () &&
+                                                                 (factory->requiresPresetAudioSources != ARA::kARAFalse)) ? "" : " not");
+
     // parse any optional test cases or audio files
     auto audioFiles { parseAudioFiles (args) };
     const auto testCases { parseTestCases (args) };
