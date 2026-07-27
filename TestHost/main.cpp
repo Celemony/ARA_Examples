@@ -23,15 +23,15 @@
 // ARA API elements is left out.
 //------------------------------------------------------------------------------
 // Command line arguments format for testing VST3 plug-ins:
-// ./ARATestHost -vst3 [binaryFilePath] [optionalPlugInName] -test [TestCase(s)] -file [AudioFile(s)]
+// ./ARATestHost -vst3 [binaryFilePath] [optionalPlugInName] -test [TestCase(s)] -file [AudioFilePath(s)] -renderOutput [AudioFilePath(s)]
 // The optionalPlugInName argument will typically be omitted, it is only needed when the VST3 binary
 // contains multiple plug-ins (e.g. WaveShell).
 //
 // On macOS, Audio Units can also be tested:
-// ./ARATestHost -au [type] [subType] [manufacturer] -test [TestCase(s)] -file [AudioFile(s)]
+// ./ARATestHost -au [type] [subType] [manufacturer] -test [TestCase(s)] -file [AudioFilePath(s)] -renderOutput [AudioFilePath(s)]
 //
 // If the CLAP SDK is installed when building, CLAP plug-ins can be tested too:
-// ./ARATestHost -clap [binaryFilePath] [optionalPlugInName] -test [TestCase(s)] -file [AudioFile(s)]
+// ./ARATestHost -clap [binaryFilePath] [optionalPlugInName] -test [TestCase(s)] -file [AudioFilePath(s)] -renderOutput [AudioFilePath(s)]
 //
 // The macOS version also supports running the plug-in in a separate process, connected via IPC,
 // by specifying `-ipc_vst3` or `-ipc_au` or `-ipc_clap` instead of `-vst3` or `-au` or `-clap`.
@@ -40,6 +40,9 @@
 // See implementation of main() at the end of this file for a list of available test cases.
 //
 // If the optional `-file` argument is not supplied, a pulsed sine wave will be generated in-memory.
+//
+// When testing playback rendering, the optional `-renderOutput` argument can be used to specify a file path
+// for storing the resulting output. Provide two paths if testing time stretching as well.
 //
 // Example:
 // # run ContentReading and PlaybackRendering tests with Melodyne for VST3:
@@ -126,21 +129,31 @@ static AudioFileList parseAudioFiles (const std::vector<std::string>& args,
     return {};
 }
 
-static const std::vector<std::string> parseTestCases (const std::vector<std::string>& args)
+static const std::vector<std::string> parseArgumentsWithKey (const std::vector<std::string>& args, const std::string key)
 {
-    std::vector<std::string> parsedTests;
+    std::vector<std::string> parsedArgs;
     auto it { args.begin () };
     while (it != args.end ())
     {
-        if (*it++ != "-test")
+        if (*it++ != key)
             continue;
         while ((it != args.end ()) &&
                ((*it)[0] != '-'))
         {
-            parsedTests.emplace_back (*it++);
+            parsedArgs.emplace_back (*it++);
         }
     }
-    return parsedTests;
+    return parsedArgs;
+}
+
+static const std::vector<std::string> parseTestCases (const std::vector<std::string>& args)
+{
+    return parseArgumentsWithKey (args, "-test");
+}
+
+static const std::vector<std::string> parseRenderOutputPaths (const std::vector<std::string>& args)
+{
+    return parseArgumentsWithKey (args, "-renderOutput");
 }
 
 // see start of this file for detailed description of the command line arguments
@@ -239,6 +252,7 @@ int main (int argc, const char* argv[])
     // parse any optional test cases or audio files
     auto audioFiles { parseAudioFiles (args, supportsSampleBasedAudioSources, supportsContentOnlyAudioSources) };
     const auto testCases { parseTestCases (args) };
+    const auto renderOutputPaths { parseRenderOutputPaths (args) };
 
     // start up ARA
     plugInEntry->initializeARA (assertFunctionReference);
@@ -260,7 +274,7 @@ int main (int argc, const char* argv[])
     if (shouldTest ("DragAndDrop"))
         testDragAndDrop (plugInEntry.get (), audioFiles);
     if (shouldTest ("PlaybackRendering"))
-        testPlaybackRendering (plugInEntry.get (), true, audioFiles);
+        testPlaybackRendering (plugInEntry.get (), true, audioFiles, renderOutputPaths);
     if (shouldTest ("EditorView"))
         testEditorView (plugInEntry.get (), audioFiles);
     if (shouldTest ("Algorithms"))

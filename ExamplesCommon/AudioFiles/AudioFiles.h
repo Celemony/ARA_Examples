@@ -115,6 +115,7 @@ class AudioDataFile : public AudioFileBase
 {
 public:
     AudioDataFile (const std::string& path, icstdsp::AudioFile&& audioFile);
+    AudioDataFile (const std::string& path, const std::vector<std::vector<float>>& samples, double sampleRate);
 
     bool readSamples (int64_t samplePosition, int64_t samplesPerChannel,
                       void* const buffers[], bool use64BitSamples) noexcept override;

@@ -825,7 +825,7 @@ void testDragAndDrop (PlugInEntry* plugInEntry, const AudioFileList& audioFiles)
 // using the companion API rendering methods
 // Can optionally use an ARA plug-in's time stretching capabilities to stretch a playback region -
 // try loading Melodyne to see this feature in action
-void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimestretchingIfSupported, const AudioFileList& audioFiles)
+void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimestretchingIfSupported, const AudioFileList& audioFiles, std::vector<std::string> renderOutputPaths)
 {
     ARA_LOG_TEST_HOST_FUNC ("playback rendering (with time stretching if supported)");
 
@@ -930,6 +930,12 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimestretchingI
         };
         logRenderResults ();
 
+        if (renderOutputPaths.size () > 0)
+        {
+            AudioDataFile resultFile { renderOutputPaths[0], outputData, renderSampleRate };
+            resultFile.saveToFile (renderOutputPaths[0]);
+        }
+
         // optionally perform the render again if the plug-in supports time stretching
         if (enableTimestretchingIfSupported)
         {
@@ -954,7 +960,14 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimestretchingI
                 ARA_LOG ("Rendering %lu region(s) assigned to playback renderer %p with sample rate %lgHz", playbackRegions.size (), playbackRenderer.getRef (), renderSampleRate);
 
                 renderOnOtherThread ();
+
                 logRenderResults ();
+
+                if (renderOutputPaths.size () > 1)
+                {
+                    AudioDataFile resultFile { renderOutputPaths[1], outputData, renderSampleRate };
+                    resultFile.saveToFile (renderOutputPaths[1]);
+                }
             }
             else
             {

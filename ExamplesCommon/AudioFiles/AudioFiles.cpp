@@ -245,6 +245,24 @@ AudioDataFile::AudioDataFile (const std::string& path, icstdsp::AudioFile&& audi
         setiXMLChunk (new ARAiXMLChunk { dataLength, data});
 }
 
+AudioDataFile::AudioDataFile (const std::string& path, const std::vector<std::vector<float>>& samples, double sampleRate)
+: AudioFileBase { filenameHelper (path), static_cast<int64_t> (samples[0].size ()), sampleRate,
+                  ARA::timeAtSamplePosition (samples[0].size (), sampleRate), static_cast<int> (samples.size ()), false }
+{
+    auto nspkpos { 0u };
+    switch (getChannelCount ())
+    {
+        case 1: nspkpos = icstdsp::SPK_FRONT_CENTER; break;
+        case 2: nspkpos = icstdsp::SPK_FRONT_LEFT | icstdsp::SPK_FRONT_RIGHT; break;
+        // \todo add other default layouts as needed
+    }
+    _audioFile.Create (static_cast<unsigned int> (getSampleCount ()), static_cast<unsigned int> (getChannelCount ()), 24u,
+                       static_cast<unsigned int> (getSampleRate () + 0.5), nspkpos);
+
+    for (auto i { 0u }; i < static_cast<unsigned int> (getChannelCount ()); ++i)
+        std::memcpy (_audioFile.GetSafePt (static_cast<unsigned int> (i)), samples[i].data (), samples[i].size () * sizeof (float));
+}
+
 bool AudioDataFile::readSamples (int64_t samplePosition, int64_t samplesPerChannel,
                                  void* const buffers[], bool use64BitSamples) noexcept
 {

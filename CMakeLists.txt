@@ -1904,7 +1904,8 @@ if(ARA_SETUP_DEBUGGING)
     #string(APPEND ARATestHost_Dbg_Arguments " -test AudioFileChunkSaving")
     #string(APPEND ARATestHost_Dbg_Arguments " -test AudioFileChunkLoading")
     # optionally, choose specific audio file(s) to selected test:
-    #string(APPEND ARATestHost_Dbg_Arguments " -file /some/path/audiofile.wav")
+    #string(APPEND ARATestHost_Dbg_Arguments " -file /some/path/inputfile.wav")
+    #string(APPEND ARATestHost_Dbg_Arguments " -renderOutput /some/path/outputfile.wav")
     set_target_properties(ARATestHost PROPERTIES
         VS_DEBUGGER_COMMAND_ARGUMENTS ${ARATestHost_Dbg_Arguments}
         XCODE_SCHEME_ARGUMENTS ${ARATestHost_Dbg_Arguments}
