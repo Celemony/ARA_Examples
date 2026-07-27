@@ -79,7 +79,8 @@ ARA::ARAAssertFunction* assertFunctionReference { &assertFunction };
 ARA_SETUP_DEBUG_MESSAGE_PREFIX ("ARATestHost");
 
 
-static AudioFileList parseAudioFiles (const std::vector<std::string>& args)
+static AudioFileList parseAudioFiles (const std::vector<std::string>& args,
+                                      const bool supportsSampleBasedAudioSources, const bool supportsContentOnlyAudioSources)
 {
     AudioFileList parsedFiles;
     auto it { args.begin () };
@@ -91,9 +92,26 @@ static AudioFileList parseAudioFiles (const std::vector<std::string>& args)
                ((*it)[0] != '-'))
         {
             icstdsp::AudioFile audioFile;
-            [[maybe_unused]] const auto err { audioFile.Load (it->c_str ()) };
-            ARA_INTERNAL_ASSERT (err == 0);
-            parsedFiles.emplace_back (std::make_shared<AudioDataFile> (*it++, std::move (audioFile)));
+            smf::MidiFile midiFile;
+            if (audioFile.Load (it->c_str ()) == 0)
+            {
+                if (supportsSampleBasedAudioSources)
+                    parsedFiles.emplace_back (std::make_shared<AudioDataFile> (*it, std::move (audioFile)));
+                else
+                    ARA_LOG ("Skipping audio file %s because the plug-in does not support sample-based audio sources", it->c_str ());
+            }
+            else if (midiFile.read (*it))
+            {
+                if (supportsContentOnlyAudioSources)
+                    parsedFiles.emplace_back (std::make_shared<MIDIFile> (*it, std::move (midiFile)));
+                else
+                    ARA_LOG ("Skipping audio file %s because the plug-in does not support content-only audio sources", it->c_str ());
+            }
+            else
+            {
+                ARA_INTERNAL_ASSERT (false && "could not parse audio file");
+            }
+            it++;
         }
     }
 
@@ -101,7 +119,11 @@ static AudioFileList parseAudioFiles (const std::vector<std::string>& args)
         return parsedFiles;
 
     // create single dummy file if not specified
-    return createDummyAudioFiles (1);
+    if (supportsSampleBasedAudioSources)
+        return createDummyAudioFiles (1);
+    if (supportsContentOnlyAudioSources)
+        return createDummyMIDIFiles (1);
+    return {};
 }
 
 static const std::vector<std::string> parseTestCases (const std::vector<std::string>& args)
@@ -203,16 +225,19 @@ int main (int argc, const char* argv[])
     ARA_LOG ("    plug-in does%s support storing audio file chunks.", (factory.implements<&ARA::ARAFactory::supportsStoringAudioFileChunks> () &&
                                                                       (factory->supportsStoringAudioFileChunks != ARA::kARAFalse)) ? "" : " not");
 
-    ARA_LOG ("    plug-in can%s be used with sample-based audio sources.", (!factory.implements<&ARA::ARAFactory::supportsSampleBasedAudioSources> () ||
-                                                                           (factory->supportsSampleBasedAudioSources != ARA::kARAFalse)) ? "" : " not");
-    ARA_LOG ("    plug-in can%s be used with content-only audio sources.", (factory.implements<&ARA::ARAFactory::supportsContentOnlyAudioSources> () &&
-                                                                           (factory->supportsContentOnlyAudioSources != ARA::kARAFalse)) ? "" : " not");
+    const bool supportsSampleBasedAudioSources { !factory.implements<&ARA::ARAFactory::supportsSampleBasedAudioSources> () ||
+                                                 (factory->supportsSampleBasedAudioSources != ARA::kARAFalse) };
+    const bool supportsContentOnlyAudioSources { factory.implements<&ARA::ARAFactory::supportsContentOnlyAudioSources> () &&
+                                                 (factory->supportsContentOnlyAudioSources != ARA::kARAFalse) };
+    ARA_INTERNAL_ASSERT (supportsSampleBasedAudioSources || supportsContentOnlyAudioSources);
+    ARA_LOG ("    plug-in can%s be used with sample-based audio sources.", (supportsSampleBasedAudioSources) ? "" : " not");
+    ARA_LOG ("    plug-in can%s be used with content-only audio sources.", (supportsContentOnlyAudioSources) ? "" : " not");
 
     ARA_LOG ("    plug-in does%s require preset audio sources.", (factory.implements<&ARA::ARAFactory::requiresPresetAudioSources> () &&
                                                                  (factory->requiresPresetAudioSources != ARA::kARAFalse)) ? "" : " not");
 
     // parse any optional test cases or audio files
-    auto audioFiles { parseAudioFiles (args) };
+    auto audioFiles { parseAudioFiles (args, supportsSampleBasedAudioSources, supportsContentOnlyAudioSources) };
     const auto testCases { parseTestCases (args) };
 
     // start up ARA

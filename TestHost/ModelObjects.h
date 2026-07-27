@@ -186,6 +186,7 @@ public:
     double getDuration () const noexcept { return _audioFile->getDuration (); }
     int getChannelCount () const noexcept { return _audioFile->getChannelCount (); }
     bool merits64BitSamples () const noexcept { return _audioFile->merits64BitSamples (); }
+    bool isContentOnly () const noexcept { return _audioFile->getChannelCount () == 0; }
 
     std::vector<std::unique_ptr<AudioModification>> const& getAudioModifications () const noexcept { return _audioModifications; }
     void addAudioModification (std::unique_ptr<AudioModification>&& modification) { _audioModifications.emplace_back (std::move (modification)); }

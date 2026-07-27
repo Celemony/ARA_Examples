@@ -56,7 +56,39 @@ AudioFileList createDummyAudioFiles (size_t numFiles)
     // add an audio source with 5 seconds of single channel audio with a sample rate of 44100
     AudioFileList dummyFiles;
     for (size_t i { 0 }; i < numFiles; ++i)
-        dummyFiles.emplace_back (new SineAudioFile ("Sin Source " + std::to_string (i), 5.0, 44100.0, 1));
+        dummyFiles.emplace_back (std::make_shared<SineAudioFile> ("Sin Source " + std::to_string (i), 5.0, 44100.0, 1));
+    return dummyFiles;
+}
+
+// Helper function to create dummy audio file representations that play back some MIDI notes.
+AudioFileList createDummyMIDIFiles (size_t numFiles)
+{
+    // add an audio source with 5 seconds of MIDI notes playing A4 (440 Hz) for half a second followed
+    // by half a second silence, with velocity altering between full scale and 1/8 scale.
+    AudioFileList dummyFiles;
+    const auto tempo { 90.0 };
+    const int ticksPerQuarter { 960 };
+    const auto ticksPerSecond { ticksPerQuarter * tempo / 60.0 };
+    for (size_t i { 0 }; i < numFiles; ++i)
+    {
+        smf::MidiFile midiFile;
+        midiFile.setTicksPerQuarterNote (ticksPerQuarter);
+        midiFile.addTrack ();
+        midiFile.addTempo (0, 0, tempo);
+
+        auto time { 0.0 };
+        bool loud { true };
+        while (time < 5.0)
+        {
+            midiFile.addNoteOn (0, static_cast<int> (time * ticksPerSecond + 0.5), 0, 69, (loud) ? 127 : 16);
+            loud = !loud;
+            time += 0.5;
+            midiFile.addNoteOff (0, static_cast<int> (time * ticksPerSecond + 0.5), 0, 69);
+            time += 0.5;
+        }
+
+        dummyFiles.emplace_back (std::make_shared<MIDIFile> ("A4 Source " + std::to_string (i), std::move (midiFile)));
+    }
     return dummyFiles;
 }
 
@@ -125,7 +157,7 @@ static ARADocumentController* createHostAndBasicDocument (PlugInEntry* plugInEnt
     {
         araDocumentController->enableAudioSourceSamplesAccess (audioSource.get (), true);
 
-        if (requestPlugInAnalysisAndBlock && araFactory->analyzeableContentTypesCount > 0)
+        if (requestPlugInAnalysisAndBlock && (araFactory->analyzeableContentTypesCount > 0))
             araDocumentController->requestAudioSourceContentAnalysis (audioSource.get (), araFactory->analyzeableContentTypesCount, araFactory->analyzeableContentTypes, true);
     }
 
@@ -807,8 +839,10 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimestretchingI
     plugInInstance->bindToDocumentControllerWithRoles (araDocumentController->getDocumentController ()->getRef (), ARA::kARAPlaybackRendererRole);
     auto playbackRenderer { plugInInstance->getPlaybackRenderer () };
 
-    // for testing purposes, we take the sample rate of the first audio source as our renderer sample rate
-    const auto renderSampleRate { (!document->getAudioSources ().empty ()) ? document->getAudioSources ().front ()->getSampleRate () : 44100.0 };
+    // for testing purposes, we take the sample rate of the first concrete audio source as our renderer sample rate
+    // and use the maximum channel count encountered across all concrete audio sources, or mono if all abstract
+    double renderSampleRate { 0.0 };
+    size_t channelCount { 1 };
 
     // add all regions to the renderer and also find the sample boundaries of our document's playback regions
     std::vector<PlaybackRegion*> playbackRegions;
@@ -818,6 +852,15 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimestretchingI
     {
         for (const auto& playbackRegion : regionSequence->getPlaybackRegions ())
         {
+            const auto audioSource { playbackRegion->getAudioModification ()->getAudioSource () };
+            if (!audioSource->isContentOnly ())
+            {
+                if (channelCount < static_cast<size_t> (audioSource->getChannelCount ()))
+                    channelCount = static_cast<size_t> (audioSource->getChannelCount ());
+                if (renderSampleRate == 0.0)
+                    renderSampleRate = audioSource->getSampleRate ();
+            }
+
             ARA_LOG ("Adding playback region %p (ARAPlaybackRegionRef %p) to playback renderer %p", playbackRegion, araDocumentController->getRef (playbackRegion), playbackRenderer.getRef ());
             playbackRenderer.addPlaybackRegion (araDocumentController->getRef (playbackRegion));
 
@@ -830,13 +873,13 @@ void testPlaybackRendering (PlugInEntry* plugInEntry, bool enableTimestretchingI
             playbackRegions.push_back (playbackRegion);
         }
     }
+    if (renderSampleRate == 0.0)
+        renderSampleRate = 44100.0;
 
     // bail if no region samples to render
     if (startOfPlaybackRegions < endOfPlaybackRegions)
     {
         ARA_LOG ("Rendering %lu region(s) assigned to playback renderer %p with sample rate %lgHz", playbackRegions.size (), playbackRenderer.getRef (), renderSampleRate);
-
-        const auto channelCount { static_cast<size_t> (audioFiles[0]->getChannelCount ()) };
 
         auto startOfPlaybackRegionSamples { ARA::samplePositionAtTime (startOfPlaybackRegions, renderSampleRate) };
         auto endOfPlaybackRegionSamples { ARA::samplePositionAtTime (endOfPlaybackRegions, renderSampleRate) };
@@ -1019,7 +1062,8 @@ void testProcessingAlgorithms (PlugInEntry* plugInEntry, const AudioFileList& au
         // now request analysis for each source and wait for completion
         for (auto& audioSource : document->getAudioSources ())
         {
-            araDocumentController->requestAudioSourceContentAnalysis (audioSource.get (), araFactory->analyzeableContentTypesCount, araFactory->analyzeableContentTypes, true);
+            if (araFactory->analyzeableContentTypesCount > 0)
+                araDocumentController->requestAudioSourceContentAnalysis (audioSource.get (), araFactory->analyzeableContentTypesCount, araFactory->analyzeableContentTypes, true);
             const auto actualIndex { araDocumentController->getProcessingAlgorithmForAudioSource (audioSource.get ()) };
             if (actualIndex != i)
                 ARA_LOG ("algorithm actually differs from requested algorithm, is %i \"%s\"", actualIndex, araDocumentController->getProcessingAlgorithmProperties (actualIndex)->name);
@@ -1141,6 +1185,12 @@ void testAudioFileChunkSaving (PlugInEntry* plugInEntry, AudioFileList& audioFil
     // store the XML data chunk for each audio source
     for (const auto& audioSource : document->getAudioSources ())
     {
+        if (audioSource->isContentOnly ())
+        {
+            ARA_LOG ("Skipping audio source %s because it does not support XML chunks.", audioSource->getName ().c_str ());
+            continue;
+        }
+
         // log the audio source content to store
         araDocumentController->logAvailableContent (audioSource.get ());
 

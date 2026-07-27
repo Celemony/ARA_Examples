@@ -34,6 +34,17 @@
 
 /*******************************************************************************/
 
+inline static const std::string filenameHelper (const std::string& path)
+{
+    std::filesystem::path fp { path };
+    if (fp.has_filename ())
+        return fp.filename ().string ();
+    else
+        return path;
+}
+
+/*******************************************************************************/
+
 class ARAiXMLChunk
 {
 public:
@@ -222,15 +233,6 @@ bool SineAudioFile::saveToFile (const std::string& path)
 
 /*******************************************************************************/
 
-inline static const std::string filenameHelper (const std::string& path)
-{
-    std::filesystem::path fp { path };
-    if (fp.has_filename ())
-        return fp.filename ().string ();
-    else
-        return path;
-}
-
 AudioDataFile::AudioDataFile (const std::string& path, icstdsp::AudioFile&& audioFile)
 : AudioFileBase { filenameHelper (path), audioFile.GetSize (), static_cast<double> (audioFile.GetRate ()),
                   ARA::timeAtSamplePosition (audioFile.GetSize (), audioFile.GetRate ()),
@@ -279,4 +281,45 @@ bool AudioDataFile::saveToFile (const std::string& path)
         validatedPath += ".wav";
 
     return (_audioFile.SaveWave (validatedPath.c_str ()) == 0);
+}
+
+/*******************************************************************************/
+
+MIDIFile::MIDIFile (const std::string& path, smf::MidiFile&& midiFile)
+: AudioFileBase { filenameHelper (path), 0, 0.0, midiFile.getFileDurationInSeconds (), 0, false },
+  _midiFile { std::move (midiFile) }
+{
+    _midiFile.joinTracks ();
+    _midiFile.linkEventPairs ();
+    _midiFile.doTimeAnalysis ();
+
+    const int eventCount { _midiFile.getEventCount (0) };
+    std::vector<MIDINote> midiNotes;
+    for (int i { 0 }; i < eventCount; ++i)
+    {
+        const auto& event { _midiFile.getEvent (0, i) };
+        if (event.isNoteOn ())
+        {
+            MIDINote note { static_cast<uint8_t> (event.getKeyNumber ()), static_cast<uint8_t> (event.getVelocity ()),
+                            event.seconds, event.getDurationInSeconds () };
+            midiNotes.emplace_back (note);
+        }
+    }
+    setMIDINotes (midiNotes);
+}
+
+bool MIDIFile::readSamples (int64_t /*samplePosition*/, int64_t /*samplesPerChannel*/,
+                                 void* const /*buffers*/[], bool /*use64BitSamples*/) noexcept
+{
+    abort ();
+}
+
+bool MIDIFile::saveToFile (const std::string& path)
+{
+    auto validatedPath { path };
+    const auto extension { (path.length () < 4) ? "" : path.substr (path.length () - 4) };
+    if ((extension != ".mid") && (extension != ".midi"))
+        validatedPath += ".mid";
+
+    return (_midiFile.write (validatedPath));
 }

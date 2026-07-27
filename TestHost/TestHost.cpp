@@ -24,6 +24,7 @@
 //------------------------------------------------------------------------------
 
 #include "TestHost.h"
+#include <cmath>
 
 Document* TestHost::addDocument (std::string documentName, PlugInEntry* plugInEntry)
 {
@@ -112,6 +113,20 @@ AudioSource* TestHost::addAudioSource (Document* document, AudioFileBase* audioF
 {
     document->addAudioSource (std::make_unique<AudioSource> (document, audioFile, persistentID));
     auto audioSource = document->getAudioSources ().back ().get ();
+    
+    const auto notes { audioFile->getMIDINotes ()};
+    if (!notes.empty ())
+    {
+        std::vector<ARA::ARAContentNote> araNotes;
+        for (auto note : notes)
+        {
+            auto freq { 440.0f * powf (2.0f, static_cast<float> (note.noteNumber - 69) / 12.0f) };
+            araNotes.emplace_back (ARA::ARAContentNote { freq, note.noteNumber, static_cast<float> (note.velocity) / 127.0f,
+                                                         note.startTime, 0.0, note.duration, note.duration });
+        }
+        audioSource->setNotes (std::move (araNotes));
+    }
+    
     if (auto araDocumentController = getDocumentController (document))
         araDocumentController->addAudioSource (audioSource);
     return audioSource;

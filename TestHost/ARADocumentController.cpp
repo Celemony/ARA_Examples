@@ -353,7 +353,8 @@ bool ARADocumentController::isUsingArchive (const ArchiveBase* archive)
 
 void ARADocumentController::enableAudioSourceSamplesAccess (AudioSource* audioSource, bool enable)
 {
-    _documentController->enableAudioSourceSamplesAccess (getRef (audioSource), enable);
+    if (!audioSource->isContentOnly ())
+        _documentController->enableAudioSourceSamplesAccess (getRef (audioSource), enable);
 }
 
 void ARADocumentController::getPlaybackRegionHeadAndTailTime (PlaybackRegion* playbackRegion, double* headTime, double* tailTime)

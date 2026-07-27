@@ -31,6 +31,9 @@ using AudioFileList = std::vector<std::shared_ptr<AudioFileBase>>;
 // Helper function to create dummy audio file representations that play back a pulsed sine signal
 AudioFileList createDummyAudioFiles (size_t numFiles);
 
+// Helper function to create dummy audio file representations that play back some MIDI notes
+AudioFileList createDummyMIDIFiles (size_t numFiles);
+
 // Demonstrates updating several properties of ARA model graph objects within an edit cycle
 // (note: in an actual application, these updates would likely be spread across individual cycles)
 void testPropertyUpdates (PlugInEntry* plugInEntry, const AudioFileList& audioFiles);

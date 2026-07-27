@@ -20,6 +20,7 @@
 
 #include <stdio.h>
 #include "3rdParty/ICST_AudioFile/AudioFile.h"
+#include "3rdParty/midifile/include/MidiFile.h"
 
 #include <cstdint>
 #include <string>
@@ -66,6 +67,16 @@ public:
                                     const std::string& manufacturer, const std::string& informationURL,
                                     const std::string& persistentID, const std::string& data);
 
+    struct MIDINote
+    {
+        uint8_t noteNumber;
+        uint8_t velocity;
+        double startTime;
+        double duration;
+    };
+    const std::vector<MIDINote>& getMIDINotes () const noexcept { return _midiNotes; }
+    void setMIDINotes (const std::vector<MIDINote>& midiNotes) noexcept { _midiNotes = midiNotes; }
+
     virtual bool saveToFile (const std::string& path) = 0;
 
 protected:
@@ -80,6 +91,7 @@ private:
     const int _channelCount;
     const bool _merits64BitSamples;
     ARAiXMLChunk* _iXMLChunk { nullptr };
+    std::vector<MIDINote> _midiNotes;
 };
 
 /*******************************************************************************/
@@ -111,4 +123,21 @@ public:
 
 private:
     icstdsp::AudioFile _audioFile;
+};
+
+/*******************************************************************************/
+
+// Encapsulation of a MIDI file.
+class MIDIFile : public AudioFileBase
+{
+public:
+    MIDIFile (const std::string& path, smf::MidiFile&& midiFile);
+
+    bool readSamples (int64_t samplePosition, int64_t samplesPerChannel,
+                      void* const buffers[], bool use64BitSamples) noexcept override;
+
+    bool saveToFile (const std::string& path) override;
+
+private:
+    smf::MidiFile _midiFile;
 };
