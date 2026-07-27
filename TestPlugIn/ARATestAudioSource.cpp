@@ -40,11 +40,14 @@ void ARATestAudioSource::updateRenderSampleCache ()
     // create temporary host audio reader and let it fill the cache
     // (we can safely ignore any errors while reading since host must clear buffers in that case,
     // as well as report the error to the user)
-    ARA::PlugIn::HostAudioReader audioReader { this };
-    std::vector<void*> dataPointers { channelCount };
-    for (auto c { 0U }; c < channelCount; ++c)
-        dataPointers[c] = _sampleCache.data () + c * sampleCount;
-    audioReader.readAudioSamples (0, static_cast<ARA::ARASampleCount> (sampleCount), dataPointers.data ());
+    if (_sampleCache.size () > 0)
+    {
+        ARA::PlugIn::HostAudioReader audioReader { this };
+        std::vector<void*> dataPointers { channelCount };
+        for (auto c { 0U }; c < channelCount; ++c)
+            dataPointers[c] = _sampleCache.data () + c * sampleCount;
+        audioReader.readAudioSamples (0, static_cast<ARA::ARASampleCount> (sampleCount), dataPointers.data ());
+    }
 }
 
 const float* ARATestAudioSource::getRenderSampleCacheForChannel (ARA::ARAChannelCount channel) const

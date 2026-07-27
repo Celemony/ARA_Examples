@@ -112,7 +112,7 @@ protected:
     ARA::ARAContentGrade doGetAudioModificationContentGrade (const ARA::PlugIn::AudioModification* audioModification, ARA::ARAContentType type) noexcept override;
     ARA::PlugIn::ContentReader* doCreateAudioModificationContentReader (ARA::PlugIn::AudioModification* audioModification, ARA::ARAContentType type, const ARA::ARAContentTimeRange* range) noexcept override;
 
-    bool doIsPlaybackRegionPreservingAudioSourceSignal (ARA::PlugIn::PlaybackRegion* /*playbackRegion*/) noexcept override { return true; }
+    bool doIsPlaybackRegionPreservingAudioSourceSignal (ARA::PlugIn::PlaybackRegion* playbackRegion) noexcept override;
     bool doIsPlaybackRegionContentAvailable (const ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::ARAContentType type) noexcept override;
     ARA::ARAContentGrade doGetPlaybackRegionContentGrade (const ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::ARAContentType type) noexcept override;
     ARA::PlugIn::ContentReader* doCreatePlaybackRegionContentReader (ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::ARAContentType type, const ARA::ARAContentTimeRange* range) noexcept override;
@@ -139,6 +139,7 @@ public:
     bool rendererWillAccessModelGraph (ARATestPlaybackRenderer* playbackRenderer) noexcept;
     void rendererDidAccessModelGraph (ARATestPlaybackRenderer* playbackRenderer) noexcept;
 
+    bool canAnalyzeAudioSource (const ARATestAudioSource* audioSource);
     void startOrScheduleAnalysisOfAudioSource (ARATestAudioSource* audioSource);    // does nothing if already analyzing
     bool cancelAnalysisOfAudioSource (ARATestAudioSource* audioSource);
 

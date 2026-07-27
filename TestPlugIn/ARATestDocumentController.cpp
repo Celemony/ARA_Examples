@@ -145,11 +145,12 @@ void APCRouteNewTransactionFunc (ULONG_PTR parameter)
 void ARATestEditorView::doNotifySelection (const ARA::PlugIn::ViewSelection* selection) noexcept
 {
 #if !ARA_ALWAYS_PERFORM_ANALYSIS
+    auto documentController { getDocumentController<ARATestDocumentController> () };
     for (const auto playbackRegion : selection->getEffectivePlaybackRegions ())
     {
         auto audioSource { playbackRegion->getAudioModification ()->getAudioSource<ARATestAudioSource> () };
-        if (audioSource->getNoteContent () == nullptr)
-            getDocumentController<ARATestDocumentController> ()->startOrScheduleAnalysisOfAudioSource (audioSource);
+        if ((audioSource->getNoteContent () == nullptr) && documentController->canAnalyzeAudioSource (audioSource))
+            documentController->startOrScheduleAnalysisOfAudioSource (audioSource);
     }
 #endif
 
@@ -296,8 +297,16 @@ private:
 
 /*******************************************************************************/
 
+bool ARATestDocumentController::canAnalyzeAudioSource (const ARATestAudioSource* audioSource)
+{
+    // our current implementation can only analyze audio samples, not content data
+    return !audioSource->isContentOnly ();
+}
+
 void ARATestDocumentController::startOrScheduleAnalysisOfAudioSource (ARATestAudioSource* audioSource)
 {
+    ARA_INTERNAL_ASSERT (canAnalyzeAudioSource (audioSource));
+
     // test if already analyzing
     if (getActiveAnalysisTaskForAudioSource (audioSource) != nullptr)
         return;
@@ -430,7 +439,10 @@ void ARATestDocumentController::updateAudioSourceAfterContentOrAlgorithmChanged 
 #if !ARA_ALWAYS_PERFORM_ANALYSIS
         if (hadNoteContent || wasAnalyzing)
 #endif
+        {
+            ARA_INTERNAL_ASSERT (canAnalyzeAudioSource (audioSource));
             startOrScheduleAnalysisOfAudioSource (audioSource);
+        }
     }
 
     if (notifyContentChanged)
@@ -622,7 +634,8 @@ ARA::PlugIn::AudioSource* ARATestDocumentController::doCreateAudioSource (ARA::P
     if (!tryCopyHostNoteContent (testAudioSource))
     {
 #if ARA_ALWAYS_PERFORM_ANALYSIS
-        startOrScheduleAnalysisOfAudioSource (testAudioSource);
+        if (canAnalyzeAudioSource (testAudioSource))
+            startOrScheduleAnalysisOfAudioSource (testAudioSource);
 #endif
     }
     return testAudioSource;
@@ -768,6 +781,11 @@ ARA::PlugIn::ContentReader* ARATestDocumentController::doCreateAudioModification
     return nullptr;
 }
 
+bool ARATestDocumentController::doIsPlaybackRegionPreservingAudioSourceSignal (ARA::PlugIn::PlaybackRegion* playbackRegion) noexcept
+{
+    return !playbackRegion->getAudioModification ()->getAudioSource ()->isContentOnly ();
+}
+
 bool ARATestDocumentController::doIsPlaybackRegionContentAvailable (const ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::ARAContentType type) noexcept
 {
     // since this demo plug-in plays back all modification data as is (no time stretching etc.),
@@ -796,9 +814,12 @@ void ARATestDocumentController::doRequestAudioSourceContentAnalysis (ARA::PlugIn
     ARA_INTERNAL_ASSERT (contentTypes.size () == 1);
     ARA_INTERNAL_ASSERT (contentTypes[0] == ARA::kARAContentTypeNotes);
 
-    processCompletedAnalysisTasks ();
-
     auto testAudioSource { static_cast<ARATestAudioSource*> (audioSource) };
+
+    if (!canAnalyzeAudioSource (testAudioSource))
+        return;
+
+    processCompletedAnalysisTasks ();
 
     if (testAudioSource->getNoteContentWasReadFromHost ())
         testAudioSource->clearNoteContent ();
@@ -812,9 +833,13 @@ bool ARATestDocumentController::doIsAudioSourceContentAnalysisIncomplete (const 
 {
     ARA_INTERNAL_ASSERT (type == ARA::kARAContentTypeNotes);
 
+    const auto testAudioSource { static_cast<const ARATestAudioSource*> (audioSource) };
+
+    if (!canAnalyzeAudioSource (testAudioSource))
+        return false;
+
     processCompletedAnalysisTasks ();
 
-    const auto testAudioSource { static_cast<const ARATestAudioSource*> (audioSource) };
     return testAudioSource->getNoteContent () == nullptr;
 }
 
@@ -924,6 +949,10 @@ public:
     const ARA::ARAPersistentID* getCompatibleDocumentArchiveIDs () const noexcept override { static const auto id { TEST_FILECHUNK_ARCHIVE_ID }; return &id; }
 
     bool supportsStoringAudioFileChunks () const noexcept override { return true; }
+
+    bool supportsSampleBasedAudioSources () const noexcept override { return true; }
+    bool supportsContentOnlyAudioSources () const noexcept override { return true; }
+    bool requiresPresetAudioSources () const noexcept override { return false; }
 };
 
 const ARA::ARAFactory* ARATestDocumentController::getARAFactory () noexcept

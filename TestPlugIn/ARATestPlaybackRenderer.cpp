@@ -46,6 +46,11 @@ void ARATestPlaybackRenderer::renderPlaybackRegions (float* const* ppOutput, ARA
             const auto audioSource { audioModification->getAudioSource<const ARATestAudioSource> () };
             ARA_VALIDATE_API_STATE (!audioSource->isDeactivatedForUndoHistory ());
 
+            // skip abstract audio sources for the time being
+            // \todo implement a simple sin wave instrument using the code in RenderPulsedSineSignal()
+            if (audioSource->isContentOnly ())
+                continue;
+
             // render silence if access is currently disabled
             // (this is done here only to ease host debugging - actual plug-ins would have at least
             // some samples cached for realtime access and would continue unless there's a cache miss.)
