@@ -397,7 +397,7 @@ bool ARATestDocumentController::tryCopyHostNoteContent (ARATestAudioSource* audi
         return false;
 
     std::vector<TestNote> notes;
-    notes.resize (static_cast<size_t> (hostNoteReader.getEventCount ()));
+    notes.reserve (static_cast<size_t> (hostNoteReader.getEventCount ()));
     for (const auto& hostNote : hostNoteReader)
         notes.emplace_back (TestNote { hostNote.frequency, hostNote.volume, hostNote.startPosition, hostNote.signalDuration });
     audioSource->setNoteContent (std::make_unique<TestNoteContent> (std::move (notes)), hostNoteReader.getGrade (), true);
