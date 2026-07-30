@@ -131,13 +131,15 @@ if(APPLE)
     endif()
     set(ARA_AUDIO_UNIT_SDK_DIR "${ARA_AUDIO_UNIT_SDK_DIR}" CACHE PATH "directory of the Audio Unit SDK")
     if(EXISTS "${ARA_AUDIO_UNIT_SDK_DIR}")
-        set(ARA_ENABLE_AUDIO_UNIT TRUE)
+        set(ARA_ENABLE_AUDIO_UNIT_V2 TRUE)
     else()
-        message(STATUS "No Audio Unit SDK installed, will not generate Audio Unit related examples.")
-        set(ARA_ENABLE_AUDIO_UNIT FALSE)
+        message(STATUS "No Audio Unit SDK installed, will not generate Audio Unit v2 related examples.")
+        set(ARA_ENABLE_AUDIO_UNIT_V2 FALSE)
     endif()
+    set(ARA_ENABLE_AUDIO_UNIT_V3 TRUE)
 else()
-    set(ARA_ENABLE_AUDIO_UNIT FALSE)
+    set(ARA_ENABLE_AUDIO_UNIT_V2 FALSE)
+    set(ARA_ENABLE_AUDIO_UNIT_V3 FALSE)
 endif()
 
 if(ARA_CLAP_SDK_DIR)
@@ -155,7 +157,7 @@ else()
     set(ARA_ENABLE_CLAP FALSE)
 endif()
 
-if(NOT (ARA_ENABLE_VST3 OR ARA_ENABLE_AUDIO_UNIT OR ARA_ENABLE_CLAP))
+if(NOT (ARA_ENABLE_VST3 OR ARA_ENABLE_AUDIO_UNIT_V2 OR ARA_ENABLE_AUDIO_UNIT_V3 OR ARA_ENABLE_CLAP))
     message(FATAL_ERROR "No companion API SDK installed - at least one of VST3, Audio Unit or CLAP SDK is required.")
 endif()
 
@@ -447,9 +449,9 @@ endif(ARA_ENABLE_VST3)
 
 # ======================
 # external dependency: Audio Unit SDK
-if(ARA_ENABLE_AUDIO_UNIT)
+if(ARA_ENABLE_AUDIO_UNIT_V2)
 
-    message(STATUS "Importing AudioUnitSDK")
+    message(STATUS "Importing AudioUnitSDK v2")
 
     add_library(AudioUnitSDK ${ARA_SHARED_TARGET_TYPE} EXCLUDE_FROM_ALL
         "${ARA_AUDIO_UNIT_SDK_DIR}/readme.md"
@@ -512,7 +514,7 @@ if(ARA_ENABLE_AUDIO_UNIT)
         XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH $<IF:$<CONFIG:Debug>,YES,NO>
     )
 
-endif(ARA_ENABLE_AUDIO_UNIT)
+endif(ARA_ENABLE_AUDIO_UNIT_V2)
 
 
 # ======================
@@ -1194,7 +1196,7 @@ if(ARA_ENABLE_VST3)
             "${ARA_VST3_SDK_DIR}"
     )
 endif()
-if(ARA_ENABLE_AUDIO_UNIT)
+if(ARA_ENABLE_AUDIO_UNIT_V2 OR ARA_ENABLE_AUDIO_UNIT_V3)
     target_sources(ARAExamplesCommon PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/AudioUnitLoader.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/ExamplesCommon/PlugInHosting/AudioUnitLoader.m"
@@ -1379,7 +1381,7 @@ endif(ARA_ENABLE_VST3)
 # ======================
 # audio plug-in target Audio Unit Test Plug-In
 
-if(ARA_ENABLE_AUDIO_UNIT)
+if(ARA_ENABLE_AUDIO_UNIT_V2)
 
     add_library(ARATestPlugInAudioUnit MODULE
         "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/TestAudioUnit.h"
@@ -1426,13 +1428,13 @@ if(ARA_ENABLE_AUDIO_UNIT)
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit/mangle-plugin-version.sh "${ARA_API_DIR}/ARA_Version.cmake" \${INFOPLIST_FILE}
     )
 
-endif(ARA_ENABLE_AUDIO_UNIT)
+endif(ARA_ENABLE_AUDIO_UNIT_V2)
 
 
 # ======================
 # audio plug-in target Audio Unit v3 App Extension Test Plug-In, including the required dummy app
 
-if(APPLE)
+if(ARA_ENABLE_AUDIO_UNIT_V3)
 
     add_library(ARATestPlugInAUv3Framework SHARED
         "${CMAKE_CURRENT_SOURCE_DIR}/TestPlugIn/AudioUnit_v3/Framework/BufferedAudioBus.hpp"
@@ -1575,7 +1577,7 @@ if(APPLE)
         )
     endif()
 
-endif(APPLE)
+endif(ARA_ENABLE_AUDIO_UNIT_V3)
 
 
 # ======================
@@ -1705,7 +1707,7 @@ if(ARA_ENABLE_VST3)
     target_compile_definitions(ARAMiniHost PRIVATE
         -DPLUGIN_FORMAT=PLUGIN_FORMAT_VST3
     )
-elseif(ARA_ENABLE_AUDIO_UNIT)
+elseif(ARA_ENABLE_AUDIO_UNIT_V2 OR ARA_ENABLE_AUDIO_UNIT_V3)
     target_compile_definitions(ARAMiniHost PRIVATE
         -DPLUGIN_FORMAT=PLUGIN_FORMAT_AU
     )
@@ -1738,8 +1740,10 @@ endif()
 if(ARA_SETUP_DEBUGGING)
     if(ARA_ENABLE_VST3)
         add_dependencies(ARAMiniHost ARATestPlugInVST3)
-    elseif(ARA_ENABLE_AUDIO_UNIT)
+    elseif(ARA_ENABLE_AUDIO_UNIT_V2)
         add_dependencies(ARAMiniHost ARATestPlugInAudioUnit)
+    elseif(ARA_ENABLE_AUDIO_UNIT_V3)
+        add_dependencies(ARATestHost ARATestPlugInAUv3App)
     elseif(ARA_ENABLE_CLAP)
         add_dependencies(ARAMiniHost ARATestPlugInCLAP)
     endif()
@@ -1791,7 +1795,7 @@ else()
     )
 endif()
 
-if(ARA_ENABLE_AUDIO_UNIT)
+if(ARA_ENABLE_AUDIO_UNIT_V2 OR ARA_ENABLE_AUDIO_UNIT_V3)
     target_compile_definitions(ARATestHost PRIVATE
         -DARA_ENABLE_AUDIO_UNIT=1
     )
@@ -1852,10 +1856,10 @@ if(ARA_SETUP_DEBUGGING)
     if(ARA_ENABLE_VST3)
         add_dependencies(ARATestHost ARATestPlugInVST3)
     endif()
-    if(ARA_ENABLE_AUDIO_UNIT)
+    if(ARA_ENABLE_AUDIO_UNIT_V2)
         add_dependencies(ARATestHost ARATestPlugInAudioUnit)
     endif()
-    if(APPLE)
+    if(ARA_ENABLE_AUDIO_UNIT_V3)
         add_dependencies(ARATestHost ARATestPlugInAUv3App)
     endif()
     if(ARA_ENABLE_CLAP)
