@@ -25,7 +25,7 @@
 #include <cstdint>
 #include <string>
 
-class ARAiXMLChunk;
+class IXMLChunk;
 
 /*******************************************************************************/
 
@@ -90,8 +90,8 @@ public:
     virtual bool saveToFile (const std::string& path) = 0;
 
 protected:
-    const ARAiXMLChunk* getiXMLChunk () const noexcept { return _iXMLChunk; }
-    void setiXMLChunk (ARAiXMLChunk* chunk) noexcept;
+    const IXMLChunk* getiXMLChunk () const noexcept { return _iXMLChunk; }
+    void setiXMLChunk (IXMLChunk* chunk) noexcept;
 
 private:
     std::string _name;
@@ -100,7 +100,7 @@ private:
     const double _duration;
     const int _channelCount;
     const bool _merits64BitSamples;
-    ARAiXMLChunk* _iXMLChunk { nullptr };
+    IXMLChunk* _iXMLChunk { nullptr };
     std::vector<MIDINote> _midiNotes;
     std::vector<LyricsEntry> _lyricsEntries;
 };

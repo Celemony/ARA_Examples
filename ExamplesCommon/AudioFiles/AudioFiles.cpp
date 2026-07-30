@@ -45,14 +45,14 @@ inline static const std::string filenameHelper (const std::string& path)
 
 /*******************************************************************************/
 
-class ARAiXMLChunk
+class IXMLChunk
 {
 public:
-    ARAiXMLChunk ()
-    : ARAiXMLChunk { 0, nullptr }
+    IXMLChunk ()
+    : IXMLChunk { 0, nullptr }
     {}
 
-    ARAiXMLChunk (size_t dataLength, const uint8_t data[])
+    IXMLChunk (size_t dataLength, const uint8_t data[])
     {
         if (dataLength)
         {
@@ -60,27 +60,18 @@ public:
             // enable this to log chunk data without parsing
             //_iXMLChunk.save (std::cout);
         }
-
-        auto iXMLNode { _iXMLChunk.child ("BWFXML") };
-        if (iXMLNode.empty ())
-            iXMLNode = _iXMLChunk.append_child ("BWFXML");
-
-        auto araNode { iXMLNode.child (ARA::kARAXMLName_ARAVendorKeyword) };
-        if (araNode.empty ())
-            araNode = iXMLNode.append_child (ARA::kARAXMLName_ARAVendorKeyword);
-
-        _audioSourceArchives = araNode.child (ARA::kARAXMLName_AudioSources);
-        if (_audioSourceArchives.empty ())
-            _audioSourceArchives = araNode.append_child (ARA::kARAXMLName_AudioSources);
     }
 
-    std::string getAudioSourceData (const std::string& documentArchiveID, bool& openAutomatically,
-                                    std::string& plugInName, std::string& plugInVersion,
-                                    std::string& manufacturer, std::string& informationURL,
-                                    std::string& persistentID) const
+    std::string getARAAudioSourceData (const std::string& documentArchiveID, bool& openAutomatically,
+                                       std::string& plugInName, std::string& plugInVersion,
+                                       std::string& manufacturer, std::string& informationURL,
+                                       std::string& persistentID) const
     {
+        auto araNode { getIXMLSubNodeIfPresent (ARA::kARAXMLName_ARAVendorKeyword) };
+
         pugi::xml_node archive;
-        for (const auto& it : _audioSourceArchives.children (ARA::kARAXMLName_AudioSource))
+        auto audioSourceArchives { araNode.child (ARA::kARAXMLName_AudioSources) };
+        for (const auto& it : audioSourceArchives.children (ARA::kARAXMLName_AudioSource))
         {
             if (std::strcmp (it.child_value (ARA::kARAXMLName_DocumentArchiveID), documentArchiveID.c_str ()) == 0)
             {
@@ -108,13 +99,19 @@ public:
         return base64_decode (std::string_view { archive.child_value (ARA::kARAXMLName_ArchiveData) }, true);
     }
 
-    void setAudioSourceData (const std::string& documentArchiveID, bool openAutomatically,
-                             const std::string& plugInName, const std::string& plugInVersion,
-                             const std::string& manufacturer, const std::string& informationURL,
-                             const std::string& persistentID, const std::string& data)
+    void setARAAudioSourceData (const std::string& documentArchiveID, bool openAutomatically,
+                                const std::string& plugInName, const std::string& plugInVersion,
+                                const std::string& manufacturer, const std::string& informationURL,
+                                const std::string& persistentID, const std::string& data)
     {
+        auto araNode { getOrCreateIXMLSubNode (ARA::kARAXMLName_ARAVendorKeyword) };
+
+        auto audioSourceArchives { araNode.child (ARA::kARAXMLName_AudioSources) };
+        if (audioSourceArchives.empty ())
+            audioSourceArchives = araNode.append_child (ARA::kARAXMLName_AudioSources);
+
         pugi::xml_node archive;
-        for (const auto& it : _audioSourceArchives.children (ARA::kARAXMLName_AudioSource))
+        for (const auto& it : audioSourceArchives.children (ARA::kARAXMLName_AudioSource))
         {
             if (std::strcmp (it.child_value (ARA::kARAXMLName_DocumentArchiveID), documentArchiveID.c_str ()) == 0)
             {
@@ -123,7 +120,7 @@ public:
             }
         }
         if (archive.empty ())
-            archive = _audioSourceArchives.append_child (ARA::kARAXMLName_AudioSource);
+            archive = audioSourceArchives.append_child (ARA::kARAXMLName_AudioSource);
         else
             archive.remove_children ();
 
@@ -144,6 +141,65 @@ public:
         //_iXMLChunk.save (std::cout);
     }
 
+    struct Marker
+    {
+        std::string text;
+        uint64_t startSample;
+        uint32_t duration;
+    };
+
+    const std::vector<Marker> getMarkerData () const
+    {
+        auto syncPointsNode { getIXMLSubNodeIfPresent (kIXMLName_SyncPointListKeyword) };
+        if (syncPointsNode.empty ())
+            return {};
+
+        std::vector<Marker> result;
+        for (const auto& it : syncPointsNode.children (kIXMLName_SyncPointKeyword))
+        {
+            const auto type { it.child_value (kIXMLName_SyncPointTypeKeyword) };
+            if (type && (std::strcmp (type, kIXMLName_SyncPointTypeRelativeValue) != 0))
+                continue;
+
+            const auto function { it.child_value (kIXMLName_SyncPointFunctionKeyword) };
+            if (function && (std::strcmp (function, kIXMLName_SyncPointFunctionMarkerGenericValue) != 0))
+                continue;
+
+            const auto commentChild { it.child (kIXMLName_SyncPointCommentKeyword) };
+            const auto lowChild { it.child (kIXMLName_SyncPointLowKeyword) };
+            if (commentChild.empty () || lowChild.empty ())
+                continue;
+            const auto low { stoul (std::string { lowChild.child_value () }) };
+            const auto highValue { it.child_value (kIXMLName_SyncPointHighKeyword) };
+            const auto high { stoul (std::string { highValue }) };
+            const auto durationValue { it.child_value (kIXMLName_SyncPointEventDurationKeyword) };
+            const auto duration { stoul (std::string { durationValue }) };
+            result.emplace_back (Marker { commentChild.child_value (), (static_cast<uint64_t> (high) << 32) + low, static_cast<uint32_t> (duration) });
+        }
+        return result;
+    }
+
+    void setMarkerData (const std::vector<Marker>& markers)
+    {
+        auto syncPointsNode { getOrCreateIXMLSubNode (kIXMLName_SyncPointListKeyword) };
+        syncPointsNode.remove_children ();
+        const auto countValue { std::to_string (markers.size ()) };
+        syncPointsNode.append_child (kIXMLName_SyncPointCountKeyword).append_child (pugi::node_pcdata).set_value (countValue.c_str ());
+        for (const auto& marker : markers)
+        {
+            auto entry { syncPointsNode.append_child (kIXMLName_SyncPointKeyword) };
+            entry.append_child (kIXMLName_SyncPointTypeKeyword).append_child (pugi::node_pcdata).set_value (kIXMLName_SyncPointTypeRelativeValue);
+            entry.append_child (kIXMLName_SyncPointFunctionKeyword).append_child (pugi::node_pcdata).set_value (kIXMLName_SyncPointFunctionMarkerGenericValue);
+            entry.append_child (kIXMLName_SyncPointCommentKeyword).append_child (pugi::node_pcdata).set_value (marker.text.c_str ());
+            const auto lowValue { std::to_string (marker.startSample & 0xFFFFFFFFul) };
+            const auto highValue { std::to_string (marker.startSample >> 32) };
+            const auto durationValue { std::to_string (marker.duration) };
+            entry.append_child (kIXMLName_SyncPointLowKeyword).append_child (pugi::node_pcdata).set_value (lowValue.c_str ());
+            entry.append_child (kIXMLName_SyncPointHighKeyword).append_child (pugi::node_pcdata).set_value (highValue.c_str ());
+            entry.append_child (kIXMLName_SyncPointEventDurationKeyword).append_child (pugi::node_pcdata).set_value (durationValue.c_str ());
+        }
+    }
+
     std::string getData () const
     {
         std::ostringstream writer;
@@ -152,13 +208,42 @@ public:
     }
 
 private:
+    pugi::xml_node getOrCreateIXMLSubNode (const char* key)
+    {
+        auto iXMLNode { _iXMLChunk.child (kIXMLName_IXMLRootKeyword) };
+        if (iXMLNode.empty ())
+            iXMLNode = _iXMLChunk.append_child (kIXMLName_IXMLRootKeyword);
+        auto subNode { iXMLNode.child (key) };
+        if (subNode.empty ())
+            subNode = iXMLNode.append_child (key);
+        return subNode;
+    }
+
+    const pugi::xml_node getIXMLSubNodeIfPresent (const char* key) const
+    {
+        return _iXMLChunk.child (kIXMLName_IXMLRootKeyword).child (key);
+    }
+
+private:
+    static constexpr auto kIXMLName_IXMLRootKeyword { "BWFXML" };
+    static constexpr auto kIXMLName_SyncPointListKeyword { "SYNC_POINT_LIST" };
+    static constexpr auto kIXMLName_SyncPointCountKeyword { "SYNC_POINT_COUNT" };
+    static constexpr auto kIXMLName_SyncPointKeyword { "SYNC_POINT" };
+    static constexpr auto kIXMLName_SyncPointTypeKeyword { "SYNC_POINT_TYPE" };
+    static constexpr auto kIXMLName_SyncPointTypeRelativeValue { "RELATIVE" };
+    static constexpr auto kIXMLName_SyncPointFunctionKeyword { "SYNC_POINT_FUNCTION" };
+    static constexpr auto kIXMLName_SyncPointFunctionMarkerGenericValue { "MARKER_GENERIC" };
+    static constexpr auto kIXMLName_SyncPointCommentKeyword { "SYNC_POINT_COMMENT" };
+    static constexpr auto kIXMLName_SyncPointLowKeyword { "SYNC_POINT_LOW" };
+    static constexpr auto kIXMLName_SyncPointHighKeyword { "SYNC_POINT_HIGH" };
+    static constexpr auto kIXMLName_SyncPointEventDurationKeyword { "SYNC_POINT_EVENT_DURATION" };
+
     pugi::xml_document _iXMLChunk;
-    pugi::xml_node _audioSourceArchives;
 };
 
 /*******************************************************************************/
 
-void AudioFileBase::setiXMLChunk (ARAiXMLChunk* chunk) noexcept
+void AudioFileBase::setiXMLChunk (IXMLChunk* chunk) noexcept
 {
     delete _iXMLChunk;
     _iXMLChunk = chunk;
@@ -170,8 +255,8 @@ void AudioFileBase::setiXMLARAAudioSourceData (const std::string& documentArchiv
                                                const std::string& persistentID, const std::string& data)
 {
     if (!_iXMLChunk)
-        _iXMLChunk = new ARAiXMLChunk {};
-    _iXMLChunk->setAudioSourceData (documentArchiveID, openAutomatically,
+        _iXMLChunk = new IXMLChunk {};
+    _iXMLChunk->setARAAudioSourceData (documentArchiveID, openAutomatically,
                                     plugInName, plugInVersion, manufacturer, informationURL,
                                     persistentID, data);
 }
@@ -188,7 +273,7 @@ std::string AudioFileBase::getiXMLARAAudioSourceData (const std::string& documen
         return {};
     }
 
-    return _iXMLChunk->getAudioSourceData (documentArchiveID, openAutomatically,
+    return _iXMLChunk->getARAAudioSourceData (documentArchiveID, openAutomatically,
                                            plugInName, plugInVersion, manufacturer, informationURL, persistentID);
 }
 
@@ -269,9 +354,53 @@ AudioDataFile::AudioDataFile (const std::string& path, icstdsp::AudioFile&& audi
   _audioFile { std::move (audioFile) }
 {
     unsigned int dataLength { 0 };
-    auto data = _audioFile.GetiXMLData (&dataLength);
+    auto data { _audioFile.GetiXMLData (&dataLength) };
     if ((data != nullptr) && (dataLength > 0))
-        setiXMLChunk (new ARAiXMLChunk { dataLength, data});
+    {
+        auto iXMLChunk { new IXMLChunk { dataLength, data } };
+        setiXMLChunk (iXMLChunk);
+
+        const auto markers { iXMLChunk->getMarkerData () };
+        if (!markers.empty ())
+        {
+            std::vector<LyricsEntry> lyricsEntries;
+            for (auto& marker : markers)
+            {
+                const LyricsEntry entry { marker.text, false, ARA::timeAtSamplePosition (marker.startSample, getSampleRate ()) };
+
+                auto it { lyricsEntries.begin () };
+                while ((it != lyricsEntries.end ()) && (it->position < entry.position))
+                {
+                    ++it;
+                }
+                if ((it != lyricsEntries.end ()) && (it->position == entry.position))
+                    *it = entry;
+                else
+                    it = lyricsEntries.insert (it, entry);
+
+                if (marker.duration > 0.0)
+                {
+                    const LyricsEntry nonEntry { "", false, ARA::timeAtSamplePosition (marker.startSample + marker.duration, getSampleRate ()) };
+                    auto it2 { ++it };
+                    while ((it2 != lyricsEntries.end ()) && (it2->position < nonEntry.position))
+                    {
+                        ++it2;
+                    }
+                    it2 = lyricsEntries.erase (it, it2);
+                    if ((it2 != lyricsEntries.end ()) && (it2->position == nonEntry.position))
+                        ;   // keep existing entry, it already limits the new entry
+                    else
+                        lyricsEntries.insert (it2, nonEntry);
+                }
+            }
+
+            parseHyphenInLyricsAfterImport (lyricsEntries);
+            setLyricsEntries (lyricsEntries);
+        }
+    }
+
+    // \todo icstdsp::AudioFile does not support any marker chunks (e.g."cue " in wave files)
+    //       we could add this and parse those as lyrics too if iXML didn't contain any...
 }
 
 AudioDataFile::AudioDataFile (const std::string& path, const std::vector<std::vector<float>>& samples, double sampleRate)
