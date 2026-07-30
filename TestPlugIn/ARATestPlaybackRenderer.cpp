@@ -21,6 +21,8 @@
 #include "ARATestDocumentController.h"
 #include "ARATestAudioSource.h"
 
+#include <cmath>
+
 void ARATestPlaybackRenderer::renderPlaybackRegions (float* const* ppOutput, ARA::ARASamplePosition samplePosition,
                                                      ARA::ARASampleCount samplesToRender, bool isPlayingBack)
 {
@@ -46,72 +48,104 @@ void ARATestPlaybackRenderer::renderPlaybackRegions (float* const* ppOutput, ARA
             const auto audioSource { audioModification->getAudioSource<const ARATestAudioSource> () };
             ARA_VALIDATE_API_STATE (!audioSource->isDeactivatedForUndoHistory ());
 
-            // skip abstract audio sources for the time being
-            // \todo implement a simple sin wave instrument using the code in RenderPulsedSineSignal()
-            if (audioSource->isContentOnly ())
-                continue;
+            // content-only audio sources (e.g. MIDI) have no samples
+            const bool synthesizeOutput { audioSource->isContentOnly () };
 
             // render silence if access is currently disabled
             // (this is done here only to ease host debugging - actual plug-ins would have at least
             // some samples cached for realtime access and would continue unless there's a cache miss.)
-            if (!audioSource->isSampleAccessEnabled ())
+            if (!synthesizeOutput && !audioSource->isSampleAccessEnabled ())
                 continue;
 
             // this simplified test code "rendering" only produces audio if the sample rate matches
-            if (audioSource->getSampleRate () != _sampleRate)
+            if (!synthesizeOutput && (audioSource->getSampleRate () != _sampleRate))
                 continue;
 
-            // evaluate region borders in song time, calculate sample range to copy in song time
-            // (if a plug-in uses playback region head/tail time, it will also need to reflect these values here)
+            // evaluate region borders in song time, calculate sample range to process in song time (incl. head/tail)
             const auto regionStartSample { playbackRegion->getStartInPlaybackSamples (_sampleRate) };
-            if (sampleEnd <= regionStartSample)
-                continue;
-
-            const auto regionEndSample { playbackRegion->getEndInPlaybackSamples (_sampleRate) };
-            if (regionEndSample <= samplePosition)
-                continue;
+            auto regionEndSample { playbackRegion->getEndInPlaybackSamples (_sampleRate) };
+            // content-only sources emit a release tail past the region end - extend the render range to cover it
+            // \todo see ARATestDocumentController::doGetPlaybackRegionHeadAndTailTime() - this should be dependent on actual note content
+            if (synthesizeOutput)
+                regionEndSample += _noteReleaseSamples;
 
             auto startSongSample { std::max (regionStartSample, samplePosition) };
             auto endSongSample { std::min (regionEndSample, sampleEnd) };
+            if (endSongSample <= startSongSample)   // region incl. head/tail does not intersect with render range
+                continue;
 
             // calculate offset between song and audio source samples, clip at region borders in audio source samples
             // (if a plug-in supports time stretching, it will also need to reflect the stretch factor here)
             const auto offsetToPlaybackRegion { playbackRegion->getStartInAudioModificationSamples () - regionStartSample };
 
-            const auto startAvailableSourceSamples { std::max (ARA::ARASamplePosition { 0 }, playbackRegion->getStartInAudioModificationSamples ()) };
-            const auto endAvailableSourceSamples { std::min (audioSource->getSampleCount (), playbackRegion->getEndInAudioModificationSamples ()) };
-
-            startSongSample = std::max (startSongSample, startAvailableSourceSamples - offsetToPlaybackRegion);
-            endSongSample = std::min (endSongSample, endAvailableSourceSamples - offsetToPlaybackRegion);
-            if (endSongSample <= startSongSample)
-                continue;
-
-            // add samples from audio source
-            const auto sourceChannelCount { audioSource->getChannelCount () };
-            for (auto posInSong { startSongSample }; posInSong < endSongSample; ++posInSong)
+            if (synthesizeOutput)
             {
-                const auto posInBuffer { posInSong - samplePosition };
-                const auto posInSource { posInSong + offsetToPlaybackRegion };
-                if (sourceChannelCount == _channelCount)
+                // synthesize a simple sine for each audio source note read from the host via kARAContentTypeNotes
+                const auto noteContent { audioSource->getNoteContent () };
+                if (!noteContent)
+                    continue;
+
+                for (const auto& note : *noteContent)
                 {
-                    for (auto c { 0 }; c < sourceChannelCount; ++c)
-                        ppOutput[c][posInBuffer] += audioSource->getRenderSampleCacheForChannel (c)[posInSource];
+                    const auto noteStartInSource { ARA::samplePositionAtTime (note._startTime, _sampleRate) };
+                    const auto noteEndInSource { ARA::samplePositionAtTime (note._startTime + note._duration, _sampleRate) };
+
+                    const auto noteStartInSong { std::max (startSongSample, noteStartInSource - offsetToPlaybackRegion) };
+                    const auto noteEndInSong { std::min (endSongSample, noteEndInSource - offsetToPlaybackRegion + _noteReleaseSamples) };
+
+                    for (auto posInSong { noteStartInSong }; posInSong < noteEndInSong; ++posInSong)
+                    {
+                        const auto posInBuffer { posInSong - samplePosition };
+                        const auto posInSource { posInSong + offsetToPlaybackRegion };
+                        const auto samplesIntoNote { posInSource - noteStartInSource };
+                        const auto samplesToNoteEnd { noteEndInSource - posInSource };
+                        auto envelope { 1.0f };
+                        if (samplesToNoteEnd < 0)
+                            envelope += static_cast<float> (samplesToNoteEnd) / static_cast<float> (_noteReleaseSamples);
+
+                        const auto normalizedTime { static_cast<double> (samplesIntoNote) * note._frequency / _sampleRate };
+                        constexpr double pi { 3.14159265358979323846264338327950288 };
+                        const auto value { note._volume * envelope * static_cast<float> (std::sin (2.0 * pi * normalizedTime)) };
+                        for (auto c { 0 }; c < _channelCount; ++c)
+                            ppOutput[c][posInBuffer] += value;
+                    }
                 }
-                else
+            }
+            else
+            {
+                // add samples from audio source
+                const auto startAvailableSourceSamples { std::max (ARA::ARASamplePosition { 0 }, playbackRegion->getStartInAudioModificationSamples ()) };
+                const auto endAvailableSourceSamples { std::min (audioSource->getSampleCount (), playbackRegion->getEndInAudioModificationSamples ()) };
+
+                startSongSample = std::max (startSongSample, startAvailableSourceSamples - offsetToPlaybackRegion);
+                endSongSample = std::min (endSongSample, endAvailableSourceSamples - offsetToPlaybackRegion);
+
+                const auto sourceChannelCount { audioSource->getChannelCount () };
+                for (auto posInSong { startSongSample }; posInSong < endSongSample; ++posInSong)
                 {
-                    // crude channel format conversion:
-                    // mix down to mono, then distribute the mono signal evenly to all channels.
-                    // note that when down-mixing to mono, the result is scaled by channel count,
-                    // whereas upon up-mixing it is just copied to all channels.
-                    // \todo ambisonic formats should just stick with the mono sum on channel 0,
-                    //       but in this simple test code we currently do not distinguish ambisonics
-                    float monoSum { 0.0f };
-                    for (auto c { 0 }; c < sourceChannelCount; ++c)
-                        monoSum += audioSource->getRenderSampleCacheForChannel (c)[posInSource];
-                    if (sourceChannelCount > 1)
-                        monoSum /= static_cast<float> (sourceChannelCount);
-                    for (auto c { 0 }; c < _channelCount; ++c)
-                        ppOutput[c][posInBuffer] = monoSum;
+                    const auto posInBuffer { posInSong - samplePosition };
+                    const auto posInSource { posInSong + offsetToPlaybackRegion };
+                    if (sourceChannelCount == _channelCount)
+                    {
+                        for (auto c { 0 }; c < sourceChannelCount; ++c)
+                            ppOutput[c][posInBuffer] += audioSource->getRenderSampleCacheForChannel (c)[posInSource];
+                    }
+                    else
+                    {
+                        // crude channel format conversion:
+                        // mix down to mono, then distribute the mono signal evenly to all channels.
+                        // note that when down-mixing to mono, the result is scaled by channel count,
+                        // whereas upon up-mixing it is just copied to all channels.
+                        // \todo ambisonic formats should just stick with the mono sum on channel 0,
+                        //       but in this simple test code we currently do not distinguish ambisonics
+                        float monoSum { 0.0f };
+                        for (auto c { 0 }; c < sourceChannelCount; ++c)
+                            monoSum += audioSource->getRenderSampleCacheForChannel (c)[posInSource];
+                        if (sourceChannelCount > 1)
+                            monoSum /= static_cast<float> (sourceChannelCount);
+                        for (auto c { 0 }; c < _channelCount; ++c)
+                            ppOutput[c][posInBuffer] = monoSum;
+                    }
                 }
             }
         }
@@ -128,6 +162,7 @@ void ARATestPlaybackRenderer::enableRendering (ARA::ARASampleRate sampleRate, AR
     _sampleRate = sampleRate;
     _channelCount = channelCount;
     _maxSamplesToRender = maxSamplesToRender;
+    _noteReleaseSamples = ARA::samplePositionAtTime (noteReleaseTime, _sampleRate);
 #if ARA_VALIDATE_API_CALLS
     _isRenderingEnabled = true;
     _apiSupportsToggleRendering = apiSupportsToggleRendering;

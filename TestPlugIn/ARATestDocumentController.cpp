@@ -374,12 +374,18 @@ void ARATestDocumentController::processCompletedAnalysisTasks ()
 
         if (auto&& noteContent { (*analysisTaskIt)->transferNoteContent () })
         {
+            if (!isHostEditingDocument ())
+                disableRendererModelGraphAccess ();
+
             auto audioSource { (*analysisTaskIt)->getAudioSource () };
             const auto algorithm { (*analysisTaskIt)->getProcessingAlgorithm () };
             audioSource->setProcessingAlgorithm (algorithm);
             audioSource->setNoteContent (std::move (noteContent), ARA::kARAContentGradeDetected, false);
             notifyAudioSourceContentChanged (audioSource, ARA::ContentUpdateScopes::notesAreAffected ());
             notifyAudioSourceDependentObjectsContentChanged (audioSource, ARA::ContentUpdateScopes::notesAreAffected ());
+
+            if (!isHostEditingDocument ())
+                enableRendererModelGraphAccess ();
         }
 
         analysisTaskIt = _activeAnalysisTasks.erase (analysisTaskIt);
@@ -422,6 +428,9 @@ void ARATestDocumentController::updateAudioSourceAfterContentOrAlgorithmChanged 
 #endif
                         cancelAnalysisOfAudioSource (audioSource);
 
+    if (!isHostEditingDocument ())
+        disableRendererModelGraphAccess ();
+
     // we only analyze note content, so if the host provides notes we can skip analysis
     bool notifyContentChanged;
     if (tryCopyHostNoteContent (audioSource))
@@ -444,6 +453,9 @@ void ARATestDocumentController::updateAudioSourceAfterContentOrAlgorithmChanged 
             startOrScheduleAnalysisOfAudioSource (audioSource);
         }
     }
+
+    if (!isHostEditingDocument ())
+        enableRendererModelGraphAccess ();
 
     if (notifyContentChanged)
     {
@@ -781,6 +793,15 @@ ARA::PlugIn::ContentReader* ARATestDocumentController::doCreateAudioModification
     return nullptr;
 }
 
+void ARATestDocumentController::doGetPlaybackRegionHeadAndTailTime (const ARA::PlugIn::PlaybackRegion* playbackRegion, ARA::ARATimeDuration* headTime, ARA::ARATimeDuration* tailTime) noexcept
+{
+    *headTime = 0.0;
+    // \todo This is a lazy implementation of tail time for content-based playback - we should instead iterate over the notes and find the end
+    //       of the last note that's playing in the region, add the note tail to that and then report how much this exceeds the end of the region.
+    //       This value should be cached whenever updating the note content, it's also needed in ARATestPlaybackRenderer::renderPlaybackRegions().
+    *tailTime = (playbackRegion->getAudioModification ()->getAudioSource ()->isContentOnly ()) ? ARATestPlaybackRenderer::noteReleaseTime : 0.0;
+}
+
 bool ARATestDocumentController::doIsPlaybackRegionPreservingAudioSourceSignal (ARA::PlugIn::PlaybackRegion* playbackRegion) noexcept
 {
     return !playbackRegion->getAudioModification ()->getAudioSource ()->isContentOnly ();
@@ -822,7 +843,13 @@ void ARATestDocumentController::doRequestAudioSourceContentAnalysis (ARA::PlugIn
     processCompletedAnalysisTasks ();
 
     if (testAudioSource->getNoteContentWasReadFromHost ())
+    {
+        if (!isHostEditingDocument ())
+            disableRendererModelGraphAccess ();
         testAudioSource->clearNoteContent ();
+        if (!isHostEditingDocument ())
+            enableRendererModelGraphAccess ();
+    }
 
     if ((testAudioSource->getNoteContent () == nullptr) ||
         (testAudioSource->getNoteContentGrade () == ARA::kARAContentGradeInitial))

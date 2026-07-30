@@ -27,6 +27,9 @@ class ARATestPlaybackRenderer : public ARA::PlugIn::PlaybackRenderer
 public:
     using PlaybackRenderer::PlaybackRenderer;
 
+    // when rendering notes from content-only audio sources, this is the release time after note-off
+    static constexpr double noteReleaseTime { 0.05 };
+
     void renderPlaybackRegions (float* const* ppOutput, ARA::ARASamplePosition samplePosition, ARA::ARASampleCount samplesToRender, bool isPlayingBack);
 
     void enableRendering (ARA::ARASampleRate sampleRate, ARA::ARAChannelCount channelCount, ARA::ARASampleCount maxSamplesToRender, bool apiSupportsToggleRendering) noexcept;
@@ -40,8 +43,9 @@ protected:
 
 private:
     ARA::ARASampleRate _sampleRate { 44100.0f };
-    ARA::ARASampleCount _maxSamplesToRender { 4096 };
+    ARA::ARASampleCount _maxSamplesToRender { 2048 };
     ARA::ARAChannelCount _channelCount { 1 };
+    ARA::ARASampleCount _noteReleaseSamples { 2048 };
 #if ARA_VALIDATE_API_CALLS
     bool _isRenderingEnabled { false };
     bool _apiSupportsToggleRendering { true };  // AAX enables rendering only once upon init, but does not allow to toggle it later like VST3, AU, CLAP etc.
