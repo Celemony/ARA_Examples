@@ -77,6 +77,16 @@ public:
     const std::vector<MIDINote>& getMIDINotes () const noexcept { return _midiNotes; }
     void setMIDINotes (const std::vector<MIDINote>& midiNotes) noexcept { _midiNotes = midiNotes; }
 
+    struct LyricsEntry
+    {
+        std::string lyrics;
+        bool continuesPreviousWord;
+        double position;
+    };
+    const std::vector<LyricsEntry>& getLyricsEntries () const noexcept { return _lyricsEntries; }
+    void setLyricsEntries (const std::vector<LyricsEntry>& lyricsEntries) noexcept { _lyricsEntries = lyricsEntries; }
+    static void parseHyphenInLyricsAfterImport (std::vector<LyricsEntry>& lyricsEntries);   // helper for reading lyrics from audio or MIDI files
+
     virtual bool saveToFile (const std::string& path) = 0;
 
 protected:
@@ -92,6 +102,7 @@ private:
     const bool _merits64BitSamples;
     ARAiXMLChunk* _iXMLChunk { nullptr };
     std::vector<MIDINote> _midiNotes;
+    std::vector<LyricsEntry> _lyricsEntries;
 };
 
 /*******************************************************************************/

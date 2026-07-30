@@ -192,6 +192,35 @@ std::string AudioFileBase::getiXMLARAAudioSourceData (const std::string& documen
                                            plugInName, plugInVersion, manufacturer, informationURL, persistentID);
 }
 
+void AudioFileBase::parseHyphenInLyricsAfterImport (std::vector<LyricsEntry>& lyricsEntries)
+{
+    bool nextEntryWillBeContinuation { false };
+    for (auto& entry : lyricsEntries)
+    {
+        entry.continuesPreviousWord |= nextEntryWillBeContinuation;
+
+        // handle continuation at begin
+        auto first { entry.lyrics.cbegin () };
+        if (!entry.lyrics.empty () && (*first == '-'))
+        {
+            entry.lyrics.erase (first);
+            entry.continuesPreviousWord = true;
+        }
+
+        // handle continuation at end
+        const auto last { --entry.lyrics.cend () };
+        if (!entry.lyrics.empty () && (*last == '-'))
+        {
+            entry.lyrics.erase (last);
+            nextEntryWillBeContinuation = true;
+        }
+        else
+        {
+            nextEntryWillBeContinuation = false;
+        }
+    }
+}
+
 /*******************************************************************************/
 
 SineAudioFile::SineAudioFile (const std::string& name, double duration, double sampleRate, int32_t channelCount)
@@ -313,17 +342,77 @@ MIDIFile::MIDIFile (const std::string& path, smf::MidiFile&& midiFile)
 
     const int eventCount { _midiFile.getEventCount (0) };
     std::vector<MIDINote> midiNotes;
+    std::vector<LyricsEntry> lyricsEntries;
+    bool foundLyricsEvents { false };
+    bool foundTextEvents { false };
+    bool nextEntryWillBeContinuation { false };
     for (int i { 0 }; i < eventCount; ++i)
     {
         const auto& event { _midiFile.getEvent (0, i) };
         if (event.isNoteOn ())
         {
-            MIDINote note { static_cast<uint8_t> (event.getKeyNumber ()), static_cast<uint8_t> (event.getVelocity ()),
-                            event.seconds, event.getDurationInSeconds () };
-            midiNotes.emplace_back (note);
+            midiNotes.emplace_back (MIDINote { static_cast<uint8_t> (event.getKeyNumber ()), static_cast<uint8_t> (event.getVelocity ()),
+                                               event.seconds, event.getDurationInSeconds () });
+        }
+        else if (event.isLyricText ())
+        {
+            if (!foundLyricsEvents)
+            {
+                lyricsEntries.clear ();
+                foundLyricsEvents = true;
+            }
+
+            if (event.getMetaContent ().empty ())       // melisma: simply skip event to let previous event continue
+                continue;
+
+            LyricsEntry entry { event.getMetaContent (), nextEntryWillBeContinuation, event.seconds };;
+            nextEntryWillBeContinuation = true;
+
+            auto it { entry.lyrics.end () };
+            while (it-- > entry.lyrics.begin ())
+            {
+                if ((*it == '\r') || (*it == '\n') ||   // remove trailing line/paragraph end marker
+                    (*it == ' '))                       // remove trailing continuation marker
+                {
+                    entry.lyrics.pop_back ();
+                    nextEntryWillBeContinuation = false;
+                    continue;
+                }
+                break;
+            }
+
+            if (entry.lyrics.empty ())                        // skip empty events
+            {
+                nextEntryWillBeContinuation = false;
+                continue;
+            }
+
+            lyricsEntries.emplace_back (entry);
+        }
+        else if (event.isText ())
+        {
+            if (foundLyricsEvents)
+                continue;
+            if (!foundTextEvents)
+            {
+                lyricsEntries.clear ();
+                foundLyricsEvents = true;
+            }
+            lyricsEntries.emplace_back (LyricsEntry { event.getMetaContent (), false, event.seconds });
+        }
+        else if (event.isMarkerText ())
+        {
+            if (foundLyricsEvents || foundTextEvents)
+                continue;
+            lyricsEntries.emplace_back (LyricsEntry { event.getMetaContent (), false, event.seconds });
         }
     }
+
     setMIDINotes (midiNotes);
+
+    if (!foundLyricsEvents)
+        parseHyphenInLyricsAfterImport (lyricsEntries);
+    setLyricsEntries (lyricsEntries);
 }
 
 bool MIDIFile::readSamples (int64_t /*samplePosition*/, int64_t /*samplesPerChannel*/,
@@ -336,7 +425,7 @@ bool MIDIFile::saveToFile (const std::string& path)
 {
     auto validatedPath { path };
     const auto extension { (path.length () < 4) ? "" : path.substr (path.length () - 4) };
-    if ((extension != ".mid") && (extension != ".midi"))
+    if ((extension != ".mid") && (extension != ".midi") && (extension != ".kar") )
         validatedPath += ".mid";
 
     return (_midiFile.write (validatedPath));

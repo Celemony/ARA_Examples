@@ -126,7 +126,20 @@ AudioSource* TestHost::addAudioSource (Document* document, AudioFileBase* audioF
         }
         audioSource->setNotes (std::move (araNotes));
     }
-    
+
+    const auto lyricsEntries { audioFile->getLyricsEntries ()};
+    if (!lyricsEntries.empty ())
+    {
+        std::vector<ARA::ARAContentLyricsEntry> araLyricsEntries;
+        for (auto lyricsEntry : lyricsEntries)
+        {
+            araLyricsEntries.emplace_back (ARA::ARAContentLyricsEntry { lyricsEntry.lyrics.c_str (), lyricsEntry.continuesPreviousWord, nullptr,
+                                                                        0, nullptr, nullptr, ARA::kARAContentGradeInitial,
+                                                                        lyricsEntry.position });
+        }
+        audioSource->setLyrics (std::move (araLyricsEntries));
+    }
+
     if (auto araDocumentController = getDocumentController (document))
         araDocumentController->addAudioSource (audioSource);
     return audioSource;
