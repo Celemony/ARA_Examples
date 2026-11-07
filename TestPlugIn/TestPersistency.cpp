@@ -54,6 +54,8 @@ private:
 
 /*******************************************************************************/
 
+// \todo this is basically the same code as the IPC binary en-/decoders, we could reuse those here instead.
+
 TestArchiver::TestArchiver (const ArchivingFunction& writeFunction) noexcept
 : _writeFunction { writeFunction }
 {

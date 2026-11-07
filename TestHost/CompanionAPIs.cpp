@@ -71,12 +71,8 @@
 #include "ARA_Library/IPC/ARAIPCProxyHost.h"
 #include "ARA_Library/IPC/ARAIPCProxyPlugIn.h"
 #include "ARA_Library/IPC/ARAIPCEncoding.h"
+#include "ARA_Library/IPC/ARAIPCMessage.h"
 #include "IPC/IPCMessageChannel.h"
-#if USE_ARA_CF_ENCODING
-    #include "ARA_Library/IPC/ARAIPCCFEncoding.h"
-#else
-    #include "IPC/IPCXMLEncoding.h"
-#endif
 
 
 std::string executablePath {};
@@ -463,7 +459,7 @@ static std::unique_ptr<ARA::IPC::Connection> createConnection (ARA::IPC::Message
 #if USE_ARA_CF_ENCODING
                              &ARA::IPC::CFMessageEncoder::create,
 #else
-                             &IPCXMLMessageEncoder::create,
+                             &ARA::IPC::VectorMessageEncoder::create,
 #endif
                              std::move (messageHandler),
                              true,  // \todo set properly - we rely on running on the same machine for now

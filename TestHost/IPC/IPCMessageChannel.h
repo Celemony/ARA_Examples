@@ -41,10 +41,8 @@
 #include <thread>
 
 
-// select underlying implementation: Apple CFDictionary or a generic pugixml-based
-// Note that the pugixml version is much less efficient because it base64-encodes bytes
-// (used for large sample data) which adds encoding overhead and requires additional copies.
-#ifndef USE_ARA_CF_ENCODING
+// select underlying implementation: Apple-only CFData or generic std::vector based
+#if !defined (USE_ARA_CF_ENCODING)
     #if defined (__APPLE__)
         #define USE_ARA_CF_ENCODING 1
     #else

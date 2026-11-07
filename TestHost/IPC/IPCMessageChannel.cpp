@@ -20,11 +20,7 @@
 #include "IPCMessageChannel.h"
 #include "ARA_Library/Debug/ARADebug.h"
 
-#if USE_ARA_CF_ENCODING
-    #include "ARA_Library/IPC/ARAIPCCFEncoding.h"
-#else
-    #include "IPC/IPCXMLEncoding.h"
-#endif
+#include "ARA_Library/IPC/ARAIPCMessage.h"
 
 #if defined (_WIN32)
     #include <chrono>
@@ -135,7 +131,7 @@ public:
 #endif
 
         const auto messageID { _sharedMemory->messageID };
-        auto decoder { IPCXMLMessageDecoder::createWithMessageData (_sharedMemory->messageData, _sharedMemory->messageSize) };
+        auto decoder { ARA::IPC::MessageDecoder::createWithMessageData (_sharedMemory->messageData, _sharedMemory->messageSize) };
 
         ::SetEvent (_dataReceived);
 
@@ -257,11 +253,7 @@ private:
     static CFDataRef _portCallback (CFMessagePortRef /*port*/, SInt32 messageID, CFDataRef messageData, void* info)
     {
         auto channel { static_cast<IPCMessageChannel*> (info) };
-#if USE_ARA_CF_ENCODING
-        auto decoder { ARA::IPC::CFMessageDecoder::createWithMessageData (messageData) };
-#else
-        auto decoder { IPCXMLMessageDecoder::createWithMessageData (messageData) };
-#endif
+        auto decoder { ARA::IPC::CFMessageDecoder::createWithMessageData (messageData, true) };
         channel->routeReceivedMessage (messageID, std::move (decoder));
         return nullptr;
     }
