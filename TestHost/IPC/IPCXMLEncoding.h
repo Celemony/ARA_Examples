@@ -40,7 +40,7 @@ class IPCXMLMessage
 {
 protected:
     IPCXMLMessage ();
-    IPCXMLMessage (const char* data, const size_t dataSize);
+    IPCXMLMessage (const uint8_t* data, const size_t dataSize);
 
 protected:
     std::shared_ptr<pugi::xml_document> _dictionary {};
@@ -58,12 +58,12 @@ public:
     void appendDouble (double argValue) override;
     void appendBytes (const uint8_t* argValue, size_t argSize, bool copy) override;
 
-    // to be used by IPCMessageChannel only: encoding to channel-internal datas format
 #if defined (__APPLE__)
-    __attribute__((cf_returns_retained)) CFDataRef createEncodedMessage () const;
+    __attribute__((cf_returns_retained)) CFDataRef
 #else
-    std::string createEncodedMessage () const;
+    std::vector<uint8_t>
 #endif
+                                                   convertToEncodedData () override;
 
     static std::unique_ptr<IPCXMLMessageEncoder> create () { return std::unique_ptr<IPCXMLMessageEncoder> { new IPCXMLMessageEncoder {} }; }
 
@@ -76,11 +76,10 @@ private:
 class IPCXMLMessageDecoder : public IPCXMLMessage, public ARA::IPC::MessageDecoder
 {
 public:
-    // to be used by IPCMessageChannel only: encoding from channel-internal datas format
 #if defined (__APPLE__)
     static std::unique_ptr<IPCXMLMessageDecoder> createWithMessageData (CFDataRef data);
 #else
-    static std::unique_ptr<IPCXMLMessageDecoder> createWithMessageData (const char* data, const size_t dataSize);
+    static std::unique_ptr<IPCXMLMessageDecoder> createWithMessageData (const uint8_t* data, const size_t dataSize);
 #endif
 
     bool readInt32 (int32_t& argValue) const override;

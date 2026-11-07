@@ -73,7 +73,7 @@ protected:
 
         size_t messageSize;
         ARA::IPC::MessageID messageID;
-        char messageData[maxMessageSize];
+        uint8_t messageData[maxMessageSize];
     };
 
     HANDLE _dataAvailable {};           // signal set by the sending side indicating new data has been placed in shared memory
@@ -174,13 +174,13 @@ public:
         ARA_INTERNAL_ASSERT (_sharedMemory != nullptr);
     }
 
-    void sendMessage (ARA::IPC::MessageID messageID, const std::string& messageData)
+    void sendMessage (ARA::IPC::MessageID messageID, const std::vector<uint8_t>& messageData)
     {
         ARA_INTERNAL_ASSERT (messageData.size () <= SharedMemory::maxMessageSize);
 
         _sharedMemory->messageID = messageID;
         _sharedMemory->messageSize = messageData.size ();
-        std::memcpy (_sharedMemory->messageData, messageData.c_str (), messageData.size ());
+        std::memcpy (_sharedMemory->messageData, messageData.data (), messageData.size ());
 
         ::SetEvent (_dataAvailable);
         const auto waitResult { ::WaitForSingleObject (_dataReceived, messageTimeout) };
@@ -338,11 +338,7 @@ IPCMessageChannel::~IPCMessageChannel () = default;
 
 void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, std::unique_ptr<ARA::IPC::MessageEncoder> && encoder)
 {
-#if USE_ARA_CF_ENCODING
-    const auto messageData { static_cast<ARA::IPC::CFMessageEncoder*> (encoder.get ())->createMessageEncoderData () };
-#else
-    const auto messageData { static_cast<const IPCXMLMessageEncoder*> (encoder.get ())->createEncodedMessage () };
-#endif
+    const auto messageData { encoder->convertToEncodedData () };
 
     _sendPort->sendMessage (messageID, messageData);
 

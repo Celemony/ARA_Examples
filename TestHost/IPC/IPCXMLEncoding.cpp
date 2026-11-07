@@ -34,7 +34,7 @@ IPCXMLMessage::IPCXMLMessage ()
     _root = *_dictionary;
 }
 
-IPCXMLMessage::IPCXMLMessage (const char* data, const size_t dataSize)
+IPCXMLMessage::IPCXMLMessage (const uint8_t* data, const size_t dataSize)
 {
     _dictionary.reset (new pugi::xml_document);
     _dictionary->load_buffer (data, dataSize, pugi::parse_minimal | pugi::parse_escapes, pugi::encoding_utf8);
@@ -81,30 +81,66 @@ pugi::xml_attribute IPCXMLMessageEncoder::_appendAttribute (const char* attribut
 }
 
 #if defined (__APPLE__)
-__attribute__((cf_returns_retained)) CFDataRef IPCXMLMessageEncoder::createEncodedMessage () const
+struct _XMLWriter : pugi::xml_writer
+{
+    _XMLWriter ()
+    : _data { CFDataCreateMutable (kCFAllocatorDefault, 0) }
+    {}
+
+    ~_XMLWriter () override
+    {
+        if (_data)
+            CFRelease (_data);
+    }
+
+    void write (const void* data, size_t size) override
+    {
+        CFDataAppendBytes (_data, static_cast<const UInt8*> (data), static_cast<CFIndex> (size));
+    }
+    
+    CFDataRef convertToData ()
+    {
+        auto result { static_cast<CFDataRef> (_data) };
+        _data = nullptr;
+        return result;
+    }
+
+private:
+    CFMutableDataRef _data;
+};
 #else
-std::string IPCXMLMessageEncoder::createEncodedMessage () const
+struct _XMLWriter : pugi::xml_writer
+{
+    void write (const void* data, size_t size) override
+    {
+        std::basic_string_view<uint8_t> view { static_cast<const uint8_t*> (data), size };
+        _data.insert (_data.end (), view.begin (), view.end ());
+    }
+    
+    std::vector<uint8_t>&& convertToData ()
+    {
+        return std::move (_data);
+    }
+
+private:
+    std::vector<uint8_t> _data;
+};
 #endif
+
+#if defined (__APPLE__)
+__attribute__((cf_returns_retained)) CFDataRef
+#else
+std::vector<uint8_t>
+#endif
+                                               IPCXMLMessageEncoder::convertToEncodedData ()
 {
     if (!_root.first_attribute () &&    // empty () does not work here because the name "msg" will be set
         !_root.first_child ())
-#if defined (__APPLE__)
-        return nullptr;
-#else
         return {};
-#endif
 
-    std::ostringstream writer;
+    _XMLWriter writer;
     _dictionary->save (writer, "", pugi::format_raw | pugi::format_no_declaration);
-
-#if defined (__APPLE__)
-    auto result { CFDataCreate (kCFAllocatorDefault, reinterpret_cast<const UInt8*> (writer.str ().c_str ()),
-                                static_cast<CFIndex> (writer.str ().size ())) };
-    ARA_INTERNAL_ASSERT (result);
-    return result;
-#else
-    return writer.str ();
-#endif
+    return writer.convertToData ();
 }
 
 
@@ -115,10 +151,10 @@ std::unique_ptr<IPCXMLMessageDecoder> IPCXMLMessageDecoder::createWithMessageDat
     if (dataSize == 0)
         return nullptr;
 
-    return std::unique_ptr<IPCXMLMessageDecoder> { new IPCXMLMessageDecoder { reinterpret_cast<const char *> (CFDataGetBytePtr (data)), dataSize } };
+    return std::unique_ptr<IPCXMLMessageDecoder> { new IPCXMLMessageDecoder { CFDataGetBytePtr (data), dataSize } };
 }
 #else
-std::unique_ptr<IPCXMLMessageDecoder> IPCXMLMessageDecoder::createWithMessageData (const char* data, const size_t dataSize)
+std::unique_ptr<IPCXMLMessageDecoder> IPCXMLMessageDecoder::createWithMessageData (const uint8_t* data, const size_t dataSize)
 {
     if (dataSize == 0)
         return nullptr;
