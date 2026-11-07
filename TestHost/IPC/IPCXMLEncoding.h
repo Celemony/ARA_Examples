@@ -40,7 +40,6 @@ class IPCXMLMessage
 {
 protected:
     IPCXMLMessage ();
-    IPCXMLMessage (std::shared_ptr<pugi::xml_document> dictionary, pugi::xml_node root);
     IPCXMLMessage (const char* data, const size_t dataSize);
 
 protected:
@@ -59,8 +58,6 @@ public:
     void appendDouble (double argValue) override;
     void appendString (const char* argValue) override;
     void appendBytes (const uint8_t* argValue, size_t argSize, bool copy) override;
-    void appendSubMessage (std::unique_ptr<MessageEncoder>&& argValue) override;
-    std::unique_ptr<MessageEncoder> createEncoder () override;
 
     // to be used by IPCMessageChannel only: encoding to channel-internal datas format
 #if defined (__APPLE__)
@@ -70,8 +67,6 @@ public:
 #endif
 
     static std::unique_ptr<IPCXMLMessageEncoder> create () { return std::unique_ptr<IPCXMLMessageEncoder> { new IPCXMLMessageEncoder {} }; }
-    static std::unique_ptr<IPCXMLMessageEncoder> createWithXML (std::shared_ptr<pugi::xml_document> dictionary, pugi::xml_node root)
-                                                           { return std::unique_ptr<IPCXMLMessageEncoder> { new IPCXMLMessageEncoder { dictionary, root } }; }
 
 private:
     using IPCXMLMessage::IPCXMLMessage;

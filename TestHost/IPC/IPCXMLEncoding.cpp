@@ -43,11 +43,6 @@ IPCXMLMessage::IPCXMLMessage (const char* data, const size_t dataSize)
     ARA_INTERNAL_ASSERT (_root.type () == pugi::node_document);
 }
 
-IPCXMLMessage::IPCXMLMessage (std::shared_ptr<pugi::xml_document> dictionary, pugi::xml_node root)
-: _dictionary { std::move (dictionary) },
-  _root { root }
-{}
-
 void IPCXMLMessageEncoder::appendInt32 (const int32_t argValue)
 {
     _appendAttribute ("int32").set_value (argValue);
@@ -89,22 +84,6 @@ void IPCXMLMessageEncoder::appendBytes (const uint8_t* argValue, const size_t ar
 pugi::xml_attribute IPCXMLMessageEncoder::_appendAttribute (const char* attributeName)
 {
     return _root.append_child ().append_attribute (attributeName);
-}
-
-void IPCXMLMessageEncoder::appendSubMessage (std::unique_ptr<MessageEncoder>&& argValue)
-{
-    const auto subMessage { dynamic_cast<IPCXMLMessageEncoder*> (argValue.release ()) };
-    ARA_INTERNAL_ASSERT (subMessage != nullptr);
-
-    for (const auto& node : subMessage->_root)
-        _root.append_copy (node);
-
-    delete subMessage;
-}
-
-std::unique_ptr<ARA::IPC::MessageEncoder> IPCXMLMessageEncoder::createEncoder ()
-{
-    return IPCXMLMessageEncoder::create ();
 }
 
 #if defined (__APPLE__)
