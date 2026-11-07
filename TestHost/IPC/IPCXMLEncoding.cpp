@@ -68,12 +68,6 @@ void IPCXMLMessageEncoder::appendDouble (const double argValue)
     _appendAttribute ("double").set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendString (const char* const argValue)
-{
-    ARA_INTERNAL_ASSERT (argValue);
-    _appendAttribute ("string").set_value (argValue);
-}
-
 void IPCXMLMessageEncoder::appendBytes (const uint8_t* argValue, const size_t argSize, const bool /*copy*/)
 {
     ARA_INTERNAL_ASSERT ((argValue != nullptr) || (argSize == 0));
@@ -176,11 +170,6 @@ bool IPCXMLMessageDecoder::readFloat (float& argValue) const
 bool IPCXMLMessageDecoder::readDouble (double& argValue) const
 {
     return _readValue (argValue, "double", &pugi::xml_attribute::as_double);
-}
-
-bool IPCXMLMessageDecoder::readString (const char*& argValue) const
-{
-    return _readValue (argValue, "string", &pugi::xml_attribute::as_string);
 }
 
 bool IPCXMLMessageDecoder::readBytes (const uint8_t*& argValue, size_t& argSize) const
