@@ -156,7 +156,7 @@ void ARATestEditorView::doNotifySelection (const ARA::PlugIn::ViewSelection* sel
 
 #if ARA_SIMULATE_USER_INTERACTION
 #if defined (_WIN32)
-    auto params { new APCProcessReceivedMessageParams { this, messageID, decoder } };
+    auto params { new APCProcessReceivedMessageParams { this, messageID, message } };
     const auto result { ::QueueUserAPC (APCRouteNewTransactionFunc, _connection->getCreationThreadDispatchTarget (), reinterpret_cast<ULONG_PTR> (params)) };
     ARA_INTERNAL_ASSERT (result != 0);
 #elif defined (__APPLE__)

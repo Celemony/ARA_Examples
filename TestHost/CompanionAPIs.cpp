@@ -457,9 +457,9 @@ static std::unique_ptr<ARA::IPC::Connection> createConnection (ARA::IPC::Message
 {
     auto result { std::make_unique<ARA::IPC::Connection> (
 #if USE_ARA_CF_ENCODING
-                             &ARA::IPC::CFMessageEncoder::create,
+                             &ARA::IPC::CFOutgoingMessage::create,
 #else
-                             &ARA::IPC::VectorMessageEncoder::create,
+                             &ARA::IPC::VectorOutgoingMessage::create,
 #endif
                              std::move (messageHandler),
                              true,  // \todo set properly - we rely on running on the same machine for now
@@ -525,12 +525,12 @@ public:
         const auto bufferSize { sizeof (float) * static_cast<size_t> (blockSize) };
         bool success { false };
         CustomDecodeFunction customDecode {
-            [&success, &channelCount, &bufferSize, &buffers] (const ARA::IPC::MessageDecoder* decoder) -> void
+            [&success, &channelCount, &bufferSize, &buffers] (const ARA::IPC::IncomingMessage* message) -> void
             {
                 const uint8_t* bytes;
                 size_t size;
                 ARA::IPC::BytesDecoder readBytesPointer { bytes, size };
-                success = decodeMessage (decoder, readBytesPointer);
+                success = decodeMessage (message, readBytesPointer);
     
                 if (size == channelCount * bufferSize)
                 {
@@ -725,19 +725,19 @@ public:
                                               std::move (mainThreadChannel), std::move (otherThreadsChannel)) }
     {}
 
-    void handleReceivedMessage (const ARA::IPC::MessageID messageID, const ARA::IPC::MessageDecoder* const decoder,
-                                ARA::IPC::MessageEncoder* const replyEncoder)
+    void handleReceivedMessage (const ARA::IPC::MessageID messageID, const ARA::IPC::IncomingMessage* const message,
+                                ARA::IPC::OutgoingMessage* const reply)
     {
         if (!ARA::IPC::MethodID::isCustomMessageID (messageID))
         {
-            ARA::IPC::ProxyHost::handleReceivedMessage (messageID, decoder, replyEncoder);
+            ARA::IPC::ProxyHost::handleReceivedMessage (messageID, message, reply);
         }
         else if (messageID == kIPCCreateEffectMethodID)
         {
             auto plugInInstance { _plugInEntry->createPlugInInstance () };
             const auto plugInInstanceRef { reinterpret_cast<size_t> (plugInInstance.get ()) };
             plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
-            ARA::IPC::encodeMessage (replyEncoder, plugInInstanceRef);
+            ARA::IPC::encodeMessage (reply, plugInInstanceRef);
         }
         else if (messageID == kIPCStartRenderingMethodID)
         {
@@ -745,7 +745,7 @@ public:
             int32_t channelCount;
             int32_t maxBlockSize;
             double sampleRate;
-            ARA::IPC::decodeMessage (decoder, plugInInstanceRef, channelCount, maxBlockSize, sampleRate);
+            ARA::IPC::decodeMessage (message, plugInInstanceRef, channelCount, maxBlockSize, sampleRate);
 
             auto& renderData { _plugInInstanceRenderDataMap[plugInInstanceRef] = { RenderData {} } };
             renderData.allSamples.resize (static_cast<size_t> (maxBlockSize * channelCount));
@@ -759,7 +759,7 @@ public:
             size_t plugInInstanceRef;
             int32_t blockSize;
             int64_t samplePosition;
-            ARA::IPC::decodeMessage (decoder, plugInInstanceRef, blockSize, samplePosition);
+            ARA::IPC::decodeMessage (message, plugInInstanceRef, blockSize, samplePosition);
 
             auto& renderData { _plugInInstanceRenderDataMap[plugInInstanceRef] };
             const auto channelCount { renderData.buffers.size () };
@@ -770,13 +770,13 @@ public:
             reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->renderSamples (blockSize, samplePosition, renderData.buffers.data ());
 
             // \todo this ignores potential byte order issues...
-            ARA::IPC::encodeMessage (replyEncoder, ARA::IPC::BytesEncoder { reinterpret_cast<const uint8_t*> (renderData.allSamples.data ()),
+            ARA::IPC::encodeMessage (reply, ARA::IPC::BytesEncoder { reinterpret_cast<const uint8_t*> (renderData.allSamples.data ()),
                                                                             allBuffersSize, false });
         }
         else if (messageID == kIPCStopRenderingMethodID)
         {
             size_t plugInInstanceRef;
-            ARA::IPC::decodeMessage (decoder, plugInInstanceRef);
+            ARA::IPC::decodeMessage (message, plugInInstanceRef);
 
             reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->stopRendering ();
 
@@ -789,7 +789,7 @@ public:
         else if (messageID == kIPCDestroyEffectMethodID)
         {
             size_t plugInInstanceRef;
-            ARA::IPC::decodeMessage (decoder, plugInInstanceRef);
+            ARA::IPC::decodeMessage (message, plugInInstanceRef);
 
             delete reinterpret_cast<PlugInInstance*> (plugInInstanceRef);
         }

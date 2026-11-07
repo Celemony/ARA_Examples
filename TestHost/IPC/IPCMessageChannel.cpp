@@ -131,11 +131,11 @@ public:
 #endif
 
         const auto messageID { _sharedMemory->messageID };
-        auto decoder { ARA::IPC::MessageDecoder::createWithMessageData (_sharedMemory->messageData, _sharedMemory->messageSize) };
+        auto message { ARA::IPC::IncomingMessage::createWithMessageData (_sharedMemory->messageData, _sharedMemory->messageSize) };
 
         ::SetEvent (_dataReceived);
 
-        _channel->routeReceivedMessage (messageID, std::move (decoder));
+        _channel->routeReceivedMessage (messageID, std::move (message));
         return true;
     }
 
@@ -253,8 +253,8 @@ private:
     static CFDataRef _portCallback (CFMessagePortRef /*port*/, SInt32 messageID, CFDataRef messageData, void* info)
     {
         auto channel { static_cast<IPCMessageChannel*> (info) };
-        auto decoder { ARA::IPC::CFMessageDecoder::createWithMessageData (messageData, true) };
-        channel->routeReceivedMessage (messageID, std::move (decoder));
+        auto message { ARA::IPC::CFIncomingMessage::createWithMessageData (messageData, true) };
+        channel->routeReceivedMessage (messageID, std::move (message));
         return nullptr;
     }
 
@@ -328,9 +328,9 @@ std::unique_ptr<IPCMessageChannel> IPCMessageChannel::createConnectedToID (const
 
 IPCMessageChannel::~IPCMessageChannel () = default;
 
-void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, std::unique_ptr<ARA::IPC::MessageEncoder> && encoder)
+void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, std::unique_ptr<ARA::IPC::OutgoingMessage> && message)
 {
-    const auto messageData { encoder->convertToEncodedData () };
+    const auto messageData { message->convertToEncodedData () };
 
     _sendPort->sendMessage (messageID, messageData);
 
