@@ -348,15 +348,7 @@ bool IPCMessageChannel::receivesMessagesOnCurrentThread ()
 #endif
 }
 
-bool IPCMessageChannel::waitForMessageOnCurrentThread ()
-{
-#if !USE_ARA_BACKGROUND_IPC
-    ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _receiveThreadID);
-#endif
-    return _receivePort->runReceiveLoop (0.01);
-}
-
-bool IPCMessageChannel::runReceiveLoop (double timeout)
+bool IPCMessageChannel::waitForMessageOnCurrentThread (ARA::ARATimeDuration timeout)
 {
 #if !USE_ARA_BACKGROUND_IPC
     ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _receiveThreadID);

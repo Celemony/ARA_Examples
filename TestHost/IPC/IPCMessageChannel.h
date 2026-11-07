@@ -70,15 +70,10 @@ public:
     static std::unique_ptr<IPCMessageChannel> createPublishingID (const std::string& channelID);
     static std::unique_ptr<IPCMessageChannel> createConnectedToID (const std::string& channelID);
 
-    // message receiving
-    // waits up to the specified time in seconds for an incoming event and processes it
-    // returns true if some event was processed during that time
-    bool runReceiveLoop (double timeout);
-
     void sendMessage (std::unique_ptr<ARA::IPC::OutgoingMessage>&& message) override;
 
     bool receivesMessagesOnCurrentThread () override;
-    bool waitForMessageOnCurrentThread () override;
+    bool waitForMessageOnCurrentThread (ARA::ARATimeDuration timeout) override;
 
 protected:
     using ARA::IPC::MessageChannel::MessageChannel;
