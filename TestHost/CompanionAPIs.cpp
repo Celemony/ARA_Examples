@@ -60,7 +60,10 @@
 
 #if ARA_ENABLE_IPC
 
-#if defined (__linux__)
+
+#if defined (_WIN32)
+    #include <combaseapi.h>
+#elif defined (__linux__)
     #error "IPC not yet implemented for Linux"
 #endif
 

@@ -26,6 +26,7 @@
 
 
 #if defined (_WIN32)
+    #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
     #include <utility>
 #elif defined (__APPLE__)
@@ -35,6 +36,7 @@
     #error "IPC not yet implemented for this platform"
 #endif
 
+#include <atomic>
 #include <string>
 #include <thread>
 
