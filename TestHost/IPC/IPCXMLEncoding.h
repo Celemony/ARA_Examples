@@ -95,8 +95,7 @@ public:
     bool readFloat (float& argValue) const override;
     bool readDouble (double& argValue) const override;
     bool readString (const char*& argValue) const override;
-    bool readBytesSize (size_t& argSize) const override;
-    void readBytes (uint8_t* argValue) const override;
+    bool readBytes (const uint8_t*& argValue, size_t& argSize) const override;
 
 private:
     using IPCXMLMessage::IPCXMLMessage;
@@ -106,8 +105,7 @@ private:
 
 private:
     mutable pugi::xml_node::iterator _node_iterator { _root.begin () };
-    mutable std::string _bytesCacheData {};
-    mutable bool _cacheIsValid { false };
+    mutable std::vector<std::string> _decodedBytesCache;
 };
 
 #endif // ARA_ENABLE_IPC

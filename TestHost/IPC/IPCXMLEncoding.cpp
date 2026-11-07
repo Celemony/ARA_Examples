@@ -204,25 +204,22 @@ bool IPCXMLMessageDecoder::readString (const char*& argValue) const
     return _readValue (argValue, "string", &pugi::xml_attribute::as_string);
 }
 
-bool IPCXMLMessageDecoder::readBytesSize (size_t& argSize) const
+bool IPCXMLMessageDecoder::readBytes (const uint8_t*& argValue, size_t& argSize) const
 {
-    ARA_INTERNAL_ASSERT (!_cacheIsValid);
     const char* cstr {};
     if (!_readValue (cstr, "bytes", &pugi::xml_attribute::as_string))
     {
+        argValue = nullptr;
         argSize = 0;
         return false;
     }
 
-    _bytesCacheData = base64_decode (std::string_view { cstr }, false);
-    argSize = _bytesCacheData.size ();
-    _cacheIsValid = true;
+    _decodedBytesCache.emplace_back (base64_decode (std::string_view { cstr }, false));
+    // back() does not return return a proper reference in some implementations, need to use rbegin() instead
+    //const auto decodedBytes { _decodedBytesCache.back () };
+    const auto decodedBytes { _decodedBytesCache.rbegin () };
+    ARA_INTERNAL_ASSERT (decodedBytes->c_str () == _decodedBytesCache[_decodedBytesCache.size () - 1].c_str ());
+    argValue = reinterpret_cast<const uint8_t*> (decodedBytes->c_str ());
+    argSize = decodedBytes->size ();
     return true;
-}
-
-void IPCXMLMessageDecoder::readBytes (uint8_t* const argValue) const
-{
-    ARA_INTERNAL_ASSERT (_cacheIsValid);
-    std::memcpy (argValue, _bytesCacheData.data (), _bytesCacheData.size ());
-    _cacheIsValid = false;
 }
