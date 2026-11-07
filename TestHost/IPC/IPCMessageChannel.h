@@ -75,7 +75,7 @@ public:
     // returns true if some event was processed during that time
     bool runReceiveLoop (int32_t milliseconds);
 
-    void sendMessage (ARA::IPC::MessageID messageID, std::unique_ptr<ARA::IPC::OutgoingMessage>&& message) override;
+    void sendMessage (std::unique_ptr<ARA::IPC::OutgoingMessage>&& message) override;
 
     bool receivesMessagesOnCurrentThread () override;
     bool waitForMessageOnCurrentThread () override;

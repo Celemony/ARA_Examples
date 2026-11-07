@@ -68,7 +68,6 @@ protected:
         static constexpr DWORD maxMessageSize { 4 * 1024 * 1024L - 64};
 
         size_t messageSize;
-        ARA::IPC::MessageID messageID;
         uint8_t messageData[maxMessageSize];
     };
 
@@ -130,12 +129,10 @@ public:
         ARA_INTERNAL_ASSERT (waitResult == WAIT_OBJECT_0);
 #endif
 
-        const auto messageID { _sharedMemory->messageID };
         auto message { ARA::IPC::IncomingMessage::createWithMessageData (_sharedMemory->messageData, _sharedMemory->messageSize) };
-
         ::SetEvent (_dataReceived);
 
-        _channel->routeReceivedMessage (messageID, std::move (message));
+        _channel->routeReceivedMessage (std::move (message));
         return true;
     }
 
@@ -170,11 +167,10 @@ public:
         ARA_INTERNAL_ASSERT (_sharedMemory != nullptr);
     }
 
-    void sendMessage (ARA::IPC::MessageID messageID, const std::vector<uint8_t>& messageData)
+    void sendMessage (const std::vector<uint8_t>& messageData)
     {
         ARA_INTERNAL_ASSERT (messageData.size () <= SharedMemory::maxMessageSize);
 
-        _sharedMemory->messageID = messageID;
         _sharedMemory->messageSize = messageData.size ();
         std::memcpy (_sharedMemory->messageData, messageData.data (), messageData.size ());
 
@@ -250,11 +246,12 @@ public:
 #endif
 
 private:
-    static CFDataRef _portCallback (CFMessagePortRef /*port*/, SInt32 messageID, CFDataRef messageData, void* info)
+    static CFDataRef _portCallback (CFMessagePortRef /*port*/, [[maybe_unused]] SInt32 messageID, CFDataRef messageData, void* info)
     {
+        ARA_INTERNAL_ASSERT (messageID == 0);
         auto channel { static_cast<IPCMessageChannel*> (info) };
         auto message { ARA::IPC::CFIncomingMessage::createWithMessageData (messageData, true) };
-        channel->routeReceivedMessage (messageID, std::move (message));
+        channel->routeReceivedMessage (std::move (message));
         return nullptr;
     }
 
@@ -294,9 +291,9 @@ public:
         CFRelease (_port);
     }
 
-    void sendMessage (ARA::IPC::MessageID messageID, CFDataRef messageData)
+    void sendMessage (CFDataRef messageData)
     {
-        [[maybe_unused]] const auto result { CFMessagePortSendRequest (_port, messageID, messageData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
+        [[maybe_unused]] const auto result { CFMessagePortSendRequest (_port, 0, messageData, 0.001 * messageTimeout, 0.0, nullptr, nullptr) };
         ARA_INTERNAL_ASSERT (result == kCFMessagePortSuccess);
     }
 
@@ -328,11 +325,11 @@ std::unique_ptr<IPCMessageChannel> IPCMessageChannel::createConnectedToID (const
 
 IPCMessageChannel::~IPCMessageChannel () = default;
 
-void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, std::unique_ptr<ARA::IPC::OutgoingMessage>&& message)
+void IPCMessageChannel::sendMessage (std::unique_ptr<ARA::IPC::OutgoingMessage>&& message)
 {
     const auto messageData { message->convertToEncodedData () };
 
-    _sendPort->sendMessage (messageID, messageData);
+    _sendPort->sendMessage (messageData);
 
 #if defined (__APPLE__)
     if (messageData)
