@@ -1791,6 +1791,16 @@ else()
     )
 endif()
 
+if(ARA_ENABLE_AUDIO_UNIT)
+    target_compile_definitions(ARATestHost PRIVATE
+        -DARA_ENABLE_AUDIO_UNIT=1
+    )
+else()
+    target_compile_definitions(ARATestHost PRIVATE
+        -DARA_ENABLE_AUDIO_UNIT=0
+    )
+endif()
+
 if(ARA_ENABLE_CLAP)
     target_compile_definitions(ARATestHost PRIVATE
         -DARA_ENABLE_CLAP=1

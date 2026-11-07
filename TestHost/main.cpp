@@ -179,15 +179,19 @@ int main (int argc, const char* argv[])
     auto plugInEntry { PlugInEntry::parsePlugInEntry (args) };
     if (!plugInEntry)
     {
+#if ARA_ENABLE_VST3
         ARA_LOG ("No plug-in binary specified via -vst3 [binaryFilePath].");
+#if ARA_ENABLE_IPC
         ARA_LOG ("No plug-in binary specified via -ipc_vst3 [binaryFilePath].");
+#endif
+#endif
 #if ARA_ENABLE_CLAP
         ARA_LOG ("No plug-in binary specified via -clap [binaryFilePath].");
 #if ARA_ENABLE_IPC
         ARA_LOG ("No plug-in binary specified via -ipc_clap [binaryFilePath].");
 #endif
 #endif
-#if defined (__APPLE__)
+#if ARA_ENABLE_AUDIO_UNIT
         ARA_LOG ("No plug-in binary specified via -au [typeID] [subTypeID] [manufacturerID].");
 #if ARA_ENABLE_IPC
         ARA_LOG ("No plug-in binary specified via -ipc_au [typeID] [subTypeID] [manufacturerID].");

@@ -27,7 +27,10 @@
 #include "CompanionAPIs.h"
 #include "ExamplesCommon/Utilities/StdUniquePtrUtilities.h"
 
-#if defined (__APPLE__)
+#ifndef ARA_ENABLE_AUDIO_UNIT
+    #define ARA_ENABLE_AUDIO_UNIT 0
+#endif
+#if ARA_ENABLE_AUDIO_UNIT
     #include "ExamplesCommon/PlugInHosting/AudioUnitLoader.h"
 #endif
 
@@ -169,7 +172,7 @@ void PlugInInstance::validateAndSetPlugInExtensionInstance (const ARA::ARAPlugIn
 
 /*******************************************************************************/
 
-#if defined (__APPLE__)
+#if ARA_ENABLE_AUDIO_UNIT
 
 class AUPlugInInstance : public PlugInInstance
 {
@@ -208,7 +211,7 @@ private:
     AudioUnitInstance const _audioUnit;
 };
 
-#endif // defined (__APPLE__)
+#endif // ARA_ENABLE_AUDIO_UNIT
 
 /*******************************************************************************/
 
@@ -300,7 +303,7 @@ private:
 
 /*******************************************************************************/
 
-#if defined (__APPLE__)
+#if ARA_ENABLE_AUDIO_UNIT
 
 // very crude conversion from string to OSType
 static OSType parseOSType (const std::string& idString)
@@ -373,7 +376,7 @@ private:
     ARA::IPC::ARAIPCProxyPlugInRef _proxyPlugInRef {};
 };
 
-#endif // defined (__APPLE__)
+#endif // ARA_ENABLE_AUDIO_UNIT
 
 /*******************************************************************************/
 
@@ -697,7 +700,7 @@ public:
 
 /*******************************************************************************/
 
-#if defined (__APPLE__)
+#if ARA_ENABLE_AUDIO_UNIT
 
 class IPCAUPlugInEntry : public IPCPlugInEntry
 {
@@ -708,7 +711,7 @@ public:
     {}
 };
 
-#endif // defined (__APPLE__)
+#endif // ARA_ENABLE_AUDIO_UNIT
 
 /*******************************************************************************/
 
@@ -1018,7 +1021,7 @@ std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<st
     }
 #endif  // ARA_ENABLE_CLAP
 
-#if defined (__APPLE__)
+#if ARA_ENABLE_AUDIO_UNIT
     if (args.size () >= 5)
     {
         auto it { std::find (args.begin (), args.end (), "-au") };
@@ -1043,7 +1046,7 @@ std::unique_ptr<PlugInEntry> PlugInEntry::parsePlugInEntry (const std::vector<st
         }
 #endif
     }
-#endif  // defined (__APPLE__)
+#endif  // ARA_ENABLE_AUDIO_UNIT
 
     return nullptr;
 }
