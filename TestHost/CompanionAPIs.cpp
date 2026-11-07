@@ -531,7 +531,7 @@ public:
                 const uint8_t* bytes;
                 size_t size;
                 ARA::IPC::BytesDecoder readBytesPointer { bytes, size };
-                success = decodeReply (readBytesPointer, decoder);
+                success = decodeMessage (decoder, readBytesPointer);
     
                 if (size == channelCount * bufferSize)
                 {
@@ -738,7 +738,7 @@ public:
             auto plugInInstance { _plugInEntry->createPlugInInstance () };
             const auto plugInInstanceRef { reinterpret_cast<size_t> (plugInInstance.get ()) };
             plugInInstance.release ();  // ownership is transferred to host - keep around until kIPCDestroyEffect
-            ARA::IPC::encodeArguments (replyEncoder, plugInInstanceRef);
+            ARA::IPC::encodeMessage (replyEncoder, plugInInstanceRef);
         }
         else if (messageID == kIPCStartRenderingMethodID)
         {
@@ -746,7 +746,7 @@ public:
             int32_t channelCount;
             int32_t maxBlockSize;
             double sampleRate;
-            ARA::IPC::decodeArguments (decoder, plugInInstanceRef, channelCount, maxBlockSize, sampleRate);
+            ARA::IPC::decodeMessage (decoder, plugInInstanceRef, channelCount, maxBlockSize, sampleRate);
 
             auto& renderData { _plugInInstanceRenderDataMap[plugInInstanceRef] = { RenderData {} } };
             renderData.allSamples.resize (static_cast<size_t> (maxBlockSize * channelCount));
@@ -760,7 +760,7 @@ public:
             size_t plugInInstanceRef;
             int32_t blockSize;
             int64_t samplePosition;
-            ARA::IPC::decodeArguments (decoder, plugInInstanceRef, blockSize, samplePosition);
+            ARA::IPC::decodeMessage (decoder, plugInInstanceRef, blockSize, samplePosition);
 
             auto& renderData { _plugInInstanceRenderDataMap[plugInInstanceRef] };
             const auto channelCount { renderData.buffers.size () };
@@ -771,13 +771,13 @@ public:
             reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->renderSamples (blockSize, samplePosition, renderData.buffers.data ());
 
             // \todo this ignores potential byte order issues...
-            ARA::IPC::encodeReply (replyEncoder, ARA::IPC::BytesEncoder { reinterpret_cast<const uint8_t*> (renderData.allSamples.data ()),
-                                                                          allBuffersSize, false });
+            ARA::IPC::encodeMessage (replyEncoder, ARA::IPC::BytesEncoder { reinterpret_cast<const uint8_t*> (renderData.allSamples.data ()),
+                                                                            allBuffersSize, false });
         }
         else if (messageID == kIPCStopRenderingMethodID)
         {
             size_t plugInInstanceRef;
-            ARA::IPC::decodeArguments (decoder, plugInInstanceRef);
+            ARA::IPC::decodeMessage (decoder, plugInInstanceRef);
 
             reinterpret_cast<PlugInInstance*> (plugInInstanceRef)->stopRendering ();
 
@@ -790,7 +790,7 @@ public:
         else if (messageID == kIPCDestroyEffectMethodID)
         {
             size_t plugInInstanceRef;
-            ARA::IPC::decodeArguments (decoder, plugInInstanceRef);
+            ARA::IPC::decodeMessage (decoder, plugInInstanceRef);
 
             delete reinterpret_cast<PlugInInstance*> (plugInInstanceRef);
         }
