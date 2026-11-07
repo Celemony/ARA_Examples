@@ -38,15 +38,10 @@
 
 class IPCXMLMessage
 {
-public:
-    using MessageArgumentKey = ARA::IPC::MessageArgumentKey;
-
 protected:
     IPCXMLMessage ();
     IPCXMLMessage (std::shared_ptr<pugi::xml_document> dictionary, pugi::xml_node root);
     IPCXMLMessage (const char* data, const size_t dataSize);
-
-    static const char* _getEncodedKey (const MessageArgumentKey argKey);
 
 protected:
     std::shared_ptr<pugi::xml_document> _dictionary {};
@@ -57,14 +52,15 @@ protected:
 class IPCXMLMessageEncoder : public IPCXMLMessage, public ARA::IPC::MessageEncoder
 {
 public:
-    void appendInt32 (MessageArgumentKey argKey, int32_t argValue) override;
-    void appendInt64 (MessageArgumentKey argKey, int64_t argValue) override;
-    void appendSize (MessageArgumentKey argKey, size_t argValue) override;
-    void appendFloat (MessageArgumentKey argKey, float argValue) override;
-    void appendDouble (MessageArgumentKey argKey, double argValue) override;
-    void appendString (MessageArgumentKey argKey, const char * argValue) override;
-    void appendBytes (MessageArgumentKey argKey, const uint8_t * argValue, size_t argSize, bool copy) override;
-    std::unique_ptr<ARA::IPC::MessageEncoder> appendSubMessage (MessageArgumentKey argKey) override;
+    void appendInt32 (int32_t argValue) override;
+    void appendInt64 (int64_t argValue) override;
+    void appendSize (size_t argValue) override;
+    void appendFloat (float argValue) override;
+    void appendDouble (double argValue) override;
+    void appendString (const char* argValue) override;
+    void appendBytes (const uint8_t* argValue, size_t argSize, bool copy) override;
+    void appendSubMessage (std::unique_ptr<MessageEncoder>&& argValue) override;
+    std::unique_ptr<MessageEncoder> createEncoder () override;
 
     // to be used by IPCMessageChannel only: encoding to channel-internal datas format
 #if defined (__APPLE__)
@@ -79,9 +75,8 @@ public:
 
 private:
     using IPCXMLMessage::IPCXMLMessage;
-    IPCXMLMessageEncoder () = default;
 
-    pugi::xml_attribute _appendAttribute (const MessageArgumentKey argKey);
+    pugi::xml_attribute _appendAttribute (const char* attributeName);
 };
 
 class IPCXMLMessageDecoder : public IPCXMLMessage, public ARA::IPC::MessageDecoder
@@ -94,22 +89,25 @@ public:
     static std::unique_ptr<IPCXMLMessageDecoder> createWithMessageData (const char* data, const size_t dataSize);
 #endif
 
-    bool readInt32 (MessageArgumentKey argKey, int32_t* argValue) const override;
-    bool readInt64 (MessageArgumentKey argKey, int64_t* argValue) const override;
-    bool readSize (MessageArgumentKey argKey, size_t* argValue) const override;
-    bool readFloat (MessageArgumentKey argKey, float* argValue) const override;
-    bool readDouble (MessageArgumentKey argKey, double* argValue) const override;
-    bool readString (MessageArgumentKey argKey, const char** argValue) const override;
-    bool readBytesSize (MessageArgumentKey argKey, size_t* argSize) const override;
-    void readBytes (MessageArgumentKey argKey, uint8_t* argValue) const override;
-    std::unique_ptr<MessageDecoder> readSubMessage (const MessageArgumentKey argKey) const override;
-    bool hasDataForKey (MessageArgumentKey argKey) const override;
+    bool readInt32 (int32_t& argValue) const override;
+    bool readInt64 (int64_t& argValue) const override;
+    bool readSize (size_t& argValue) const override;
+    bool readFloat (float& argValue) const override;
+    bool readDouble (double& argValue) const override;
+    bool readString (const char*& argValue) const override;
+    bool readBytesSize (size_t& argSize) const override;
+    void readBytes (uint8_t* argValue) const override;
 
 private:
     using IPCXMLMessage::IPCXMLMessage;
 
+    template <typename ArgType, typename XMLType>
+    bool _readValue (ArgType& argValue, const char* attributeName, XMLType (pugi::xml_attribute::* getter) (XMLType) const) const;
+
+private:
+    mutable pugi::xml_node::iterator _node_iterator { _root.begin () };
     mutable std::string _bytesCacheData {};
-    mutable MessageArgumentKey _bytesCacheKey { std::numeric_limits<MessageArgumentKey>::max () };
+    mutable bool _cacheIsValid { false };
 };
 
 #endif // ARA_ENABLE_IPC

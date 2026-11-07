@@ -28,20 +28,19 @@
 #include <map>
 
 
-constexpr auto kRootKey { "msg" };
-
-
 IPCXMLMessage::IPCXMLMessage ()
 {
     _dictionary.reset (new pugi::xml_document);
-    _root = _dictionary->append_child (kRootKey);
+    _root = *_dictionary;
 }
 
 IPCXMLMessage::IPCXMLMessage (const char* data, const size_t dataSize)
 {
     _dictionary.reset (new pugi::xml_document);
     _dictionary->load_buffer (data, dataSize, pugi::parse_minimal | pugi::parse_escapes, pugi::encoding_utf8);
-    _root = _dictionary->child (kRootKey);
+    _root = *_dictionary;
+
+    ARA_INTERNAL_ASSERT (_root.type () == pugi::node_document);
 }
 
 IPCXMLMessage::IPCXMLMessage (std::shared_ptr<pugi::xml_document> dictionary, pugi::xml_node root)
@@ -49,61 +48,63 @@ IPCXMLMessage::IPCXMLMessage (std::shared_ptr<pugi::xml_document> dictionary, pu
   _root { root }
 {}
 
-const char* IPCXMLMessage::_getEncodedKey (const MessageArgumentKey argKey)
+void IPCXMLMessageEncoder::appendInt32 (const int32_t argValue)
 {
-    static std::map<MessageArgumentKey, std::string> cache;
-    auto existingEntry { cache.find (argKey) };
-    if (existingEntry != cache.end ())
-        return existingEntry->second.c_str ();
-    // \todo pugixml ignores attributes with only numbers as keys - bug or feature? for now, we just prepend an underscore.
-    return cache.emplace (argKey, std::string { "_"} + std::to_string (argKey)).first->second.c_str ();
+    _appendAttribute ("int32").set_value (argValue);
 }
 
-
-void IPCXMLMessageEncoder::appendInt32 (const MessageArgumentKey argKey, const int32_t argValue)
+void IPCXMLMessageEncoder::appendInt64 (const int64_t argValue)
 {
-    _appendAttribute (argKey).set_value (argValue);
+    _appendAttribute ("int64").set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendInt64 (const MessageArgumentKey argKey, const int64_t argValue)
+void IPCXMLMessageEncoder::appendSize (const size_t argValue)
 {
-    _appendAttribute (argKey).set_value (argValue);
+    _appendAttribute ("size").set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendSize (const MessageArgumentKey argKey, const size_t argValue)
+void IPCXMLMessageEncoder::appendFloat (const float argValue)
 {
-    _appendAttribute (argKey).set_value (argValue);
+    _appendAttribute ("float").set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendFloat (const MessageArgumentKey argKey, const float argValue)
+void IPCXMLMessageEncoder::appendDouble (const double argValue)
 {
-    _appendAttribute (argKey).set_value (argValue);
+    _appendAttribute ("double").set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendDouble (const MessageArgumentKey argKey, const double argValue)
+void IPCXMLMessageEncoder::appendString (const char* const argValue)
 {
-    _appendAttribute (argKey).set_value (argValue);
+    ARA_INTERNAL_ASSERT (argValue);
+    _appendAttribute ("string").set_value (argValue);
 }
 
-void IPCXMLMessageEncoder::appendString (const MessageArgumentKey argKey, const char* const argValue)
+void IPCXMLMessageEncoder::appendBytes (const uint8_t* argValue, const size_t argSize, const bool /*copy*/)
 {
-    _appendAttribute (argKey).set_value (argValue);
-}
-
-void IPCXMLMessageEncoder::appendBytes (const MessageArgumentKey argKey, const uint8_t* argValue, const size_t argSize, const bool /*copy*/)
-{
+    ARA_INTERNAL_ASSERT ((argValue != nullptr) || (argSize == 0));
     const auto encodedData { base64_encode (argValue, argSize, false) };
-    _appendAttribute (argKey).set_value (encodedData.c_str ());
+    _appendAttribute ("bytes").set_value (encodedData.c_str ());
 }
 
-pugi::xml_attribute IPCXMLMessageEncoder::_appendAttribute (const MessageArgumentKey argKey)
+pugi::xml_attribute IPCXMLMessageEncoder::_appendAttribute (const char* attributeName)
 {
-    return _root.append_attribute (_getEncodedKey (argKey));
+    return _root.append_child ().append_attribute (attributeName);
 }
 
-std::unique_ptr<ARA::IPC::MessageEncoder> IPCXMLMessageEncoder::appendSubMessage (const MessageArgumentKey argKey)
+void IPCXMLMessageEncoder::appendSubMessage (std::unique_ptr<MessageEncoder>&& argValue)
 {
-    return IPCXMLMessageEncoder::createWithXML (_dictionary, _root.append_child (_getEncodedKey (argKey)));
+    const auto subMessage { dynamic_cast<IPCXMLMessageEncoder*> (argValue.release ()) };
+    ARA_INTERNAL_ASSERT (subMessage != nullptr);
+
+    for (const auto& node : subMessage->_root)
+        _root.append_copy (node);
+
+    delete subMessage;
+}
+
+std::unique_ptr<ARA::IPC::MessageEncoder> IPCXMLMessageEncoder::createEncoder ()
+{
+    return IPCXMLMessageEncoder::create ();
 }
 
 #if defined (__APPLE__)
@@ -120,15 +121,8 @@ std::string IPCXMLMessageEncoder::createEncodedMessage () const
         return {};
 #endif
 
-    auto dictionary { _dictionary };
-    if (_root != _dictionary->child (kRootKey))
-    {
-        dictionary.reset (new pugi::xml_document);
-        dictionary->append_child (kRootKey).append_copy (_root);
-    }
-
     std::ostringstream writer;
-    dictionary->save (writer, "", pugi::format_raw | pugi::format_no_declaration);
+    _dictionary->save (writer, "", pugi::format_raw | pugi::format_no_declaration);
 
 #if defined (__APPLE__)
     auto result { CFDataCreate (kCFAllocatorDefault, reinterpret_cast<const UInt8*> (writer.str ().c_str ()),
@@ -160,135 +154,75 @@ std::unique_ptr<IPCXMLMessageDecoder> IPCXMLMessageDecoder::createWithMessageDat
 }
 #endif
 
-bool IPCXMLMessageDecoder::readInt32 (const MessageArgumentKey argKey, int32_t* argValue) const
+template <typename ArgType, typename XMLType>
+bool IPCXMLMessageDecoder::_readValue (ArgType& argValue, const char* attributeName, XMLType (pugi::xml_attribute::* getter) (XMLType) const) const
 {
+    argValue = ArgType {};
+
     ARA_INTERNAL_ASSERT (!_root.empty ());
-    const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (attribute.empty ())
-    {
-        *argValue = 0;
+    if (_node_iterator == _root.end ())
         return false;
-    }
+
+    const auto attribute { _node_iterator++->attribute (attributeName) };
+    if (attribute.empty ())
+        return false;
+    
+    argValue = (attribute.*getter) (ArgType {});
+    return true;
+}
+
+bool IPCXMLMessageDecoder::readInt32 (int32_t& argValue) const
+{
     static_assert (sizeof (int) >= sizeof (int32_t), "integer type needs adjustment for this compiler setup");
-    *argValue = attribute.as_int ();
-    return true;
+    return _readValue (argValue, "int32", &pugi::xml_attribute::as_int);
 }
 
-bool IPCXMLMessageDecoder::readInt64 (const MessageArgumentKey argKey, int64_t* argValue) const
+bool IPCXMLMessageDecoder::readInt64 (int64_t& argValue) const
 {
-    ARA_INTERNAL_ASSERT (!_root.empty ());
-    const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (attribute.empty ())
-    {
-        *argValue = 0;
-        return false;
-    }
     static_assert (sizeof (long long) >= sizeof (int64_t), "integer type needs adjustment for this compiler setup");
-    *argValue = attribute.as_llong ();
-    return true;
+    return _readValue (argValue, "int64", &pugi::xml_attribute::as_llong);
 }
 
-bool IPCXMLMessageDecoder::readSize (const MessageArgumentKey argKey, size_t* argValue) const
+bool IPCXMLMessageDecoder::readSize (size_t& argValue) const
 {
-    ARA_INTERNAL_ASSERT (!_root.empty ());
-    const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (attribute.empty ())
-    {
-        *argValue = 0U;
-        return false;
-    }
     static_assert (sizeof (unsigned long long) >= sizeof (size_t), "integer type needs adjustment for this compiler setup");
-    *argValue = attribute.as_ullong ();
-    return true;
+    return _readValue (argValue, "size", &pugi::xml_attribute::as_ullong);
 }
 
-bool IPCXMLMessageDecoder::readFloat (const MessageArgumentKey argKey, float* argValue) const
+bool IPCXMLMessageDecoder::readFloat (float& argValue) const
 {
-    ARA_INTERNAL_ASSERT (!_root.empty ());
-    const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (attribute.empty ())
+    return _readValue (argValue, "float", &pugi::xml_attribute::as_float);
+}
+
+bool IPCXMLMessageDecoder::readDouble (double& argValue) const
+{
+    return _readValue (argValue, "double", &pugi::xml_attribute::as_double);
+}
+
+bool IPCXMLMessageDecoder::readString (const char*& argValue) const
+{
+    return _readValue (argValue, "string", &pugi::xml_attribute::as_string);
+}
+
+bool IPCXMLMessageDecoder::readBytesSize (size_t& argSize) const
+{
+    ARA_INTERNAL_ASSERT (!_cacheIsValid);
+    const char* cstr {};
+    if (!_readValue (cstr, "bytes", &pugi::xml_attribute::as_string))
     {
-        *argValue = 0.0f;
+        argSize = 0;
         return false;
     }
-    *argValue = attribute.as_float ();
+
+    _bytesCacheData = base64_decode (std::string_view { cstr }, false);
+    argSize = _bytesCacheData.size ();
+    _cacheIsValid = true;
     return true;
 }
 
-bool IPCXMLMessageDecoder::readDouble (const MessageArgumentKey argKey, double* argValue) const
+void IPCXMLMessageDecoder::readBytes (uint8_t* const argValue) const
 {
-    ARA_INTERNAL_ASSERT (!_root.empty ());
-    const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (attribute.empty ())
-    {
-        *argValue = 0.0;
-        return false;
-    }
-    *argValue = attribute.as_double ();
-    return true;
-}
-
-bool IPCXMLMessageDecoder::readString (const MessageArgumentKey argKey, const char** argValue) const
-{
-    ARA_INTERNAL_ASSERT (!_root.empty ());
-    const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (attribute.empty ())
-    {
-        *argValue = nullptr;
-        return false;
-    }
-    *argValue = attribute.as_string ();
-    return true;
-}
-
-bool IPCXMLMessageDecoder::readBytesSize (const MessageArgumentKey argKey, size_t* argSize) const
-{
-    ARA_INTERNAL_ASSERT (!_root.empty ());
-    const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    if (attribute.empty ())
-    {
-        *argSize = 0;
-        return false;
-    }
-    _bytesCacheKey = argKey;
-    _bytesCacheData = base64_decode (std::string_view { attribute.as_string () }, false);
-    *argSize = _bytesCacheData.size ();
-    return true;
-}
-
-void IPCXMLMessageDecoder::readBytes (const MessageArgumentKey argKey, uint8_t* const argValue) const
-{
-    if (argKey == _bytesCacheKey)
-        std::memcpy (argValue, _bytesCacheData.data (), _bytesCacheData.size ());
-
-    ARA_INTERNAL_ASSERT (!_root.empty ());
-    const auto attribute { _root.attribute (_getEncodedKey (argKey)) };
-    ARA_INTERNAL_ASSERT (!attribute.empty ());
-
-    const auto decodedData { base64_decode (std::string_view { attribute.as_string () }, false) };
-    std::memcpy (argValue, decodedData.c_str (), decodedData.size ());
-}
-
-std::unique_ptr<ARA::IPC::MessageDecoder> IPCXMLMessageDecoder::readSubMessage (const MessageArgumentKey argKey) const
-{
-    ARA_INTERNAL_ASSERT (!_root.empty ());
-    const auto child { _root.child (_getEncodedKey (argKey)) };
-    if (child.empty ())
-        return nullptr;
-
-    return std::unique_ptr<IPCXMLMessageDecoder> { new IPCXMLMessageDecoder { _dictionary, child } };
-}
-
-bool IPCXMLMessageDecoder::hasDataForKey (const MessageArgumentKey argKey) const
-{
-    ARA_INTERNAL_ASSERT (!_root.empty ());
-    const auto encodedKey { _getEncodedKey (argKey) };
-
-    if (!_root.attribute (encodedKey).empty ())
-        return true;
-
-    if (!_root.child (encodedKey).empty ())
-        return true;
-
-    return false;
+    ARA_INTERNAL_ASSERT (_cacheIsValid);
+    std::memcpy (argValue, _bytesCacheData.data (), _bytesCacheData.size ());
+    _cacheIsValid = false;
 }
