@@ -67,6 +67,9 @@ tresult PLUGIN_API TestVST3Processor::initialize (FUnknown* context)
     addAudioInput (STR16 ("Stereo In"), Steinberg::Vst::SpeakerArr::kStereo);
     addAudioOutput (STR16 ("Stereo Out"), Steinberg::Vst::SpeakerArr::kStereo);
 
+    //--- create Event input ------
+    addEventInput (STR16 ("Event In"), 1);
+
     return kResultOk;
 }
 
