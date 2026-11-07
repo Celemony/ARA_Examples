@@ -31,10 +31,10 @@
 
 
 #if defined (NDEBUG)
-    constexpr auto messageTimeout { 500 /* milliseconds */};
+    constexpr auto messageTimeout { 0.5 };
 #else
     // increase to 5 min while debugging so that stopping in the debugger does not break program flow
-    constexpr auto messageTimeout { 5 * 60 * 1000 };
+    constexpr auto messageTimeout { 5.0 * 60.0 };
 #endif
 
 
@@ -52,6 +52,8 @@ protected:
         ARA_INTERNAL_ASSERT (_dataAvailable != nullptr);
         ARA_INTERNAL_ASSERT (_dataReceived != nullptr);
     }
+
+    static inline DWORD asIntegerMilliSeconds (double seconds) { return static_cast<DWORD> (seconds * 1000.0 + 0.5); }
 
 public:
     ~IPCMessagePort ()
@@ -109,13 +111,13 @@ public:
     }
 #endif
 
-    bool runReceiveLoop (int32_t milliseconds)
+    bool runReceiveLoop (double timeout)
     {
 #if USE_ARA_BACKGROUND_IPC
-        const auto deadline { std::chrono::steady_clock::now () + std::chrono::milliseconds { milliseconds } };
+        const auto deadline { std::chrono::steady_clock::now () + std::chrono::milliseconds { asIntegerMilliSeconds (timeout) } };
         while (true)
         {
-            const auto waitResult { ::WaitForSingleObjectEx (_dataAvailable, milliseconds, true) };
+            const auto waitResult { ::WaitForSingleObjectEx (_dataAvailable, asIntegerMilliSeconds (timeout), true) };
             if (waitResult == WAIT_OBJECT_0)
                 break;
             ARA_INTERNAL_ASSERT ((waitResult == WAIT_IO_COMPLETION) || (waitResult == WAIT_TIMEOUT));
@@ -123,7 +125,7 @@ public:
                 return false;
         }
 #else
-        const auto waitResult { ::WaitForSingleObject (_dataAvailable, milliseconds) };
+        const auto waitResult { ::WaitForSingleObject (_dataAvailable, asIntegerMilliSeconds (timeout)) };
         if (waitResult == WAIT_TIMEOUT)
             return false;
         ARA_INTERNAL_ASSERT (waitResult == WAIT_OBJECT_0);
@@ -175,7 +177,7 @@ public:
         std::memcpy (_sharedMemory->messageData, messageData.data (), messageData.size ());
 
         ::SetEvent (_dataAvailable);
-        const auto waitResult { ::WaitForSingleObject (_dataReceived, messageTimeout) };
+        const auto waitResult { ::WaitForSingleObject (_dataReceived, asIntegerMilliSeconds (messageTimeout)) };
         ARA_INTERNAL_ASSERT (waitResult == WAIT_OBJECT_0);
     }
 };
@@ -233,9 +235,9 @@ public:
         CFRelease (_port);
     }
 
-    bool runReceiveLoop (int32_t milliseconds)
+    bool runReceiveLoop (double timeout)
     {
-        return (CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.001 * milliseconds, true) != kCFRunLoopRunTimedOut);
+        return (CFRunLoopRunInMode (kCFRunLoopDefaultMode, timeout, true) != kCFRunLoopRunTimedOut);
     }
 
 #if USE_ARA_BACKGROUND_IPC
@@ -270,7 +272,7 @@ public:
     {
         auto wrappedPortID { CFStringCreateWithCStringNoCopy (kCFAllocatorDefault, portID.c_str (), kCFStringEncodingASCII, kCFAllocatorNull) };
 
-        auto timeout { 0.001 * messageTimeout };
+        auto timeout { messageTimeout };
         while (timeout > 0.0)
         {
             if ((_port = CFMessagePortCreateRemote (kCFAllocatorDefault, wrappedPortID)))
@@ -351,13 +353,13 @@ bool IPCMessageChannel::waitForMessageOnCurrentThread ()
 #if !USE_ARA_BACKGROUND_IPC
     ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _receiveThreadID);
 #endif
-    return _receivePort->runReceiveLoop (10);
+    return _receivePort->runReceiveLoop (0.01);
 }
 
-bool IPCMessageChannel::runReceiveLoop (int32_t milliseconds)
+bool IPCMessageChannel::runReceiveLoop (double timeout)
 {
 #if !USE_ARA_BACKGROUND_IPC
     ARA_INTERNAL_ASSERT (std::this_thread::get_id () == _receiveThreadID);
 #endif
-    return _receivePort->runReceiveLoop (milliseconds);
+    return _receivePort->runReceiveLoop (timeout);
 }

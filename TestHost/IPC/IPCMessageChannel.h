@@ -71,9 +71,9 @@ public:
     static std::unique_ptr<IPCMessageChannel> createConnectedToID (const std::string& channelID);
 
     // message receiving
-    // waits up to the specified amount of milliseconds for an incoming event and processes it
+    // waits up to the specified time in seconds for an incoming event and processes it
     // returns true if some event was processed during that time
-    bool runReceiveLoop (int32_t milliseconds);
+    bool runReceiveLoop (double timeout);
 
     void sendMessage (std::unique_ptr<ARA::IPC::OutgoingMessage>&& message) override;
 

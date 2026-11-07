@@ -465,7 +465,7 @@ static std::unique_ptr<ARA::IPC::Connection> createConnection (ARA::IPC::Message
                              std::move (messageHandler),
                              true,  // \todo set properly - we rely on running on the same machine for now
                                     //       C++20 offers std::endian which allows for a simple implementation upon connecting...
-                             [channel = mainThreadChannel.get ()] { channel->runReceiveLoop (10); }) };
+                             [channel = mainThreadChannel.get ()] { channel->runReceiveLoop (0.001); }) };
     result->setMainThreadChannel (std::move (mainThreadChannel));
     result->setOtherThreadsChannel (std::move (otherThreadsChannel));
     return result;
@@ -821,7 +821,7 @@ int main (std::unique_ptr<PlugInEntry> plugInEntry, const std::string& channelID
     auto mainThreadMessageChannel { IPCMessageChannel::createPublishingID (channelID + mainChannelIDSuffix) };
     auto otherThreadsMessageChannel { IPCMessageChannel::createPublishingID (channelID + otherChannelIDSuffix) };
     
-    auto waitLoop { [messageChannel = mainThreadMessageChannel.get ()] { messageChannel->runReceiveLoop (100 /*ms*/); } };
+    auto waitLoop { [messageChannel = mainThreadMessageChannel.get ()] { messageChannel->runReceiveLoop (0.1); } };
 
     ProxyHost proxy { std::move (mainThreadMessageChannel), std::move (otherThreadsMessageChannel) };
 
