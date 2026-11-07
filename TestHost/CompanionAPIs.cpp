@@ -72,6 +72,7 @@
 #include "ARA_Library/IPC/ARAIPCProxyPlugIn.h"
 #include "ARA_Library/IPC/ARAIPCEncoding.h"
 #include "ARA_Library/IPC/ARAIPCMessage.h"
+#include "ARA_Library/Utilities/ARAFunctionDispatcher.h"
 #include "IPC/IPCMessageChannel.h"
 
 
@@ -453,19 +454,21 @@ private:
 #if ARA_ENABLE_IPC
 
 static std::unique_ptr<ARA::IPC::Connection> createConnection (ARA::IPC::MessageHandler&& messageHandler,
+                                                               ARA::IPC::Connection::CreationThreadDispatcher&& creationThreadDispatcher,
                                                                std::unique_ptr<IPCMessageChannel>&& mainThreadChannel,
                                                                std::unique_ptr<IPCMessageChannel>&& otherThreadsChannel)
 {
     auto result { std::make_unique<ARA::IPC::Connection> (
 #if USE_ARA_CF_ENCODING
-                             &ARA::IPC::CFOutgoingMessage::create,
+                            &ARA::IPC::CFOutgoingMessage::create,
 #else
-                             &ARA::IPC::VectorOutgoingMessage::create,
+                            &ARA::IPC::VectorOutgoingMessage::create,
 #endif
-                             std::move (messageHandler),
-                             true,  // \todo set properly - we rely on running on the same machine for now
+                            std::move (messageHandler),
+                            std::move (creationThreadDispatcher),
+                            true,   // \todo set properly - we rely on running on the same machine for now
                                     //       C++20 offers std::endian which allows for a simple implementation upon connecting...
-                             [channel = mainThreadChannel.get ()] { channel->waitForMessageOnCurrentThread (0.001); }) };
+                            [channel = mainThreadChannel.get ()] { channel->waitForMessageOnCurrentThread (0.001); }) };
     result->setMainThreadChannel (std::move (mainThreadChannel));
     result->setOtherThreadsChannel (std::move (otherThreadsChannel));
     return result;
@@ -584,7 +587,7 @@ struct RemoteLauncher
     }
 };
 
-class IPCPlugInEntry : public PlugInEntry, private RemoteLauncher
+class IPCPlugInEntry : public PlugInEntry, public ARA::FunctionDispatcher, private RemoteLauncher
 {
 private:
     static const ARA::ARAFactory* defaultGetFactory (ARA::IPC::ARAIPCProxyPlugInRef proxyPlugInRef)
@@ -600,6 +603,7 @@ private:
     : PlugInEntry { std::move (description) },
       RemoteLauncher { launchArgs, channelID },
       _proxyPlugIn { createConnection (ARA::IPC::ProxyPlugIn::handleReceivedMessage,
+                                       [this] (ARA::FunctionDispatcher::DispatchableFunction func) { dispatchToCreationThread (func); },
                                        IPCMessageChannel::createConnectedToID (channelID + mainChannelIDSuffix),
                                        IPCMessageChannel::createConnectedToID (channelID + otherChannelIDSuffix)) }
     {
@@ -718,11 +722,12 @@ public:
 std::unique_ptr<PlugInEntry> _plugInEntry {};
 bool _shutDown { false };
 
-class ProxyHost : public ARA::IPC::ProxyHost
+class ProxyHost : public ARA::IPC::ProxyHost, public ARA::FunctionDispatcher
 {
 public:
     ProxyHost (std::unique_ptr<IPCMessageChannel>&& mainThreadChannel, std::unique_ptr<IPCMessageChannel>&& otherThreadsChannel)
     : ARA::IPC::ProxyHost { createConnection ([this] (auto&& ...args) { handleReceivedMessage (args...); },
+                                              [this] (ARA::FunctionDispatcher::DispatchableFunction func) { dispatchToCreationThread (func); },
                                               std::move (mainThreadChannel), std::move (otherThreadsChannel)) }
     {}
 
