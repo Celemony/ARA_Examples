@@ -328,7 +328,7 @@ std::unique_ptr<IPCMessageChannel> IPCMessageChannel::createConnectedToID (const
 
 IPCMessageChannel::~IPCMessageChannel () = default;
 
-void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, std::unique_ptr<ARA::IPC::OutgoingMessage> && message)
+void IPCMessageChannel::sendMessage (ARA::IPC::MessageID messageID, std::unique_ptr<ARA::IPC::OutgoingMessage>&& message)
 {
     const auto messageData { message->convertToEncodedData () };
 

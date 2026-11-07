@@ -453,7 +453,8 @@ private:
 #if ARA_ENABLE_IPC
 
 static std::unique_ptr<ARA::IPC::Connection> createConnection (ARA::IPC::MessageHandler&& messageHandler,
-                                                               std::unique_ptr<IPCMessageChannel> && mainThreadChannel, std::unique_ptr<IPCMessageChannel> && otherThreadsChannel)
+                                                               std::unique_ptr<IPCMessageChannel>&& mainThreadChannel,
+                                                               std::unique_ptr<IPCMessageChannel>&& otherThreadsChannel)
 {
     auto result { std::make_unique<ARA::IPC::Connection> (
 #if USE_ARA_CF_ENCODING
@@ -720,7 +721,7 @@ bool _shutDown { false };
 class ProxyHost : public ARA::IPC::ProxyHost
 {
 public:
-    ProxyHost (std::unique_ptr<IPCMessageChannel> && mainThreadChannel, std::unique_ptr<IPCMessageChannel> && otherThreadsChannel)
+    ProxyHost (std::unique_ptr<IPCMessageChannel>&& mainThreadChannel, std::unique_ptr<IPCMessageChannel>&& otherThreadsChannel)
     : ARA::IPC::ProxyHost { createConnection ([this] (auto&& ...args) { handleReceivedMessage (args...); },
                                               std::move (mainThreadChannel), std::move (otherThreadsChannel)) }
     {}
