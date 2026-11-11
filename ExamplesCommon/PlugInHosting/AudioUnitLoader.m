@@ -76,26 +76,10 @@ void CallAudioUnitAsyncIfNeeded(AudioUnitInstance audioUnitInstance, void (^audi
 {
 #if ARA_AUDIOUNITV3_IPC_IS_AVAILABLE
     if (audioUnitInstance->audioUnitComponent->araProxy)
-    {
-        _Atomic bool ready;
-        _Atomic bool * readyPtr = &ready;
-        atomic_init (readyPtr, 0);
-        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-            audioUnitCall();
-            atomic_store_explicit(readyPtr, 1, memory_order_release);
-        });
-
-        while (atomic_load_explicit(readyPtr, memory_order_acquire) == 0)
-        {
-            if (@available(macOS 13.0, iOS 16.0, *))
-                ARAIPCAUProxyPlugInPerformPendingMainThreadTasks(audioUnitInstance->audioUnitComponent->araProxy);
-        }
-    }
+        ARAIPCAUProxyPlugInCallAudioUnitAllowingCallbacks(audioUnitInstance->audioUnitComponent->araProxy, audioUnitCall);
     else
 #endif
-    {
        audioUnitCall();
-    }
 }
 
 AudioUnitComponent AudioUnitPrepareComponentWithIDs(OSType type, OSType subtype, OSType manufacturer)
