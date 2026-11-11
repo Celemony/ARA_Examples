@@ -466,9 +466,8 @@ static std::unique_ptr<ARA::IPC::Connection> createConnection (ARA::IPC::Message
 #endif
                             std::move (messageHandler),
                             std::move (creationThreadDispatcher),
-                            true,   // \todo set properly - we rely on running on the same machine for now
-                                    //       C++20 offers std::endian which allows for a simple implementation upon connecting...
-                            [channel = mainThreadChannel.get ()] { channel->waitForMessageOnCurrentThread (0.001); }) };
+                            true) };    // \todo set properly - we rely on running on the same machine for now
+                                        //       C++20 offers std::endian which allows for a simple implementation upon connecting...
     result->setMainThreadChannel (std::move (mainThreadChannel));
     result->setOtherThreadsChannel (std::move (otherThreadsChannel));
     return result;
