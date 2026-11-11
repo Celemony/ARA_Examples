@@ -162,6 +162,7 @@ int main (int argc, const char* argv[])
     const std::vector<std::string> args (argv, argv + argc);
 
     ARA::ARASetExternalAssertReference (assertFunctionReference);
+    ARA::ARASetupDebugMessagePrefix ("ARATestHost");
 
 #if ARA_ENABLE_IPC
     // check if run as remote host
